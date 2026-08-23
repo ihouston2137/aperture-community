@@ -1,0 +1,5866 @@
+@import "tailwindcss";
+
+/* =========================================================================
+   Aperture global stylesheet
+
+   Sections:
+     1.  Tokens (driven by the Appearance model)
+     2.  Base / reset
+     3.  Public site chrome
+     4.  Rich text
+     5.  Admin shell
+     6.  Admin forms, lists and panels
+     7.  Builder chrome (shared by page/form/story-template/publication)
+     8.  Builder canvas + block rendering (shared preview/public classes)
+     9.  Collections
+     10. Stories
+     11. Publications
+     12. Safe mode
+     13. Responsive
+   ========================================================================= */
+
+/* ------------------------------------------------------------- 1. Tokens */
+
+:root {
+  --header-bg: #0f1115;
+  --header-text: #f5f5f5;
+  --header-accent: #8ab4f8;
+
+  --admin-bg: #101317;
+  --admin-panel: #171b21;
+  --admin-text: #e8eaed;
+  --admin-accent: #8ab4f8;
+  --admin-border: #262b33;
+  --admin-muted: #9aa4b2;
+
+  --content-bg: #ffffff;
+  --content-text: #16181d;
+  --content-accent: #2b6cb0;
+
+  --footer-bg: #0f1115;
+  --footer-text: #c9ced6;
+
+  --heading-font: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --body-font: system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  /* Header/footer layout, overridden per site by the Appearance settings. */
+  --header-max: 76rem;
+  --header-pad-y: 1rem;
+  --header-border-color: rgba(255, 255, 255, 0.08);
+  --header-border-width: 0.0625rem;
+  --header-nav-size: 0.9375rem;
+  --header-nav-gap: 1.25rem;
+  --header-shadow: none;
+
+  --footer-max: 76rem;
+  --footer-pad-y: 2rem;
+  --footer-font-size: 0.875rem;
+  --footer-border-color: transparent;
+  --footer-border-width: 0.0625rem;
+
+  --radius: 0.5rem;
+  --shell-max: 76rem;
+}
+
+/* --------------------------------------------------------- 2. Base/reset */
+
+html {
+  font-size: 100%;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--content-bg);
+  color: var(--content-text);
+  font-family: var(--body-font);
+  line-height: 1.55;
+  min-height: 100vh;
+}
+
+/* `:where()` keeps the reset at zero specificity, so a block class or a style
+   from the editor overrides it without needing to out-specify an element
+   selector. Without this, `h1` beat `.story-headline` and heading spacing was
+   not settable. */
+:where(h1, h2, h3, h4, h5, h6) {
+  font-family: var(--heading-font);
+  line-height: 1.2;
+  margin: 0 0 0.5em;
+}
+
+a {
+  color: inherit;
+}
+
+img, video, canvas, svg {
+  max-width: 100%;
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+}
+
+input, select, textarea {
+  font: inherit;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------- 3. Public site chrome */
+
+.site-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+/* Paints from the content variables rather than leaving them to `body`, so a
+   page that redeclares them for itself colours the whole area between header
+   and footer — not just the box its own layout happens to fill. */
+.site-main {
+  flex: 1;
+  background: var(--content-bg);
+  color: var(--content-text);
+  /* The gap above the footer belongs to the content area, not to the footer.
+     As a margin on the footer it was transparent, so a page or document that
+     set its own background ended in a band of the site colour instead. */
+  padding-bottom: 3rem;
+}
+
+.site-header {
+  background: var(--header-bg);
+  color: var(--header-text);
+  border-bottom: var(--header-border-width) solid var(--header-border-color);
+  box-shadow: var(--header-shadow);
+  /* Positioned so the drop shadow paints above the following content, which
+     would otherwise cover it wherever the main area has its own background. */
+  position: relative;
+  z-index: 1;
+}
+
+/* Sticky is opt-in per site; it must not trap the admin preview. */
+.site-header.is-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+.site-header-inner {
+  max-width: var(--header-max);
+  margin: 0 auto;
+  padding: var(--header-pad-y) 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.site-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  text-decoration: none;
+  font-family: var(--heading-font);
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+/* Held to its aspect ratio, and never shrunk by a crowded header. */
+.site-brand img {
+  display: block;
+  flex: none;
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
+}
+
+.site-tagline {
+  font-size: 0.8125rem;
+  opacity: 0.7;
+}
+
+.site-nav {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--header-nav-gap);
+  flex-wrap: wrap;
+}
+
+/* Nav placement: pushed right by default, or centred/left beside the brand. */
+.site-header-inner[data-nav-align="left"] .site-nav {
+  margin-left: 0;
+}
+
+.site-header-inner[data-nav-align="center"] .site-nav {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.site-nav a {
+  text-decoration: none;
+  font-size: var(--header-nav-size);
+  letter-spacing: 0.01em;
+  opacity: 0.85;
+}
+
+.site-nav a:hover {
+  opacity: 1;
+  color: var(--header-accent);
+}
+
+/* The hamburger. Hidden until the nav collapses; see the mobile block below. */
+.site-nav-toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  background: none;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+}
+
+/* Three bars from one element: the middle is the box, the outer two are
+   pseudo-elements offset above and below it. */
+.site-nav-burger,
+.site-nav-burger::before,
+.site-nav-burger::after {
+  display: block;
+  width: 1.25rem;
+  height: 2px;
+  background: currentColor;
+  transition: transform 150ms ease, opacity 150ms ease;
+}
+
+.site-nav-burger {
+  position: relative;
+}
+
+.site-nav-burger::before,
+.site-nav-burger::after {
+  content: "";
+  position: absolute;
+  left: 0;
+}
+
+.site-nav-burger::before {
+  top: -0.375rem;
+}
+
+.site-nav-burger::after {
+  top: 0.375rem;
+}
+
+/* Open, the bars cross into a close icon. */
+.site-nav-toggle[aria-expanded="true"] .site-nav-burger {
+  background: transparent;
+}
+
+.site-nav-toggle[aria-expanded="true"] .site-nav-burger::before {
+  top: 0;
+  transform: rotate(45deg);
+}
+
+.site-nav-toggle[aria-expanded="true"] .site-nav-burger::after {
+  top: 0;
+  transform: rotate(-45deg);
+}
+
+/* Dropdown menus. Every base rule here is a single class, so the generated
+   `.site-shell .site-nav-panel` rules from the Appearance styles win over it. */
+.site-nav-menu {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+/* A label reads as a nav item, so it drops the button chrome and inherits the
+   nav typography rather than the browser's. */
+.site-nav-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  color: inherit;
+  font: inherit;
+  font-size: var(--header-nav-size);
+  letter-spacing: 0.01em;
+  opacity: 0.85;
+  cursor: pointer;
+}
+
+.site-nav-label:hover,
+.site-nav-menu[data-open="true"] .site-nav-label {
+  opacity: 1;
+  color: var(--header-accent);
+}
+
+.site-nav-caret {
+  width: 0;
+  height: 0;
+  border-left: 0.25rem solid transparent;
+  border-right: 0.25rem solid transparent;
+  border-top: 0.3rem solid currentColor;
+  transition: transform 150ms ease;
+}
+
+.site-nav-menu[data-open="true"] .site-nav-caret {
+  transform: rotate(180deg);
+}
+
+.site-nav-panel {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  left: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 10rem;
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  background: var(--header-bg);
+  /* Neutral rather than the header's border colour, which is transparent
+     whenever the header border is switched off. */
+  border: 1px solid rgba(128, 128, 128, 0.28);
+  box-shadow: 0 0.75rem 2rem rgba(0, 0, 0, 0.28);
+}
+
+/* `hidden` is otherwise beaten by the panel's own `display: flex`. */
+.site-nav-panel[hidden] {
+  display: none;
+}
+
+.site-nav-panel a {
+  text-decoration: none;
+  white-space: nowrap;
+  opacity: 0.85;
+}
+
+.site-nav-panel a:hover {
+  opacity: 1;
+  color: var(--header-accent);
+}
+
+/* A dropdown near the right edge would otherwise run off the header. */
+.site-header-inner .site-nav > .site-nav-menu:last-child .site-nav-panel,
+.site-header-inner[data-nav-align="right"] .site-nav-panel {
+  left: auto;
+  right: 0;
+}
+
+/* ---------------------------------------------------------- Mobile nav
+
+   Below the breakpoint the links collapse behind the hamburger and reopen as a
+   panel filling the screen under the header. The same declarations repeat for
+   the page builder's mobile viewport, which is a narrow canvas inside a wide
+   window and so never matches the media query. */
+
+@media (max-width: 720px) {
+  /* One line, always: the brand gives up width rather than pushing the
+     hamburger onto a row of its own. */
+  .site-header-inner {
+    flex-wrap: nowrap;
+    gap: 0.75rem;
+  }
+
+  .site-brand,
+  .site-tagline {
+    min-width: 0;
+  }
+
+  .site-nav-toggle {
+    display: inline-flex;
+    flex: none;
+    margin-left: auto;
+  }
+
+  /* Pinned to the viewport, not the document: `top` is the measured header
+     height and `bottom: 0` is the bottom of the screen, so the panel fills
+     everything under the bar however far the page happens to be scrolled. */
+  .site-nav {
+    position: fixed;
+    top: var(--site-header-height, 4rem);
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 30;
+    display: none;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+    padding: 1.25rem;
+    overflow-y: auto;
+    background: var(--header-bg);
+    border-top: 1px solid rgba(128, 128, 128, 0.28);
+  }
+
+  .site-nav[data-open="true"] {
+    display: flex;
+  }
+
+  /* Dropdowns expand in place instead of floating over the panel. */
+  .site-nav-menu {
+    display: block;
+  }
+
+  .site-nav-label {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .site-nav-panel {
+    position: static;
+    width: 100%;
+    min-width: 0;
+    margin-top: 0.5rem;
+    box-shadow: none;
+  }
+}
+
+.builder-canvas[data-viewport="mobile"] .site-header-inner {
+  flex-wrap: nowrap;
+  gap: 0.75rem;
+}
+
+.builder-canvas[data-viewport="mobile"] .site-brand,
+.builder-canvas[data-viewport="mobile"] .site-tagline {
+  min-width: 0;
+}
+
+.builder-canvas[data-viewport="mobile"] .site-nav-toggle {
+  display: inline-flex;
+  flex: none;
+  margin-left: auto;
+}
+
+/* Absolute rather than fixed in the canvas: a fixed panel would escape the
+   preview and cover the admin. It still runs from under the header to the
+   bottom of the screen, which is what the mobile viewport is showing. */
+.builder-canvas[data-viewport="mobile"] .site-nav {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 30;
+  display: none;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 1rem;
+  padding: 1.25rem;
+  height: calc(100dvh - 100%);
+  overflow-y: auto;
+  background: var(--header-bg);
+  border-top: 1px solid rgba(128, 128, 128, 0.28);
+}
+
+.builder-canvas[data-viewport="mobile"] .site-nav[data-open="true"] {
+  display: flex;
+}
+
+.builder-canvas[data-viewport="mobile"] .site-nav-menu {
+  display: block;
+}
+
+.builder-canvas[data-viewport="mobile"] .site-nav-label {
+  width: 100%;
+  justify-content: space-between;
+}
+
+.builder-canvas[data-viewport="mobile"] .site-nav-panel {
+  position: static;
+  width: 100%;
+  min-width: 0;
+  margin-top: 0.5rem;
+  box-shadow: none;
+}
+
+.site-cta {
+  border: 1px solid var(--header-accent);
+  color: var(--header-accent);
+  border-radius: 999px;
+  padding: 0.35rem 0.9rem;
+  font-size: 0.875rem;
+  text-decoration: none;
+}
+
+.site-footer {
+  background: var(--footer-bg);
+  color: var(--footer-text);
+  border-top: var(--footer-border-width) solid var(--footer-border-color);
+  position: relative;
+  z-index: 1;
+}
+
+/* Two stacked rows: brand / footer text / social, then copyright / safe mode. */
+.site-footer-inner {
+  max-width: var(--footer-max);
+  margin: 0 auto;
+  padding: var(--footer-pad-y) 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: var(--footer-row-gap, 1.25rem);
+  font-size: var(--footer-font-size);
+}
+
+.site-footer-row {
+  display: grid;
+  gap: var(--footer-row-gap, 1.25rem) var(--footer-col-gap, 1.5rem);
+  align-items: center;
+}
+
+/* Three equal columns. `minmax(0, …)` rather than a bare `1fr` so a column
+   that runs out of room shrinks and wraps its content instead of overflowing
+   across its neighbour. */
+.site-footer-main {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.site-footer-legal {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.site-footer-legal[data-columns="2"] {
+  grid-template-columns: minmax(0, 1fr) minmax(0, auto);
+}
+
+.site-footer-cell {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+/* Long words and unbroken URLs break instead of pushing a column wide. */
+.site-footer-cell > * {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.site-footer-cell[data-cell="start"] {
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.site-footer-cell[data-cell="center"] {
+  justify-content: center;
+  text-align: center;
+}
+
+.site-footer-cell[data-cell="end"] {
+  justify-content: flex-end;
+  text-align: right;
+}
+
+/* The rows fix where each piece sits, so the Appearance alignment setting now
+   governs alignment inside each column. "Spread apart" is the arrangement
+   above; the other two pull every column the same way. */
+.site-footer-inner[data-footer-align="left"] .site-footer-cell {
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.site-footer-inner[data-footer-align="center"] .site-footer-cell {
+  justify-content: center;
+  text-align: center;
+}
+
+/* The logo and the brand text share one line, centred against each other
+   whichever is taller. Aligning on the flex line rather than the text baseline
+   keeps a tall logo from hanging off the text. */
+.site-footer-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+/* `flex: none` keeps the logo out of the flex shrink: a squeezed column wraps
+   the brand text instead of squashing the image. `width: auto` with a set
+   height, plus `object-fit: contain`, holds the aspect ratio whatever the
+   source dimensions are. */
+.site-footer-brand img {
+  display: block;
+  flex: none;
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
+}
+
+.site-footer-brand strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* Three equal columns run out of room well before phone widths, especially now
+   that the social links hold one line. Stacked, a right-aligned column under a
+   left-aligned one reads as a mistake, so centre them — unless the site asked
+   for left alignment outright. */
+@media (max-width: 960px) {
+  .site-footer-main,
+  .site-footer-legal[data-columns="2"] {
+    grid-template-columns: 1fr;
+  }
+
+  .site-footer-inner:not([data-footer-align="left"]) .site-footer-cell {
+    justify-content: center;
+    text-align: center;
+  }
+}
+
+/* Wrapped in :where() so generated text styles always win, whatever order the
+   stylesheets happen to load in. */
+:where(.site-footer-text),
+:where(.site-footer-copyright) {
+  margin: 0;
+}
+
+:where(.site-footer-copyright) {
+  opacity: 0.7;
+}
+
+/* The links stay on one line: the row is meant to read as a single group, and
+   holding it together is what makes the footer stack into rows at a sensible
+   width rather than quietly folding the links first. */
+.site-footer-cell.site-social {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 1rem;
+}
+
+.site-social a {
+  text-decoration: none;
+  opacity: 0.8;
+  white-space: nowrap;
+}
+
+.site-social a:hover {
+  opacity: 1;
+}
+
+.page-shell {
+  max-width: var(--shell-max);
+  margin: 0 auto;
+  padding: 2rem 1.25rem 4rem;
+}
+
+.empty-state {
+  padding: 4rem 1.25rem;
+  text-align: center;
+  color: var(--admin-muted);
+}
+
+/* ---------------------------------------------------------- 4. Rich text */
+
+.rich-text > :first-child {
+  margin-top: 0;
+}
+
+.rich-text > :last-child {
+  margin-bottom: 0;
+}
+
+.rich-text p {
+  margin: 0 0 var(--rich-text-paragraph-space, 1em);
+}
+
+.rich-text h1 { font-size: 2rem; }
+.rich-text h2 { font-size: 1.625rem; }
+.rich-text h3 { font-size: 1.375rem; }
+.rich-text h4 { font-size: 1.125rem; }
+
+.rich-text ul,
+.rich-text ol {
+  margin: 0 0 1em;
+  padding-left: 1.5rem;
+  list-style: revert;
+}
+
+.rich-text li {
+  margin-bottom: 0.35em;
+}
+
+.rich-text blockquote {
+  margin: 0 0 1em;
+  padding-left: 1rem;
+  border-left: 3px solid currentColor;
+  opacity: 0.85;
+}
+
+.rich-text a {
+  color: var(--content-accent);
+  text-decoration: underline;
+}
+
+.rich-text img {
+  height: auto;
+}
+
+.rich-text .ql-align-center { text-align: center; }
+.rich-text .ql-align-right { text-align: right; }
+.rich-text .ql-align-justify { text-align: justify; }
+
+/* --- Editor toolbar: a font picker and a rem size stepper replace Quill's
+   heading and size dropdowns. Both are React controls sitting outside Quill's
+   own container, which it would otherwise convert into pickers. --- */
+
+.rte-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.5rem;
+  border: 1px solid var(--admin-border);
+  border-bottom: 0;
+  border-radius: var(--radius) var(--radius) 0 0;
+  background: var(--admin-panel);
+}
+
+.rte-group {
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Quill draws its own bordered bar; here it is one group inside ours. */
+.rte-toolbar-host {
+  display: contents;
+}
+
+.rich-text-editor .rte-quill-toolbar.ql-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  padding: 0;
+  border: 0;
+}
+
+.rich-text-editor .rte-quill-toolbar.ql-toolbar .ql-formats {
+  margin-right: 0.5rem;
+}
+
+.rte-font-select {
+  height: 1.5rem;
+  max-width: 11rem;
+  padding: 0 0.35rem;
+  border: 1px solid var(--admin-border);
+  border-radius: 0.25rem;
+  background: var(--admin-panel);
+  color: inherit;
+  font-size: 0.8125rem;
+}
+
+.rte-font-select:disabled {
+  opacity: 0.5;
+}
+
+.rte-size {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.125rem;
+}
+
+.rte-size-step {
+  width: 1.5rem;
+  height: 1.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--admin-border);
+  border-radius: 0.25rem;
+  background: var(--admin-panel);
+  color: inherit;
+  font-size: 0.9375rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.rte-size-step:hover:not(:disabled) {
+  border-color: var(--admin-accent);
+  color: var(--admin-accent);
+}
+
+.rte-size-step:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.rte-size-value {
+  min-width: 3.75rem;
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.15rem;
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* An inherited size is shown as the base it would step from, not as a value
+   the selection actually carries. */
+.rte-size-value[data-inherited] {
+  opacity: 0.55;
+}
+
+.rte-size-value small {
+  font-size: 0.6875rem;
+  opacity: 0.7;
+}
+
+/* Snow is a light theme and the admin is dark, so the icons need recolouring. */
+.rich-text-editor .ql-snow .ql-stroke,
+.rich-text-editor .ql-snow .ql-stroke-miter {
+  stroke: var(--admin-text);
+}
+
+.rich-text-editor .ql-snow .ql-fill,
+.rich-text-editor .ql-snow .ql-stroke.ql-fill {
+  fill: var(--admin-text);
+}
+
+.rich-text-editor .ql-snow .ql-picker {
+  color: var(--admin-text);
+}
+
+.rich-text-editor .ql-snow button:hover .ql-stroke,
+.rich-text-editor .ql-snow button.ql-active .ql-stroke,
+.rich-text-editor .ql-snow .ql-picker-label:hover .ql-stroke,
+.rich-text-editor .ql-snow .ql-picker-label.ql-active .ql-stroke {
+  stroke: var(--admin-accent);
+}
+
+.rich-text-editor .ql-snow button:hover .ql-fill,
+.rich-text-editor .ql-snow button.ql-active .ql-fill {
+  fill: var(--admin-accent);
+}
+
+/* The dropdown panels stay light, so their contents keep dark text. */
+.rich-text-editor .ql-snow .ql-picker-options {
+  color: var(--content-text);
+  border-color: var(--admin-border);
+}
+
+.rich-text-editor .ql-container.ql-snow {
+  border-color: var(--admin-border);
+  border-radius: 0 0 var(--radius) var(--radius);
+}
+
+/* The `minHeight` prop sizes the writing area itself, not just the wrapper. */
+.rich-text-editor .ql-editor {
+  min-height: var(--rte-min-height, 12rem);
+}
+
+.rich-text-editor .ql-editor.ql-blank::before {
+  color: var(--admin-muted);
+  font-style: normal;
+}
+
+/* -------------------------------------------------------- 5. Admin shell */
+
+.admin-shell {
+  height: 100vh;
+  background: var(--admin-bg);
+  color: var(--admin-text);
+  display: grid;
+  grid-template-columns: 15rem 1fr;
+  /* The shell fills the viewport and its panes scroll internally, so the
+     document itself never scrolls — and never shows a scrollbar. */
+  overflow: hidden;
+}
+
+.admin-sidebar {
+  background: var(--admin-panel);
+  border-right: 1px solid var(--admin-border);
+  padding: 1.25rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.admin-logo {
+  font-family: var(--heading-font);
+  font-size: 1.125rem;
+  font-weight: 700;
+  padding: 0 0.5rem 1rem;
+  letter-spacing: 0.02em;
+}
+
+.admin-nav-group {
+  margin-top: 0.75rem;
+  padding: 0 0.5rem;
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--admin-muted);
+}
+
+.admin-nav-link {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.5rem 0.625rem;
+  border-radius: var(--radius);
+  text-decoration: none;
+  color: var(--admin-text);
+  font-size: 0.9375rem;
+}
+
+.admin-nav-link:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.admin-nav-link.is-active {
+  background: rgba(138, 180, 248, 0.16);
+  color: var(--admin-accent);
+}
+
+.admin-main {
+  padding: 1.5rem 2rem 4rem;
+  min-width: 0;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.admin-topbar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.5rem;
+}
+
+.admin-title {
+  font-size: 1.5rem;
+  margin: 0;
+}
+
+.admin-subtitle {
+  color: var(--admin-muted);
+  font-size: 0.875rem;
+  margin: 0.25rem 0 0;
+}
+
+.admin-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 0.625rem;
+  flex-wrap: wrap;
+}
+
+.admin-notice {
+  border: 1px solid var(--admin-border);
+  border-left: 3px solid var(--admin-accent);
+  background: var(--admin-panel);
+  border-radius: var(--radius);
+  padding: 0.75rem 1rem;
+  margin-bottom: 1.25rem;
+  font-size: 0.9375rem;
+}
+
+.admin-notice.is-error {
+  border-left-color: #f28b82;
+}
+
+/* Builders take over the window; their own topbar provides the way out. */
+.admin-shell.is-fullscreen {
+  grid-template-columns: 1fr;
+}
+
+.admin-shell.is-fullscreen .admin-sidebar {
+  display: none;
+}
+
+.admin-shell.is-fullscreen .admin-main {
+  padding: 0;
+}
+
+/* --------------------------------------- 5b. Hidden scrollbars (admin) */
+
+/*
+ * The admin hides scrollbar chrome while keeping everything scrollable —
+ * wheel, trackpad, touch, keyboard and programmatic scrolling are unaffected.
+ * Scoped to admin-only containers so the public site keeps its native
+ * scrollbars.
+ */
+.admin-shell,
+.admin-sidebar,
+.admin-main,
+.builder,
+.builder-outline,
+.builder-inspector,
+.builder-workspace,
+.style-modal,
+.style-modal-body,
+.media-inspector,
+.upload-queue,
+.rich-text-editor .ql-container,
+.rich-text-editor .ql-editor {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* legacy Edge */
+}
+
+.admin-shell::-webkit-scrollbar,
+.admin-sidebar::-webkit-scrollbar,
+.admin-main::-webkit-scrollbar,
+.builder::-webkit-scrollbar,
+.builder-outline::-webkit-scrollbar,
+.builder-inspector::-webkit-scrollbar,
+.builder-workspace::-webkit-scrollbar,
+.style-modal::-webkit-scrollbar,
+.style-modal-body::-webkit-scrollbar,
+.media-inspector::-webkit-scrollbar,
+.upload-queue::-webkit-scrollbar,
+.rich-text-editor .ql-container::-webkit-scrollbar,
+.rich-text-editor .ql-editor::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+/* ------------------------------------------- 6. Admin forms/lists/panels */
+
+.panel {
+  background: var(--admin-panel);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  margin-bottom: 1.25rem;
+}
+
+.panel-title {
+  font-size: 1rem;
+  margin: 0 0 1rem;
+  font-weight: 600;
+}
+
+.field-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 1rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.field > label,
+.field-label {
+  font-size: 0.8125rem;
+  color: var(--admin-muted);
+}
+
+.field input[type="text"],
+.field input[type="email"],
+.field input[type="password"],
+.field input[type="number"],
+.field input[type="url"],
+.field input[type="date"],
+.field input[type="time"],
+.field select,
+.field textarea,
+.input {
+  background: #0d1014;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--radius);
+  color: var(--admin-text);
+  padding: 0.5rem 0.625rem;
+  width: 100%;
+  min-width: 0;
+}
+
+.field textarea {
+  min-height: 6rem;
+  resize: vertical;
+}
+
+.field input[type="color"] {
+  background: #0d1014;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--radius);
+  height: 2.25rem;
+  width: 100%;
+  padding: 0.15rem;
+}
+
+/* ------------------------------------------------------- Colour control */
+
+.color-control {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+/* Checkerboard so partial transparency is visible in the swatch. */
+.color-swatch {
+  position: relative;
+  flex: 0 0 2.25rem;
+  width: 2.25rem;
+  height: 2.25rem;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background-color: #fff;
+  background-image:
+    linear-gradient(45deg, #b0b0b0 25%, transparent 25%),
+    linear-gradient(-45deg, #b0b0b0 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #b0b0b0 75%),
+    linear-gradient(-45deg, transparent 75%, #b0b0b0 75%);
+  background-size: 0.5rem 0.5rem;
+  background-position: 0 0, 0 0.25rem, 0.25rem -0.25rem, -0.25rem 0;
+}
+
+.color-swatch-fill {
+  position: absolute;
+  inset: 0;
+}
+
+/* The native picker sits on top, invisible, so the swatch stays the target. */
+.color-swatch input[type="color"] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+.color-value {
+  flex: 1;
+  min-width: 0;
+}
+
+.color-alpha {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.3rem;
+}
+
+.color-alpha input[type="range"] {
+  flex: 1;
+  accent-color: var(--admin-accent);
+}
+
+.color-alpha .help-text {
+  flex: 0 0 2.5rem;
+  text-align: right;
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9375rem;
+}
+
+.help-text {
+  font-size: 0.75rem;
+  color: var(--admin-muted);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 1px solid var(--admin-border);
+  background: #1d2229;
+  color: var(--admin-text);
+  border-radius: var(--radius);
+  padding: 0.45rem 0.85rem;
+  font-size: 0.875rem;
+  text-decoration: none;
+}
+
+.btn:hover {
+  border-color: var(--admin-accent);
+}
+
+.btn-primary {
+  background: var(--admin-accent);
+  border-color: var(--admin-accent);
+  color: #0b0f14;
+  font-weight: 600;
+}
+
+.btn-danger {
+  border-color: #6d3a37;
+  color: #f28b82;
+}
+
+.btn-danger:hover {
+  border-color: #f28b82;
+}
+
+.btn-ghost {
+  background: transparent;
+}
+
+.btn-sm {
+  padding: 0.3rem 0.6rem;
+  font-size: 0.8125rem;
+}
+
+.admin-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.admin-list-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  background: var(--admin-panel);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--radius);
+  padding: 0.75rem 1rem;
+}
+
+.admin-list-item h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.admin-list-meta {
+  color: var(--admin-muted);
+  font-size: 0.8125rem;
+}
+
+.admin-list-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.badge {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 0.1rem 0.55rem;
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border: 1px solid var(--admin-border);
+  color: var(--admin-muted);
+}
+
+.badge-published {
+  border-color: #3d6b4a;
+  color: #81c995;
+}
+
+.badge-draft {
+  border-color: #6b5b32;
+  color: #fdd663;
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.admin-table th,
+.admin-table td {
+  text-align: left;
+  padding: 0.6rem 0.75rem;
+  border-bottom: 1px solid var(--admin-border);
+  vertical-align: top;
+}
+
+.admin-table th {
+  color: var(--admin-muted);
+  font-weight: 500;
+}
+
+/* Roles: the "Add role" button above the list, and the permission checkbox
+   grid the role popup uses. */
+.panel-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+
+.permission-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.permission-group {
+  border: 1px solid var(--admin-border);
+  border-radius: var(--radius);
+  padding: 0.75rem;
+  min-width: 0;
+}
+
+/* ------------------------------------------------- 6a. Calendar (shared) */
+
+/*
+ * One set of structural rules for the calendar grid, drawn by both the admin
+ * screen and the public page block. Colours come from `--cal-*`, which default
+ * to the admin palette here and are re-pointed at the site palette inside
+ * `.pb-calendar`, so neither copy can drift from the other.
+ */
+.calendar-grid,
+.calendar-toolbar,
+.calendar-legend {
+  --cal-bg: var(--admin-bg);
+  --cal-panel: var(--admin-panel);
+  --cal-text: var(--admin-text);
+  --cal-muted: var(--admin-muted);
+  --cal-border: var(--admin-border);
+  --cal-accent: var(--admin-accent);
+}
+
+.calendar-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+
+.calendar-month-label {
+  font-size: 1.0625rem;
+  /* Centres the month between the two navigation buttons at any width. */
+  flex: 1 1 auto;
+  text-align: center;
+}
+
+.calendar-today-link {
+  flex-shrink: 0;
+}
+
+.calendar-grid {
+  background: var(--cal-panel);
+  border: 1px solid var(--cal-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.calendar-weekdays,
+.calendar-week {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.calendar-weekday {
+  padding: 0.5rem 0.625rem;
+  font-size: 0.75rem;
+  color: var(--cal-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--cal-border);
+}
+
+.calendar-day {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-height: 7.5rem;
+  padding: 0.4rem 0.45rem 0.5rem;
+  border-top: 1px solid var(--cal-border);
+  border-left: 1px solid var(--cal-border);
+  /* `min-width: 0` lets a long event title ellipsize instead of stretching
+     the whole column and pushing the last weekday off the grid. */
+  min-width: 0;
+}
+
+.calendar-week:first-of-type .calendar-day {
+  border-top: none;
+}
+
+.calendar-day:first-child {
+  border-left: none;
+}
+
+.calendar-day.is-outside {
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.calendar-day.is-outside .calendar-day-number {
+  opacity: 0.4;
+}
+
+.calendar-day.is-today .calendar-day-number {
+  background: var(--cal-accent);
+  color: #0d1014;
+  border-radius: 999px;
+  padding: 0 0.4rem;
+}
+
+.calendar-day-header {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.calendar-day-number {
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+
+/* Only earns its place in the stacked mobile layout, where the column headers
+   are gone; see the breakpoint below. */
+.calendar-day-weekday {
+  display: none;
+  font-size: 0.75rem;
+  color: var(--cal-muted);
+}
+
+.calendar-add {
+  margin-left: auto;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  color: var(--cal-muted);
+  cursor: pointer;
+  font-size: 0.9375rem;
+  line-height: 1;
+  padding: 0.1rem 0.35rem;
+  /* Revealed on hover so the grid stays quiet, but always reachable by tab. */
+  opacity: 0;
+}
+
+.calendar-day:hover .calendar-add,
+.calendar-add:focus-visible {
+  opacity: 1;
+}
+
+.calendar-add:hover {
+  border-color: var(--cal-border);
+  color: var(--cal-text);
+}
+
+.calendar-day-events {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.calendar-event {
+  display: flex;
+  align-items: baseline;
+  gap: 0.3rem;
+  width: 100%;
+  text-align: left;
+  background: rgba(138, 180, 248, 0.12);
+  border: 1px solid transparent;
+  border-left: 3px solid var(--cal-accent);
+  border-radius: 3px;
+  color: var(--cal-text);
+  cursor: pointer;
+  font-size: 0.75rem;
+  padding: 0.15rem 0.35rem;
+  min-width: 0;
+}
+
+.calendar-event:hover {
+  border-color: var(--cal-border);
+  border-left-color: var(--cal-accent);
+}
+
+/* Drafts read as provisional at a glance, matching the badge colours. */
+.calendar-event.is-draft {
+  background: rgba(253, 214, 99, 0.1);
+  border-left-color: #fdd663;
+}
+
+.calendar-event.is-draft:hover {
+  border-left-color: #fdd663;
+}
+
+.calendar-event-time {
+  color: var(--cal-muted);
+  flex-shrink: 0;
+  font-size: 0.6875rem;
+}
+
+.calendar-event-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.calendar-view-switch {
+  display: flex;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
+
+.calendar-view-switch .btn.is-active {
+  border-color: var(--cal-accent);
+  color: var(--cal-accent);
+}
+
+/* Week view is a vertical list: seven full-width day rows, one under the next,
+   so an event gets a whole line for its time range and name instead of a
+   seventh of the width. */
+.calendar-grid.is-week .calendar-weekdays {
+  display: none;
+}
+
+.calendar-grid.is-week .calendar-week {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.calendar-grid.is-week .calendar-day {
+  min-height: 0;
+  gap: 0.4rem;
+  padding: 0.6rem 0.75rem;
+  border-left: none;
+  border-top: 1px solid var(--cal-border);
+}
+
+.calendar-grid.is-week .calendar-week:first-of-type .calendar-day:first-child {
+  border-top: none;
+}
+
+.calendar-day-heading {
+  font-size: 0.9375rem;
+  font-weight: 500;
+}
+
+.calendar-grid.is-week .calendar-day.is-today .calendar-day-heading {
+  color: var(--cal-accent);
+}
+
+.calendar-day-empty {
+  color: var(--cal-muted);
+  font-size: 0.8125rem;
+  font-style: italic;
+}
+
+/* A week row carries the whole event, so it is a block rather than the single
+   strip the month grid uses. The row itself is the button. */
+.calendar-event-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.9rem;
+  width: 100%;
+  text-align: left;
+  background: rgba(138, 180, 248, 0.08);
+  border: 1px solid var(--cal-border);
+  border-left: 3px solid var(--cal-accent);
+  border-radius: 3px;
+  color: var(--cal-text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.9375rem;
+  padding: 0.6rem 0.75rem;
+  min-width: 0;
+}
+
+.calendar-event-row:hover {
+  background: rgba(138, 180, 248, 0.16);
+}
+
+.calendar-event-row.is-draft {
+  background: rgba(253, 214, 99, 0.08);
+  border-left-color: #fdd663;
+}
+
+.calendar-event-row.is-draft:hover {
+  background: rgba(253, 214, 99, 0.16);
+}
+
+/* Times hold their own column so they line up down the whole week, with the
+   event's own fields beside them rather than beneath. */
+.calendar-event-range {
+  flex: 0 0 10rem;
+  color: var(--cal-muted);
+  font-size: 1rem;
+}
+
+/* Name and description on the left, the classifying fields on the right. */
+.calendar-event-row-body {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: 0.4rem 1rem;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Pushed to the far end by the body claiming the space between. */
+.calendar-event-row > .badge {
+  flex-shrink: 0;
+}
+
+.calendar-event-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.calendar-event-name {
+  font-size: 1.0625rem;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.calendar-event-description {
+  color: var(--cal-muted);
+  font-size: 0.875rem;
+  /* Descriptions are written with line breaks; keep them. */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.calendar-event-category {
+  color: var(--cal-muted);
+  font-size: 0.875rem;
+  font-style: italic;
+}
+
+.calendar-event-chips {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.calendar-event-chips-label {
+  color: var(--cal-muted);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.calendar-event-tag {
+  border: 1px solid var(--cal-border);
+  border-radius: 999px;
+  color: var(--cal-muted);
+  font-size: 0.8125rem;
+  padding: 0.05rem 0.5rem;
+}
+
+/* Groups read as a different kind of thing from tags, so they get their own
+   tint rather than relying on the label alone. */
+.calendar-event-tag.is-who {
+  border-color: rgba(138, 180, 248, 0.45);
+  color: var(--cal-text);
+}
+
+/* The URL itself lives in the editor; only its label shows here. */
+/* The location sits with the name rather than in the details column: it
+   qualifies the event itself, the way the time does. */
+.calendar-event-location {
+  color: var(--cal-muted);
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+}
+
+/* In a month chip the location trails the name on the same line. */
+.calendar-grid.is-month .calendar-event-location {
+  font-size: 0.6875rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.calendar-event-linktext {
+  color: var(--cal-accent);
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+}
+
+.calendar-legend {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin-top: 0.75rem;
+}
+
+.calendar-zone {
+  margin-left: 0.75rem;
+}
+
+.calendar-swatch {
+  display: inline-block;
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 2px;
+}
+
+.calendar-swatch.is-published {
+  background: var(--cal-accent);
+}
+
+.calendar-swatch.is-draft {
+  background: #fdd663;
+  margin-left: 0.75rem;
+}
+
+.calendar-count {
+  margin-left: auto;
+}
+
+/* ---- Chip and weekday pickers ---- */
+
+/* A checkbox-per-value picker. Generic: the calendar's who/tags fields and the
+   user dialog's role picker all use it. */
+.chip-picker,
+.calendar-weekday-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.chip-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid var(--cal-border);
+  border-radius: 999px;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
+.chip-option:has(input:checked) {
+  border-color: var(--cal-accent);
+  color: var(--cal-accent);
+}
+
+.calendar-weekday-option {
+  border: 1px solid var(--cal-border);
+  border-radius: var(--radius);
+  padding: 0.3rem 0.55rem;
+  font-size: 0.8125rem;
+  cursor: pointer;
+  /* The input inside is visually hidden, so the label carries the state. */
+  user-select: none;
+}
+
+.calendar-weekday-option.is-on {
+  border-color: var(--cal-accent);
+  color: var(--cal-accent);
+}
+
+.calendar-weekday-option:focus-within {
+  outline: 2px solid var(--cal-accent);
+  outline-offset: 1px;
+}
+
+.calendar-repeat-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-top: 1rem;
+  padding: 0.75rem;
+  border: 1px dashed var(--cal-border);
+  border-radius: var(--radius);
+}
+
+/* ------------------------------ Calendar settings ------------------------ */
+
+.calendar-settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  gap: 1.25rem;
+  margin-top: 1.25rem;
+}
+
+.calendar-vocabulary {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.calendar-vocabulary-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid var(--cal-border);
+  border-radius: 999px;
+  padding: 0.2rem 0.35rem 0.2rem 0.6rem;
+  font-size: 0.8125rem;
+}
+
+.calendar-vocabulary-count {
+  color: var(--cal-muted);
+  font-size: 0.6875rem;
+}
+
+.calendar-vocabulary-remove {
+  background: none;
+  border: none;
+  color: var(--cal-muted);
+  cursor: pointer;
+  font-size: 0.9375rem;
+  line-height: 1;
+  padding: 0 0.2rem;
+}
+
+.calendar-vocabulary-remove:hover {
+  color: #f28b82;
+}
+
+.calendar-vocabulary-add {
+  display: flex;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+}
+
+/* A seven-column month is unreadable on a phone. Below the breakpoint the
+   weekday header drops away and each day becomes a full-width row, so an
+   event's text has room instead of being ellipsized to nothing. */
+@media (max-width: 40rem) {
+  .calendar-weekdays {
+    display: none;
+  }
+
+  .calendar-week {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .calendar-day {
+    min-height: 0;
+    border-left: none;
+  }
+
+  /* Neither the times column nor two columns of detail fit a phone. */
+  .calendar-event-row {
+    flex-wrap: wrap;
+    gap: 0.3rem 0.6rem;
+  }
+
+  .calendar-event-range {
+    flex-basis: auto;
+  }
+
+  .calendar-event-row-body {
+    grid-template-columns: minmax(0, 1fr);
+    flex-basis: 100%;
+  }
+
+  /* Stacked, every day but the very first needs the divider the desktop grid
+     got from the row above it. */
+  .calendar-week:first-of-type .calendar-day + .calendar-day {
+    border-top: 1px solid var(--cal-border);
+  }
+
+  .calendar-day.is-outside {
+    display: none;
+  }
+
+  /* Without the column headers the day number alone is ambiguous. */
+  .calendar-day-weekday {
+    display: inline;
+  }
+
+  .calendar-add {
+    opacity: 1;
+  }
+
+  .calendar-month-label {
+    order: -1;
+    flex-basis: 100%;
+  }
+}
+
+/* ---- Calendar slots, drawn by a layout template ---- */
+
+.cal-slot {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.cal-slot-label {
+  color: var(--cal-muted, inherit);
+  margin-right: 0.35rem;
+}
+
+/* A slot with nothing behind it names itself on the canvas, so an author can
+   see and select it. Never rendered on a published page. */
+.cal-slot.is-placeholder {
+  opacity: 0.45;
+  font-style: italic;
+}
+
+.cal-slot-chips {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.cal-slot-chip {
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  padding: 0.05rem 0.5rem;
+  opacity: 0.75;
+}
+
+.cal-slot-link {
+  text-decoration: underline;
+}
+
+/* A templated event fills the day cell; the template owns everything inside. */
+.calendar-event-template {
+  min-width: 0;
+}
+
+.calendar-event-template.is-clickable {
+  cursor: pointer;
+}
+
+.calendar-event-template.is-clickable:focus-visible {
+  outline: 2px solid var(--cal-accent);
+  outline-offset: 2px;
+}
+
+/* A template's own rows must not re-impose page gutters inside a day cell. */
+.calendar-event-template .pb-row-inner,
+.cal-template .pb-row-inner {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.calendar-detail-close.is-floating {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+}
+
+/* What shows, as one table: a row per field, a column per size. Every cell is
+   visible at once, which is why this replaced three tabbed breakpoint panels. */
+
+
+
+
+
+
+
+
+/* ---- Documentation: reference-doc typography and layout ---- */
+
+/* A measure, not a window width. Long lines are the single biggest thing that
+   makes generated documentation hard to read. */
+.doc-render .doc-content {
+  --doc-block-gap: 1.5rem;
+  max-width: 46rem;
+}
+
+.doc-render .doc-heading {
+  font-weight: 600;
+  letter-spacing: -0.011em;
+  /* Anchored headings jumped to from the contents need room under a sticky
+     header rather than landing flush against the top of the window. */
+  scroll-margin-top: 5rem;
+}
+
+.doc-render .doc-heading[data-level="1"] {
+  font-size: 2.25rem;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
+/* Extra space above a section heading, none below it: a heading belongs to what
+   follows it, and even spacing makes it float between the two. */
+.doc-render .doc-heading[data-level="2"] {
+  font-size: 1.5rem;
+  line-height: 1.3;
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid color-mix(in srgb, var(--content-text) 10%, transparent);
+}
+
+.doc-render .doc-heading[data-level="3"] {
+  font-size: 1.1875rem;
+  margin-top: 0.75rem;
+}
+
+.doc-render .doc-heading[data-level="4"],
+.doc-render .doc-heading[data-level="5"],
+.doc-render .doc-heading[data-level="6"] {
+  font-size: 1rem;
+  margin-top: 0.5rem;
+}
+
+.doc-render .doc-paragraph {
+  font-size: 1rem;
+  line-height: 1.75;
+}
+
+.doc-render .doc-paragraph a,
+.doc-render .doc-list a {
+  color: var(--content-accent);
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+.doc-render .doc-list {
+  line-height: 1.75;
+  gap: 0.5rem;
+}
+
+/* Inline code sits inside a line, so it is tinted rather than boxed — a border
+   here would make every sentence containing one look ruled. */
+.doc-render .doc-paragraph code,
+.doc-render .doc-list code,
+.doc-render .doc-table code {
+  background: color-mix(in srgb, var(--content-text) 8%, transparent);
+  border-radius: 0.25rem;
+  padding: 0.1em 0.35em;
+  font-size: 0.9em;
+}
+
+.doc-render .doc-code {
+  border: 1px solid color-mix(in srgb, var(--content-text) 12%, transparent);
+  border-radius: 0.5rem;
+}
+
+/* The language, named on the block rather than left for the reader to guess. */
+.doc-render .doc-code[data-language]::before {
+  content: attr(data-language);
+  display: block;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.55;
+  margin-bottom: 0.5rem;
+}
+
+.doc-render .doc-quote {
+  background: color-mix(in srgb, var(--content-accent) 5%, transparent);
+  border-radius: 0 0.5rem 0.5rem 0;
+  padding: 0.875rem 1rem;
+}
+
+.doc-render .doc-title {
+  font-size: 2.5rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+
+.doc-render .doc-description {
+  font-size: 1.125rem;
+  line-height: 1.6;
+  opacity: 0.75;
+  margin-bottom: 1.5rem;
+}
+
+/* ---- Contents rail ---- */
+
+/* The disclosure is the narrow-screen form; the plain list is the wide one.
+   Exactly one is ever displayed, so the markup carries both and CSS chooses. */
+.doc-toc-drop {
+  display: none;
+}
+
+.doc-toc-drop > summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  border: 1px solid color-mix(in srgb, var(--content-text) 18%, transparent);
+  border-radius: var(--radius);
+  padding: 0.625rem 0.875rem;
+  font-weight: 500;
+  list-style: none;
+}
+
+.doc-toc-drop > summary::-webkit-details-marker {
+  display: none;
+}
+
+.doc-toc-drop-hint {
+  margin-left: auto;
+  font-size: 0.8125rem;
+  font-weight: 400;
+  opacity: 0.6;
+}
+
+.doc-toc-drop-hint::after {
+  content: " ▾";
+}
+
+.doc-toc-drop[open] .doc-toc-drop-hint::after {
+  content: " ▴";
+}
+
+/* The panel is a wrapper of its own so the template can dress it separately
+   from the control that opens it. It has no look until the template gives it
+   one — the spacing below is all it contributes. */
+.doc-toc-drop[open] > .doc-toc-panel {
+  margin-top: 0.75rem;
+  padding-bottom: 0.5rem;
+}
+
+@media (max-width: 64rem) {
+  .doc-toc-drop {
+    display: block;
+  }
+
+  .doc-toc-wide {
+    display: none;
+  }
+}
+
+/* ---- Tables that do not fit ---- */
+
+/* Stacking turns each row into a labelled card. Without repeating the column
+   headings a stacked table is a run of unattributed strings, which is why the
+   cells carry `data-label`. */
+@media (max-width: 48rem) {
+  .doc-content.is-tables-stack .doc-table thead {
+    /* Hidden from sight but not from a screen reader, which still reads the
+       header association from the table itself. */
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .doc-content.is-tables-stack .doc-table,
+  .doc-content.is-tables-stack .doc-table tbody,
+  .doc-content.is-tables-stack .doc-table tr,
+  .doc-content.is-tables-stack .doc-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .doc-content.is-tables-stack .doc-table tr {
+    border: 1px solid color-mix(in srgb, var(--content-text) 15%, transparent);
+    border-radius: var(--radius);
+    padding: 0.5rem 0.75rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .doc-content.is-tables-stack .doc-table td {
+    border: none;
+    padding: 0.35rem 0;
+    text-align: left !important;
+  }
+
+  .doc-content.is-tables-stack .doc-table td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    opacity: 0.6;
+  }
+
+  /* A cell with no value would otherwise show a heading and nothing under it. */
+  .doc-content.is-tables-stack .doc-table td:empty {
+    display: none;
+  }
+}
+
+/* -------------------------------------------------------- Documentation */
+
+/* Rendered document content. Deliberately close to plain prose — a doc
+   template's own styling dresses the page around it. */
+.doc-content {
+  --doc-block-gap: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: var(--doc-block-gap);
+  min-width: 0;
+}
+
+.doc-content > * {
+  margin: 0;
+}
+
+.doc-heading {
+  line-height: 1.25;
+  /* Anchored headings jumped to from the contents need room under a sticky
+     header rather than landing flush against the top of the window. */
+  scroll-margin-top: 5rem;
+}
+
+.doc-paragraph {
+  line-height: 1.65;
+}
+
+.doc-code {
+  background: color-mix(in srgb, var(--content-text) 6%, transparent);
+  border-radius: var(--radius);
+  padding: 0.875rem 1rem;
+  overflow-x: auto;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.doc-quote {
+  border-left: 3px solid color-mix(in srgb, var(--content-accent) 60%, transparent);
+  padding-left: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.doc-list {
+  padding-left: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  line-height: 1.6;
+}
+
+/* A task list carries its own boxes, so the markers would be a second bullet. */
+.doc-list.is-tasks {
+  list-style: none;
+  padding-left: 0;
+}
+
+.doc-task {
+  margin-right: 0.5rem;
+}
+
+.doc-list-item > .doc-list {
+  margin-top: 0.35rem;
+}
+
+.doc-table-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.doc-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.9375rem;
+}
+
+.doc-table th,
+.doc-table td {
+  border: 1px solid color-mix(in srgb, var(--content-text) 15%, transparent);
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+}
+
+.doc-table th {
+  background: color-mix(in srgb, var(--content-text) 5%, transparent);
+  font-weight: 600;
+}
+
+.doc-divider {
+  border: none;
+  border-top: 1px solid color-mix(in srgb, var(--content-text) 18%, transparent);
+}
+
+.doc-figure {
+  margin: 0;
+}
+
+.doc-figure img {
+  max-width: 100%;
+  height: auto;
+}
+
+.doc-figure figcaption {
+  font-size: 0.875rem;
+  opacity: 0.7;
+  margin-top: 0.4rem;
+}
+
+/* ---- Document slots ---- */
+
+.doc-title {
+  margin: 0;
+  line-height: 1.15;
+}
+
+.doc-description {
+  margin: 0.4rem 0 0;
+  font-size: 1.125rem;
+  opacity: 0.8;
+}
+
+.doc-breadcrumbs {
+  font-size: 0.875rem;
+  opacity: 0.75;
+  margin-bottom: 0.5rem;
+}
+
+/* Both rails stay put while the body scrolls, which is what makes a long
+   document navigable without scrolling back to the top. `align-self: start`
+   matters: a stretched flex item is as tall as the row and can never stick. */
+.doc-slot.is-toc {
+  position: sticky;
+  top: 1.5rem;
+  /* A stretched flex item is as tall as its row and can never stick. */
+  align-self: start;
+  max-height: calc(100vh - 3rem);
+  overflow-y: auto;
+  /* The rail is chrome; a visible scrollbar on it competes with the page. */
+  scrollbar-width: thin;
+}
+
+/* In the default layout this sits above the body rather than in a second rail,
+   so it reads as a summary of the page you are on. */
+.doc-slot.is-on-this-page {
+  border: 1px solid color-mix(in srgb, var(--content-text) 15%, transparent);
+  border-radius: var(--radius);
+  padding: 0.875rem 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.doc-toc-list {
+  list-style: none;
+  padding-left: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.9375rem;
+}
+
+.doc-toc a,
+.doc-on-this-page a {
+  display: block;
+  padding: 0.15rem 0;
+  text-decoration: none;
+  opacity: 0.85;
+}
+
+.doc-toc a:hover,
+.doc-on-this-page a:hover {
+  opacity: 1;
+  text-decoration: underline;
+}
+
+/* Each level steps in, so the hierarchy is legible as a contents list. */
+.doc-toc-list[data-depth] .doc-toc-list {
+  padding-left: 0.875rem;
+  margin-top: 0.3rem;
+  border-left: 1px solid color-mix(in srgb, var(--content-text) 12%, transparent);
+}
+
+/* The current page is marked on the rail rather than only in the address bar,
+   which is how a reader keeps their place in a large set. */
+.doc-toc a.is-current {
+  font-weight: 600;
+  color: var(--content-accent);
+  opacity: 1;
+}
+
+/* The document being read expands to list its own pages, so the sidebar shows
+   position inside a long document as well as across the set. */
+.doc-toc-pages {
+  list-style: none;
+  padding-left: 0.875rem;
+  margin: 0.25rem 0 0.5rem;
+  border-left: 1px solid color-mix(in srgb, var(--content-text) 12%, transparent);
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  font-size: 0.875rem;
+}
+
+/* Within a document the current *page* is the one marked, not the document. */
+.doc-toc-pages a[aria-current="page"] {
+  font-weight: 600;
+  color: var(--content-accent);
+  opacity: 1;
+}
+
+.doc-on-this-page ul {
+  list-style: none;
+  padding-left: 0;
+  margin: 0.35rem 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.875rem;
+}
+
+/* Indented by heading level, so the page's own shape shows in the rail. */
+.doc-on-this-page li[data-level="3"] { padding-left: 0.75rem; }
+.doc-on-this-page li[data-level="4"] { padding-left: 1.5rem; }
+.doc-on-this-page li[data-level="5"] { padding-left: 2.25rem; }
+.doc-on-this-page li[data-level="6"] { padding-left: 3rem; }
+
+.doc-slot-label {
+  opacity: 0.7;
+  margin-right: 0.35rem;
+}
+
+.doc-slot-placeholder {
+  opacity: 0.45;
+  font-style: italic;
+}
+
+.doc-tags {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  padding: 0;
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+/* Pagination as a pair of cards, the convention online documentation has
+   settled on: each names where it goes rather than saying only "next", so the
+   destination is readable before it is clicked. */
+.doc-prev-next {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-top: 2.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid color-mix(in srgb, var(--content-text) 15%, transparent);
+}
+
+.doc-prev-next a {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  border: 1px solid color-mix(in srgb, var(--content-text) 18%, transparent);
+  border-radius: var(--radius);
+  padding: 0.875rem 1rem;
+  text-decoration: none;
+  font-weight: 500;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.doc-prev-next a:hover {
+  border-color: var(--content-accent);
+  background: color-mix(in srgb, var(--content-accent) 6%, transparent);
+}
+
+/* The label, not the title. Arrows are drawn here so the markup stays plain
+   text and a screen reader is not read a stray glyph. */
+.doc-prev-next a span {
+  font-size: 0.8125rem;
+  opacity: 0.6;
+  font-weight: 400;
+}
+
+.doc-prev-next .doc-prev span::before {
+  content: "← ";
+}
+
+.doc-prev-next .doc-next span::after {
+  content: " →";
+}
+
+.doc-next {
+  text-align: right;
+  /* Pinned right so a page with no previous still puts "next" where it belongs. */
+  grid-column: 2;
+}
+
+@media (max-width: 40rem) {
+  .doc-prev-next {
+    grid-template-columns: 1fr;
+  }
+
+  .doc-next {
+    grid-column: 1;
+  }
+}
+
+/* On a phone the rails become ordinary blocks: a sticky sidebar there costs
+   more width and vertical room than it returns. The contents move above the
+   page, and the in-page headings collapse into a details disclosure. */
+@media (max-width: 64rem) {
+  .doc-slot.is-toc {
+    position: static;
+    max-height: none;
+    overflow: visible;
+  }
+}
+
+/* ---- Documentation admin ---- */
+
+.doc-tree {
+  gap: 0.4rem;
+}
+
+.doc-tree ul {
+  list-style: none;
+  padding: 0;
+  margin: 0.4rem 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.doc-import {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.doc-block {
+  border: 1px solid var(--admin-border);
+  border-radius: var(--radius);
+  padding: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.doc-block-head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.doc-block-head .admin-list-actions {
+  margin-left: auto;
+}
+
+.doc-add-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.75rem;
+}
+
+/* Revealed on hover so a long document is not a wall of buttons. */
+.doc-add-row.is-inline {
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.doc-block:hover .doc-add-row.is-inline,
+.doc-block:focus-within .doc-add-row.is-inline {
+  opacity: 1;
+}
+
+.doc-markdown {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  width: 100%;
+  background: #0d1014;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--radius);
+  color: var(--admin-text);
+  padding: 0.75rem;
+}
+
+.doc-list-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.35rem;
+}
+
+.doc-list-row select {
+  flex: 0 0 4rem;
+}
+
+.doc-table-edit {
+  overflow-x: auto;
+}
+
+.doc-table-edit table {
+  border-collapse: collapse;
+}
+
+.doc-table-edit td {
+  padding: 0.15rem;
+}
+
+/* The preview wears the content theme, since it stands in for a public page. */
+.doc-preview {
+  background: var(--content-bg);
+  color: var(--content-text);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+}
+
+/* ---- Event list block ---- */
+
+.pb-event-list {
+  display: flex;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.pb-event-list.is-vertical {
+  flex-direction: column;
+}
+
+.pb-event-list.is-horizontal {
+  flex-direction: row;
+}
+
+/* Wrapping needs items that can share a line; scrolling needs them to keep
+   their width and let the track move instead. */
+.pb-event-list.is-horizontal.is-wrap {
+  flex-wrap: wrap;
+}
+
+.pb-event-list.is-horizontal.is-wrap > .pb-event-item {
+  flex: 1 1 16rem;
+}
+
+.pb-event-list.is-horizontal.is-scroll {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  /* Momentum on a phone, and a resting point per card. */
+  scroll-snap-type: x proximity;
+  padding-bottom: 0.5rem;
+}
+
+.pb-event-list.is-horizontal.is-scroll > .pb-event-item {
+  flex: 0 0 18rem;
+  scroll-snap-align: start;
+}
+
+.pb-event-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+/* A layout template's own rows must not re-impose page gutters inside an item. */
+.pb-event-item .pb-row-inner {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.pb-event-date {
+  font-size: 0.875rem;
+  opacity: 0.7;
+}
+
+.pb-event-name {
+  font-size: 1.125rem;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.pb-event-time,
+.pb-event-location {
+  font-size: 0.9375rem;
+  opacity: 0.8;
+}
+
+.pb-event-description {
+  font-size: 0.9375rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.pb-event-link {
+  color: var(--content-accent);
+  font-size: 0.9375rem;
+}
+
+.pb-event-list-more {
+  display: flex;
+  justify-content: center;
+  margin-top: 1rem;
+}
+
+.pb-event-list-empty {
+  opacity: 0.7;
+  font-style: italic;
+}
+
+/* Dimmed while the next page is fetched, rather than blanked — what is already
+   read stays readable. */
+.pb-event-list.is-loading {
+  opacity: 0.6;
+  transition: opacity 150ms ease;
+}
+
+/* ---- Calendar Style editor ---- */
+
+/* The parts list: one row per box of the calendar, saying what it is. */
+.calendar-part-list {
+  display: flex;
+  flex-direction: column;
+  margin: 1rem 0;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.calendar-part {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--admin-border);
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  padding: 0.5rem 0.7rem;
+  text-align: left;
+}
+
+.calendar-part:last-child {
+  border-bottom: none;
+}
+
+.calendar-part:hover {
+  background: rgba(138, 180, 248, 0.08);
+}
+
+.calendar-part.is-active {
+  background: rgba(138, 180, 248, 0.16);
+  box-shadow: inset 0.1875rem 0 0 var(--admin-accent);
+}
+
+.calendar-part-name {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.875rem;
+}
+
+.calendar-part-only {
+  color: var(--admin-muted);
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.calendar-part-note {
+  color: var(--admin-muted);
+  font-size: 0.75rem;
+}
+
+.calendar-seg {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex-wrap: wrap;
+}
+
+.calendar-seg .btn.is-active {
+  border-color: var(--admin-accent);
+  color: var(--admin-accent);
+}
+
+.calendar-scope-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+/* ---- Event boxes, as a Calendar Style dresses them ---- */
+
+/* Deliberately close to unstyled: a Calendar Style supplies the look, so the
+   built-in rules only make an unstyled calendar legible. */
+.calendar-event-box {
+  display: block;
+  min-width: 0;
+  font-size: 0.8125rem;
+}
+
+.calendar-event-box.is-clickable {
+  cursor: pointer;
+}
+
+.calendar-event-box.is-clickable:focus-visible {
+  outline: 2px solid var(--cal-accent);
+  outline-offset: 2px;
+}
+
+.calendar-event-box + .calendar-event-box {
+  margin-top: 0.2rem;
+}
+
+.calendar-event-line {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.calendar-event-line.is-name {
+  font-weight: 500;
+}
+
+.calendar-event-line.is-time {
+  color: var(--cal-muted);
+  font-size: 0.75rem;
+}
+
+/* A template's own rows must not re-impose page gutters inside a day cell. */
+.calendar-event-box .pb-row-inner {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.calendar-detail-body[data-size] {
+  display: block;
+}
+
+/* ---- Calendar appearance and template pages ---- */
+
+.calendar-preview-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+
+/* The preview stands in for a public page, so it wears the content theme
+   rather than the admin one — the same trade the appearance preview makes. */
+.calendar-preview-canvas {
+  background: var(--content-bg);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--radius);
+  padding: 1rem;
+  overflow-x: auto;
+}
+
+.calendar-preview {
+  color: var(--content-text);
+}
+
+/* A lightbox previewed in place is a panel on the page, not an overlay over
+   the whole admin — so the backdrop stops being fixed and just holds it. */
+.calendar-preview .lightbox-backdrop {
+  position: static;
+  background: none;
+  padding: 0;
+  display: block;
+}
+
+.calendar-preview .calendar-detail {
+  max-height: none;
+  width: 100%;
+}
+
+/* ---- Calendar block inspector ---- */
+
+.calendar-view-tabs {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+
+.calendar-view-tabs .btn.is-active {
+  border-color: var(--admin-accent);
+  color: var(--admin-accent);
+}
+
+
+
+
+
+
+
+
+/* Fifteen style slots expanded at once is unreadable, so each is a disclosure. */
+
+
+
+
+/* ---- The calendar as a page block, on the public site ---- */
+
+.pb-calendar {
+  width: 100%;
+}
+
+/* The site palette, in place of the admin one the tokens default to. Derived
+   from the content colours so the calendar sits in whatever the page is
+   wearing rather than carrying the dark admin chrome onto the site. */
+.pb-calendar .calendar-grid,
+.pb-calendar .calendar-toolbar {
+  --cal-bg: transparent;
+  --cal-panel: transparent;
+  --cal-text: var(--content-text);
+  --cal-muted: color-mix(in srgb, var(--content-text) 60%, transparent);
+  --cal-border: color-mix(in srgb, var(--content-text) 18%, transparent);
+  --cal-accent: var(--content-accent);
+}
+
+.pb-calendar .calendar-day.is-outside {
+  background: color-mix(in srgb, var(--content-text) 4%, transparent);
+}
+
+.pb-calendar .calendar-event,
+.pb-calendar .calendar-event-row {
+  background: color-mix(in srgb, var(--content-accent) 10%, transparent);
+  border-left-color: var(--content-accent);
+  color: var(--content-text);
+}
+
+.pb-calendar .calendar-event:hover,
+.pb-calendar .calendar-event-row:hover {
+  background: color-mix(in srgb, var(--content-accent) 18%, transparent);
+}
+
+/* A calendar with no lightbox has nothing to click, so its events must not
+   pretend otherwise. */
+.pb-calendar .calendar-event.is-static,
+.pb-calendar .calendar-event-row.is-static {
+  cursor: default;
+}
+
+.pb-calendar .calendar-event.is-static:hover,
+.pb-calendar .calendar-event-row.is-static:hover {
+  background: color-mix(in srgb, var(--content-accent) 10%, transparent);
+}
+
+.pb-calendar .btn {
+  background: transparent;
+  border-color: var(--cal-border);
+  color: var(--content-text);
+}
+
+.pb-calendar .btn.is-active {
+  border-color: var(--content-accent);
+  color: var(--content-accent);
+}
+
+/* Dimmed while a month is being fetched, rather than blanked — the previous
+   range stays readable until the new one lands. */
+.pb-calendar.is-loading .calendar-grid {
+  opacity: 0.6;
+  transition: opacity 150ms ease;
+}
+
+/* ---- Event detail lightbox ---- */
+
+.calendar-detail {
+  background: var(--content-bg);
+  color: var(--content-text);
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  width: min(34rem, 100%);
+  max-height: 85vh;
+  overflow-y: auto;
+  /* Above the backdrop's own stacking, matching the image lightbox. */
+  position: relative;
+  z-index: 1;
+}
+
+.calendar-detail-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.calendar-detail-date {
+  margin: 0;
+  font-size: 0.875rem;
+  color: color-mix(in srgb, var(--content-text) 65%, transparent);
+}
+
+.calendar-detail-name {
+  margin: 0.15rem 0 0;
+  font-size: 1.5rem;
+  line-height: 1.2;
+}
+
+.calendar-detail-time {
+  margin: 0.35rem 0 0;
+  font-size: 1rem;
+  color: var(--content-accent);
+}
+
+.calendar-detail-close {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  font-size: 1.5rem;
+  line-height: 1;
+  padding: 0 0.25rem;
+}
+
+.calendar-detail-location {
+  margin: 0.2rem 0 0;
+  font-size: 1rem;
+  color: color-mix(in srgb, var(--content-text) 75%, transparent);
+}
+
+.calendar-detail-description {
+  margin: 1rem 0 0;
+  /* Descriptions are written with line breaks; keep them. */
+  white-space: pre-wrap;
+}
+
+.calendar-detail-meta {
+  display: grid;
+  gap: 0.5rem;
+  margin: 1.25rem 0 0;
+}
+
+.calendar-detail-meta div {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.calendar-detail-meta dt {
+  flex: 0 0 5rem;
+  font-size: 0.875rem;
+  color: color-mix(in srgb, var(--content-text) 65%, transparent);
+}
+
+.calendar-detail-meta dd {
+  margin: 0;
+}
+
+.calendar-detail-link {
+  display: inline-block;
+  margin-top: 1.25rem;
+  color: var(--content-accent);
+}
+
+/* --------------------------------------------------- 6b. Analytics charts */
+
+.viz-figure {
+  margin: 0;
+}
+
+.viz-caption {
+  font-size: 0.875rem;
+  color: var(--admin-muted);
+  margin-bottom: 0.75rem;
+}
+
+/* Identity sits in the coloured key beside the name — never in the text
+   itself, which stays in an ink token so it is legible on any panel colour. */
+.viz-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.875rem;
+  color: var(--admin-text);
+}
+
+.viz-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.viz-legend-item strong {
+  font-variant-numeric: tabular-nums;
+}
+
+.viz-key {
+  width: 0.75rem;
+  height: 0.1875rem;
+  border-radius: 999px;
+  flex: none;
+}
+
+.viz-plot {
+  position: relative;
+}
+
+.viz-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  /* The crosshair gradient inherits this. */
+  color: var(--admin-text);
+  overflow: visible;
+}
+
+/* Recessive by construction: one hairline step off the panel, never dashed. */
+.viz-grid {
+  stroke: var(--admin-border);
+  stroke-width: 1;
+}
+
+.viz-crosshair {
+  stroke: var(--admin-muted);
+  stroke-width: 1;
+}
+
+/* The whole bucket lights up rather than one 4px column — that band is also
+   the hit target, which no individual bar is wide enough to be. */
+.viz-hover-band {
+  fill: var(--admin-text);
+  opacity: 0.06;
+}
+
+.viz-tick {
+  fill: var(--admin-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The ring is the panel colour, so a dot stays readable where two lines
+   cross — a stroke in the series colour would read as extra data. */
+.viz-dot {
+  stroke: var(--admin-panel);
+  stroke-width: 2;
+}
+
+.viz-tooltip {
+  position: absolute;
+  top: 0;
+  pointer-events: none;
+  background: var(--admin-bg);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--radius);
+  padding: 0.5rem 0.625rem;
+  font-size: 0.8125rem;
+  min-width: 9rem;
+  box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.35);
+  z-index: 2;
+}
+
+.viz-tooltip-title {
+  color: var(--admin-muted);
+  margin-bottom: 0.35rem;
+}
+
+.viz-tooltip-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.4rem;
+  line-height: 1.6;
+}
+
+.viz-tooltip-row strong {
+  font-variant-numeric: tabular-nums;
+}
+
+/* One row above everything it scopes — never a filter per card. */
+.viz-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.viz-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.viz-stat-label {
+  font-size: 0.8125rem;
+  color: var(--admin-muted);
+}
+
+.viz-stat-value {
+  font-size: 1.75rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+/* --------------------------------------------------- 7. Builder chrome */
+
+/* Builders fill the admin main pane exactly rather than overflowing it. */
+.admin-main:has(> .builder) {
+  padding: 0;
+}
+
+.builder {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--admin-bg);
+  color: var(--admin-text);
+}
+
+.builder-topbar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--admin-border);
+  background: var(--admin-panel);
+}
+
+.builder-topbar .spacer {
+  margin-left: auto;
+}
+
+.builder-body {
+  display: grid;
+  grid-template-columns: 17rem 1fr 20rem;
+  flex: 1;
+  min-height: 0;
+}
+
+/* Editors with nothing to outline — the collection editor — are settings on
+   the left and a live preview on the right. */
+.builder-body.is-two-column {
+  grid-template-columns: 22rem 1fr;
+}
+
+.builder-outline,
+.builder-inspector {
+  background: var(--admin-panel);
+  border-right: 1px solid var(--admin-border);
+  overflow-y: auto;
+  padding: 0.875rem;
+  min-width: 0;
+}
+
+.builder-inspector {
+  border-right: none;
+  border-left: 1px solid var(--admin-border);
+}
+
+/* An inspector used as the left-hand column carries its rule on the other side. */
+.builder-inspector.is-left {
+  border-left: none;
+  border-right: 1px solid var(--admin-border);
+}
+
+.builder-tabs {
+  display: flex;
+  gap: 0.25rem;
+  margin-bottom: 0.75rem;
+}
+
+.builder-tab {
+  flex: 1;
+  border: 1px solid var(--admin-border);
+  background: transparent;
+  color: var(--admin-muted);
+  border-radius: var(--radius);
+  padding: 0.35rem 0.5rem;
+  font-size: 0.8125rem;
+}
+
+.builder-tab.is-active {
+  background: rgba(138, 180, 248, 0.16);
+  color: var(--admin-accent);
+  border-color: var(--admin-accent);
+}
+
+.builder-workspace {
+  overflow: auto;
+  padding: 1.5rem;
+  background: #0b0e12;
+  min-width: 0;
+}
+
+.builder-canvas {
+  background: var(--content-bg);
+  color: var(--content-text);
+  margin: 0 auto;
+  min-height: 100%;
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.builder-canvas[data-viewport="tablet"] { max-width: 48rem; }
+.builder-canvas[data-viewport="mobile"] { max-width: 24rem; }
+
+/* --- Collection editor -------------------------------------------------- */
+
+/* Category, title and description above a gallery, on the page and in the
+   preview alike. */
+.collection-header {
+  margin-bottom: 1.25rem;
+}
+
+.collection-header > * {
+  margin: 0 0 0.35rem;
+}
+
+.collection-header > :last-child {
+  margin-bottom: 0;
+}
+
+/* Desktop / tablet / mobile column counts, read as one decision. */
+.column-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.35rem;
+  margin-bottom: 0.6rem;
+}
+
+/* A show/hide tick with the style button for the same thing beside it. */
+.styled-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.styled-toggle > .checkbox-row {
+  flex: 1;
+  margin: 0;
+}
+
+.styled-toggle > .btn {
+  flex: 0 0 auto;
+}
+
+/* Thumbnails of what the selection panel is about to write to. */
+.selection-thumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin: 0.5rem 0;
+}
+
+.selection-thumbs img {
+  width: 2.75rem;
+  height: 2.75rem;
+  object-fit: cover;
+  border-radius: 0.25rem;
+}
+
+/* Editable gallery tiles: selection ring and drop indicator. A tile is a drag
+   handle here, so the usual link affordances are replaced. */
+.collection-item.is-editing {
+  cursor: grab;
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+}
+
+.collection-item.is-editing:hover {
+  outline-color: rgba(138, 180, 248, 0.5);
+}
+
+.collection-item.is-editing.is-selected {
+  outline-color: var(--admin-accent);
+}
+
+.collection-item.is-editing[data-drag-over="true"] {
+  outline-color: var(--admin-accent);
+  outline-style: dashed;
+}
+
+/* The mosaic span control, sitting on the tile it governs. */
+.collection-span-menu {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.35rem;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem 0.35rem;
+  border-radius: 0.25rem;
+  background: rgba(16, 18, 22, 0.82);
+  color: #fff;
+  font-size: 0.6875rem;
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+
+.collection-item.is-editing:hover .collection-span-menu,
+.collection-item.is-editing.is-selected .collection-span-menu {
+  opacity: 1;
+}
+
+/* Its own colours rather than the admin form defaults: this select sits on a
+   dark chip over a photograph, where the inherited pair is unreadable. */
+.collection-span-menu select {
+  padding: 0 0.15rem;
+  height: 1.35rem;
+  font-size: 0.6875rem;
+  min-width: 2.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 0.2rem;
+  background: #16181d;
+  color: #fff;
+}
+
+/* The dropdown itself is painted by the platform, which does not inherit the
+   control's colours on every browser. */
+.collection-span-menu select option {
+  background: #16181d;
+  color: #fff;
+}
+
+/* The live header/footer shown around the rows: context only, never editable,
+   and slightly dimmed so the editable area still reads as the focus. */
+.builder-canvas-chrome {
+  pointer-events: none;
+  user-select: none;
+  opacity: 0.9;
+  /* Carries `.site-shell` so the generated text styles match, but must not
+     inherit its full-viewport height. */
+  min-height: 0;
+}
+
+.builder-canvas-chrome .site-header,
+.builder-canvas-chrome .site-footer {
+  position: relative;
+}
+
+/* --- Outline drag and drop ------------------------------------------- */
+
+.outline-drag {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+/* A draggable row that carries its own actions, e.g. the container outline. */
+.outline-drag.is-row {
+  display: flex;
+  align-items: center;
+}
+
+/* The grab surface.
+   A drag cannot start from a mousedown on a form control, and the node label is
+   a button filling the whole row — so without this there is nowhere to take
+   hold of. Deliberately not a button itself, which would have the same
+   problem. */
+.outline-grip {
+  flex: none;
+  width: 1.25rem;
+  align-self: stretch;
+  min-height: 1.4rem;
+  border-radius: 0.2rem;
+  cursor: grab;
+  opacity: 0.45;
+  /* The grip owns the gesture: without this a touch drag scrolls the panel,
+     and a press can start a text selection instead of a drag. */
+  touch-action: none;
+  user-select: none;
+  /* Two columns of dots rather than one, so the handle reads as something to
+     take hold of at a glance and gives the pointer a real target. */
+  background-image: radial-gradient(currentColor 1px, transparent 1px);
+  background-size: 5px 5px;
+  background-position: 4px 4px;
+}
+
+.outline-drag:hover .outline-grip {
+  opacity: 0.9;
+  background-color: rgba(255, 255, 255, 0.06);
+}
+
+/* The label takes the rest of the row. `width: 100%` would resolve against the
+   full parent and overflow by the width of the grip. */
+.outline-drag > .outline-node {
+  flex: 1;
+  min-width: 0;
+}
+
+.outline-grip:active,
+.outline-drag.is-dragging .outline-grip {
+  cursor: grabbing;
+}
+
+.outline-drag.is-dragging {
+  opacity: 0.4;
+}
+
+/* The insertion line, drawn against the node being hovered. */
+.outline-drag.is-drop-before::before,
+.outline-drag.is-drop-after::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--admin-accent);
+  border-radius: 1px;
+  pointer-events: none;
+}
+
+.outline-drag.is-drop-before::before { top: -1px; }
+.outline-drag.is-drop-after::after { bottom: -1px; }
+
+/* Only rendered while a drag is in progress. */
+.outline-drop-zone {
+  margin: 0.2rem 0;
+  padding: 0.3rem 0.45rem;
+  border: 1px dashed var(--admin-border);
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--admin-muted);
+  text-align: center;
+}
+
+.outline-drop-zone.is-active {
+  border-color: var(--admin-accent);
+  color: var(--admin-accent);
+  background: rgba(138, 180, 248, 0.12);
+}
+
+.outline-node {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: 100%;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--admin-text);
+  border-radius: var(--radius);
+  padding: 0.3rem 0.45rem;
+  font-size: 0.8125rem;
+  text-align: left;
+}
+
+.outline-node:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.outline-node.is-selected {
+  border-color: var(--admin-accent);
+  color: var(--admin-accent);
+}
+
+.outline-children {
+  margin-left: 0.75rem;
+  border-left: 1px solid var(--admin-border);
+  padding-left: 0.4rem;
+}
+
+.outline-row-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 0.15rem;
+}
+
+.outline-row-actions button {
+  border: none;
+  background: transparent;
+  color: var(--admin-muted);
+  padding: 0.1rem;
+  line-height: 0;
+  border-radius: 0.25rem;
+}
+
+.outline-row-actions button:hover {
+  color: var(--admin-accent);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.block-palette {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.4rem;
+}
+
+/* Section divider between palette groups, e.g. story slots and page blocks. */
+.block-palette-group {
+  grid-column: 1 / -1;
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--admin-border);
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--admin-muted);
+}
+
+.block-palette-group:first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.block-palette button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.55rem 0.35rem;
+  border: 1px solid var(--admin-border);
+  background: transparent;
+  color: var(--admin-text);
+  border-radius: var(--radius);
+  font-size: 0.6875rem;
+}
+
+.block-palette button:hover {
+  border-color: var(--admin-accent);
+  color: var(--admin-accent);
+}
+
+.inspector-section {
+  border-top: 1px solid var(--admin-border);
+  padding-top: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.inspector-section:first-child {
+  border-top: none;
+  margin-top: 0;
+  padding-top: 0;
+}
+
+.inspector-title {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--admin-muted);
+  margin: 0 0 0.6rem;
+}
+
+/* A heading that divides one run of settings from the next needs room above it,
+   or it reads as a label for the field it is sitting on top of. */
+.inspector-fold-body .inspector-title:not(:first-child) {
+  margin-top: 1.25rem;
+}
+
+.inspector-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.inspector-grid.one-col {
+  grid-template-columns: 1fr;
+}
+
+/* A panel that has taken over the inspector: its title and the way back out. */
+.inspector-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+/* Groups the controls for one view so they can be disabled together. A
+   fieldset carries browser chrome of its own, which has no place here. */
+.inspector-fieldset {
+  border: none;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+/* Turned off, the fields still show what the view inherits — legible, but
+   plainly not the thing being edited. */
+.inspector-fieldset:disabled {
+  opacity: 0.55;
+}
+
+/* Style editor popup — shared by every builder. */
+.style-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  /* Above every other overlay, including the collection lightbox. Modals are
+     also portalled to <body> so no stacking context can trap them. */
+  z-index: 100;
+}
+
+.style-modal {
+  background: var(--admin-panel);
+  color: var(--admin-text);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--radius);
+  width: min(52rem, 100%);
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  /* Keeps the body's scroll area inside the rounded frame. */
+  overflow: hidden;
+}
+
+/* When a dialog wraps its header/body/footer in a <form>, that form becomes
+   the modal's only flex child. Without this it collapses the column layout and
+   the body stops scrolling, so the footer buttons fall off a short screen. */
+.style-modal-form {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.style-modal-header,
+.style-modal-footer {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.875rem 1.125rem;
+  border-bottom: 1px solid var(--admin-border);
+  /* Never squeezed by a tall body. */
+  flex-shrink: 0;
+}
+
+.style-modal-footer {
+  border-bottom: none;
+  border-top: 1px solid var(--admin-border);
+}
+
+.style-modal-body {
+  padding: 1.125rem;
+  /* `min-height: 0` is what lets a flex item shrink below its content so the
+     scrollbar engages. Without it the modal grows past its max-height and the
+     content — grid, buttons — spills off the screen. */
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.style-preview {
+  border: 1px dashed var(--admin-border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  margin-bottom: 1rem;
+  background: #0d1014;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 6rem;
+}
+
+/* The style editor pins its preview so it stays visible while the settings
+   below it scroll. The body drops its top padding and the preview bleeds to
+   the full width, so nothing shows in the gap once it sticks. */
+.style-editor-body {
+  padding-top: 0;
+}
+
+.style-editor-body .style-preview {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  margin: 0 -1.125rem 1rem;
+  border-width: 0 0 1px;
+  border-style: solid;
+  border-color: var(--admin-border);
+  border-radius: 0;
+  padding: 1.25rem;
+}
+
+/* Four sides on one row, led by a control that sets all of them. */
+.style-sides {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.75rem;
+  align-items: end;
+  margin-bottom: 0.75rem;
+}
+
+.style-sides:last-child {
+  margin-bottom: 0;
+}
+
+/* Separated so it reads as driving the four beside it, not as a fifth side. */
+.style-sides-all {
+  padding-right: 0.75rem;
+  border-right: 1px solid var(--admin-border);
+}
+
+/* In a settings column there is no room for five across: radius, padding and
+   margin become unreadable slivers. The shortcut takes its own line and the
+   four sides pair up beneath it. Scoped to the column rather than a viewport
+   media query, which never fires for a narrow panel in a wide window. */
+.builder-inspector .style-sides {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.builder-inspector .style-sides-all {
+  grid-column: 1 / -1;
+  padding-right: 0;
+  padding-bottom: 0.5rem;
+  border-right: none;
+  border-bottom: 1px solid var(--admin-border);
+}
+
+@media (max-width: 52rem) {
+  .style-sides {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .style-sides-all {
+    grid-column: 1 / -1;
+    padding-right: 0;
+    border-right: 0;
+    border-bottom: 1px solid var(--admin-border);
+    padding-bottom: 0.5rem;
+  }
+}
+
+/* ------------------------------------- 8. Builder canvas + block render */
+
+/* These classes are used by BOTH the admin preview and the public renderer so
+   a change to block behaviour lands in both places at once. */
+
+/*
+ * Rows, columns, container shells and container areas all stack their
+ * background layer and their content in one grid area rather than positioning
+ * the background absolutely.
+ *
+ * An absolute layer is out of flow: it can only ever fill a height the content
+ * already decided, so a background set to "scale to width" had nothing to grow.
+ * In the stack the layer's own height counts, and the box ends up as tall as
+ * whichever of the two is taller.
+ */
+.pb-row {
+  position: relative;
+  width: 100%;
+  display: grid;
+  grid-template-areas: "stack";
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.pb-row > .pb-row-bg,
+.pb-row > .pb-row-inner {
+  grid-area: stack;
+  min-width: 0;
+}
+
+.pb-row-bg {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.pb-row-bg > img,
+.pb-row-bg > video {
+  display: block;
+}
+
+.pb-row-bg.is-parallax {
+  background-attachment: fixed;
+}
+
+.pb-row-inner {
+  position: relative;
+  display: flex;
+  /* Columns share a row. They shrink rather than wrap, so a row whose spans
+     add up to more than the grid still reads as one row. */
+  flex-wrap: nowrap;
+  width: 100%;
+  margin: 0 auto;
+  align-items: stretch;
+}
+
+.pb-column {
+  position: relative;
+  min-width: 0;
+  display: grid;
+  grid-template-areas: "stack";
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.pb-column > .pb-column-bg,
+.pb-column > .pb-column-inner {
+  grid-area: stack;
+  min-width: 0;
+}
+
+.pb-column-bg {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  /* Follows the rounding of the column, container or area it sits in, so a
+     rounded corner clips the media rather than showing a square behind it. */
+  border-radius: inherit;
+}
+
+/*
+ * "Scale to width" is the one fit that sizes its box rather than filling it, so
+ * its layer joins the stack in flow: the box then ends up as tall as whichever
+ * of the media and the content is taller. Every other fit stays absolute, where
+ * it can cover the box without ever enlarging it — an in-flow layer would
+ * instead contribute the media's natural height and blow the box open.
+ */
+.pb-row-bg.is-flow,
+.pb-column-bg.is-flow {
+  position: relative;
+  inset: auto;
+}
+
+/* Sizing comes from `backgroundMediaStyle`, which differs per fit option. */
+.pb-column-bg > img,
+.pb-column-bg > video {
+  display: block;
+}
+
+.pb-column-inner {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+}
+
+.pb-block {
+  position: relative;
+  min-width: 0;
+}
+
+.pb-block img,
+.pb-block video {
+  display: block;
+  height: auto;
+}
+
+.pb-headline {
+  margin: 0;
+}
+
+.pb-plain-text {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.pb-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  border-radius: var(--radius);
+  padding: 0.6rem 1.25rem;
+  background: var(--content-accent);
+  color: #fff;
+}
+
+.pb-shape {
+  display: block;
+  /* The anchor for the text layer, which sits over the drawing. */
+  position: relative;
+}
+
+.pb-shape svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Clipped to the shape's own silhouette, so text laid inside a triangle stops
+   at its edges rather than at the corners of the box around it. */
+.pb-shape-clip {
+  position: absolute;
+  inset: 0;
+  display: block;
+  pointer-events: none;
+}
+
+/* Placed in the largest box the silhouette contains — set inline, since it
+   differs per shape — and centred in it. Overflow is left to the clip above,
+   so a long line runs on into the rest of the shape before it is cut. */
+.pb-shape-text {
+  position: absolute;
+  /* A column that stretches, so the flex box only centres the text vertically
+     and `text-align` — which the style editor can set — decides the rest. */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: stretch;
+  text-align: center;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Text placed above the shape rather than in it: nothing constrains it, so it
+   is plain flow above the drawing. */
+.pb-shape-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.pb-shape-label {
+  display: block;
+  white-space: pre-wrap;
+}
+
+.pb-icon {
+  display: inline-flex;
+}
+
+.pb-qr {
+  display: block;
+}
+
+.pb-qr img {
+  width: 100%;
+  height: auto;
+  image-rendering: pixelated;
+}
+
+.pb-panorama {
+  width: 100%;
+  overflow: hidden;
+  border-radius: var(--radius);
+  background: #000;
+}
+
+.pb-panorama canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Nested container blocks use an explicit grid so mobile wrapping is
+   predictable instead of inheriting desktop column widths. */
+.pb-container {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+}
+
+/* The container's own box, and each area inside it — stacked the same way a
+   row and a column are, so a background behaves identically in all four. */
+.pb-container-shell,
+.pb-container-cell {
+  position: relative;
+  min-width: 0;
+  display: grid;
+  grid-template-areas: "stack";
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.pb-container-shell > .pb-column-bg,
+.pb-container-shell > .pb-container-shell-inner,
+.pb-container-cell > .pb-column-bg,
+.pb-container-cell > .pb-column-inner {
+  grid-area: stack;
+  min-width: 0;
+}
+
+.pb-container-shell-inner {
+  position: relative;
+  min-width: 0;
+}
+
+/* Painted over a media background, above the media and below the content. */
+.pb-bg-overlay {
+  position: absolute;
+  inset: 0;
+  display: block;
+  pointer-events: none;
+}
+
+/* Links generated by a story link block. */
+.story-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  text-decoration: none;
+}
+
+/* A foldable inspector group, e.g. a container's whole configuration. */
+.inspector-fold {
+  border: 1px solid var(--admin-border);
+  border-radius: var(--radius);
+  margin-bottom: 0.75rem;
+}
+
+.inspector-fold > summary {
+  cursor: pointer;
+  padding: 0.5rem 0.625rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--admin-muted);
+  list-style: none;
+}
+
+.inspector-fold > summary::-webkit-details-marker {
+  display: none;
+}
+
+/* A caret drawn from text, so no icon has to load for a fold. */
+.inspector-fold > summary::before {
+  content: "B8";
+  display: inline-block;
+  margin-right: 0.4rem;
+  transition: transform 150ms ease;
+}
+
+.inspector-fold[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.inspector-fold > summary:hover {
+  color: var(--admin-accent);
+}
+
+.inspector-fold-body {
+  padding: 0 0.625rem 0.25rem;
+}
+
+/* The last group inside a fold should not add a gap before the fold's edge. */
+.inspector-fold-body > .inspector-section:last-child {
+  margin-bottom: 0.5rem;
+}
+
+/* A fold nested inside another, e.g. Background inside Container inside Config.
+   Quieter than its parent so the nesting reads at a glance. */
+.inspector-fold.is-sub {
+  border-color: transparent;
+  border-left: 1px solid var(--admin-border);
+  border-radius: 0;
+  margin: 0 0 0.35rem;
+}
+
+.inspector-fold.is-sub > summary {
+  padding: 0.35rem 0.5rem;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.8125rem;
+}
+
+.inspector-fold.is-sub > .inspector-fold-body {
+  padding: 0 0.5rem 0.25rem 0.75rem;
+}
+
+/* Inside a fold the group headings are redundant with the fold's own label. */
+.inspector-fold.is-sub .inspector-section {
+  margin-bottom: 0.5rem;
+}
+
+/* --- Icon picker ---------------------------------------------------------- */
+
+.icon-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(6rem, 1fr));
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+}
+
+.icon-picker-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.5rem 0.25rem;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--radius);
+  background: var(--admin-panel);
+  color: var(--admin-text);
+  cursor: pointer;
+}
+
+.icon-picker-item:hover {
+  border-color: var(--admin-accent);
+  color: var(--admin-accent);
+}
+
+.icon-picker-item.is-selected {
+  border-color: var(--admin-accent);
+  background: rgba(138, 180, 248, 0.14);
+  color: var(--admin-accent);
+}
+
+/* The name under each glyph; long ones wrap rather than widen the cell. */
+.icon-picker-item small {
+  font-size: 0.6875rem;
+  opacity: 0.7;
+  overflow-wrap: anywhere;
+  line-height: 1.2;
+}
+
+.icon-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: 100%;
+  justify-content: flex-start;
+}
+
+/* --- Saved custom blocks -------------------------------------------------- */
+
+.saved-block-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.saved-block-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.saved-block-chips button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+/* An inline action that reads as part of the sentence around it. */
+.link-button {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--admin-accent);
+  text-decoration: underline;
+  cursor: pointer;
+  font: inherit;
+}
+
+/* Map of a container's content areas, shown in its settings. Cells sit on the
+   same grid they render on, so overlaps and gaps are visible while editing. */
+.cell-map {
+  display: grid;
+  gap: 0.25rem;
+  margin-bottom: 0.5rem;
+  padding: 0.35rem;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--radius);
+  background: var(--admin-bg);
+}
+
+.cell-map-cell {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.25rem;
+  min-height: 1.75rem;
+  padding: 0.2rem 0.4rem;
+  border: 1px dashed var(--admin-border);
+  border-radius: 0.25rem;
+  background: var(--admin-panel);
+  color: var(--admin-muted);
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.cell-map-cell:hover {
+  border-color: var(--admin-accent);
+}
+
+.cell-map-cell.is-selected {
+  border-style: solid;
+  border-color: var(--admin-accent);
+  color: var(--admin-accent);
+  background: rgba(138, 180, 248, 0.14);
+}
+
+/* The block count, kept quiet next to the area number. */
+.cell-map-cell small {
+  opacity: 0.6;
+}
+
+
+/* Admin-only affordances layered over the shared classes. */
+.pb-editable {
+  outline: 1px dashed transparent;
+  outline-offset: 2px;
+}
+
+.pb-editable:hover {
+  outline-color: rgba(138, 180, 248, 0.5);
+}
+
+.pb-editable.is-selected {
+  outline: 2px solid var(--admin-accent);
+  outline-offset: 2px;
+}
+
+.pb-row-label {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform: translateY(-100%);
+  background: var(--admin-accent);
+  color: #0b0f14;
+  font-size: 0.625rem;
+  padding: 0.05rem 0.35rem;
+  border-radius: 0.25rem 0.25rem 0 0;
+  z-index: 3;
+}
+
+.pb-empty-drop {
+  border: 1px dashed var(--admin-border);
+  border-radius: var(--radius);
+  color: var(--admin-muted);
+  font-size: 0.8125rem;
+  padding: 1.5rem;
+  text-align: center;
+  margin: 0.5rem;
+}
+
+/* -------------------------------------------------------- 9. Collections */
+
+/*
+ * The layouts add no spacing of their own — no gap, no padding, no margins.
+ * The space between tiles is the image style's margin, so one control governs
+ * it rather than a layout gap and a style fighting each other.
+ */
+
+.collection-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--collection-columns, 3), minmax(0, 1fr));
+}
+
+/*
+ * Masonry is real columns rather than CSS multi-column: the component deals
+ * images across them so the reading order stays left to right. Multi-column
+ * fills one column to the bottom first, which put image two below the fold.
+ */
+.collection-masonry {
+  display: grid;
+  grid-template-columns: repeat(var(--collection-columns, 3), minmax(0, 1fr));
+  align-items: start;
+}
+
+.collection-masonry-column {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.collection-mosaic {
+  display: grid;
+  grid-template-columns: repeat(var(--collection-columns, 3), minmax(0, 1fr));
+  grid-auto-flow: dense;
+  /*
+   * A tile spanning more columns than exist forces the grid to invent implicit
+   * ones, and those default to `auto` — sized to the image's intrinsic width,
+   * which blows the whole gallery past its container. Spans are clamped in the
+   * component, so this only has to cover the frame rendered before the client
+   * knows which breakpoint it is on.
+   */
+  grid-auto-columns: minmax(0, 1fr);
+}
+
+.collection-item {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  text-decoration: none;
+  color: inherit;
+  /*
+   * Tiles fill their row. A tile's own shape is what sizes the row in the
+   * first place — the tallest one wins — and every tile then stretches to it,
+   * so a gallery never has a hole where a shorter picture sits.
+   */
+  align-self: stretch;
+}
+
+/* Except when nothing knows the shape: the image sizes its own tile, so
+   stretching it would leave the media stranded at the top of a taller box. */
+.collection-item[data-frame="natural"] {
+  align-self: start;
+}
+
+.collection-item img {
+  display: block;
+}
+
+/*
+ * The tile states the shape — a chosen ratio, or the media's own — and the
+ * media is laid into it. The wrapper is taken out of flow so it cannot size
+ * the tile in either direction: an in-flow image pushes the tile's width out
+ * and leaves nothing to crop against.
+ */
+.collection-item[data-frame="ratio"] .collection-media {
+  position: absolute;
+  inset: 0;
+}
+
+/*
+ * `fill` scales by whichever edge is needed to cover the tile and crops the
+ * other; `full` shows the whole frame, centred in the space.
+ */
+.collection-item[data-frame="ratio"] .collection-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.collection-item[data-frame="ratio"][data-fit="full"] .collection-media img {
+  object-fit: contain;
+}
+
+/* No recorded dimensions: the image sizes its own tile, as it always did. */
+.collection-item[data-frame="natural"] .collection-media img {
+  width: 100%;
+  height: auto;
+}
+
+.collection-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  padding: 0.75rem;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.65), rgba(0, 0, 0, 0));
+  color: #fff;
+  opacity: 0;
+  transition: opacity 200ms ease;
+  font-size: 0.875rem;
+}
+
+.collection-item:hover .collection-overlay,
+.collection-item:focus-visible .collection-overlay {
+  opacity: 1;
+}
+
+.collection-overlay[data-position^="top"] { align-items: flex-start; }
+.collection-overlay[data-position^="middle"] { align-items: center; }
+.collection-overlay[data-position^="bottom"] { align-items: flex-end; }
+.collection-overlay[data-position$="left"] { justify-content: flex-start; }
+.collection-overlay[data-position$="center"] { justify-content: center; }
+.collection-overlay[data-position$="right"] { justify-content: flex-end; }
+
+.collection-overlay.is-always-visible {
+  opacity: 1;
+}
+
+/*
+ * One image at full size with its metadata beneath it, used by the lightbox and
+ * by an image's own page. The controls sit at fixed corners — close top right,
+ * arrows centred at the sides, download and share bottom right — so the frame
+ * around a picture is the same wherever it is opened.
+ */
+.image-stage {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Room for the pinned controls, so they never sit on the picture. */
+  padding: 3.5rem;
+  min-height: 0;
+  /* The metadata and the buttons sit under the picture, so a tall image with a
+     long caption can outgrow the screen. Scrolling is the right answer: the
+     alternative is shrinking the photograph to fit its own caption. */
+  overflow-y: auto;
+}
+
+/* Content that is taller than the stage starts at the top rather than being
+   centred and clipped at both ends. */
+.image-stage > .image-stage-content {
+  margin: auto;
+}
+
+/* Nothing is pinned to the top when the exit is a row in the flow, so there is
+   nothing to leave room for. */
+.image-stage[data-exit="row"] {
+  padding-top: 0;
+}
+
+/* The flow content, kept apart from the stage so a background or border from
+   the content style wraps the picture rather than the controls around it. */
+.image-stage-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+}
+
+.image-stage-figure {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  /* Hugs the image, so the metadata below can match its width. */
+  width: fit-content;
+  max-width: 100%;
+  margin: 0;
+}
+
+.image-stage-figure img {
+  display: block;
+  max-width: 100%;
+  max-height: 70vh;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  margin: 0 auto;
+}
+
+/*
+ * One field per row, and no wider than the picture. `width: 0` keeps the
+ * metadata out of the figure's own width calculation — otherwise a long caption
+ * would stretch the figure and the image would follow it.
+ */
+.image-stage-meta {
+  width: 0;
+  min-width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.875rem;
+}
+
+/* --- Stage controls ------------------------------------------------------ */
+
+.image-stage-close,
+.image-stage-step,
+.image-stage-action {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity 150ms ease;
+  /*
+   * Clears the browser's own underline on a link. Not a decision about how the
+   * exit should read: the style editor can only *add* `text-decoration`, so
+   * starting from none is what leaves it free to choose either way.
+   */
+  text-decoration: none;
+}
+
+.image-stage-close:hover,
+.image-stage-step:hover,
+.image-stage-action:hover {
+  opacity: 1;
+}
+
+/* A step with nowhere to go stays in place rather than shifting the others. */
+.image-stage-step:disabled {
+  opacity: 0.15;
+  cursor: default;
+}
+
+.image-stage-close {
+  top: 0.5rem;
+  right: 0.5rem;
+}
+
+/*
+ * The worded exit: a full-width row above the picture, so its style can align
+ * the text within it. Nothing here decides how it reads — no underline, no
+ * weight, no alignment — that is entirely its style slot's to say.
+ */
+.image-stage-exit {
+  display: block;
+  width: 100%;
+  margin-bottom: 0.75rem;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  /* Cleared for the same reason as the pinned controls: the style editor can
+     only add `text-decoration`, so none is the neutral starting point. */
+  text-decoration: none;
+}
+
+/*
+ * The collection's name, upper left and in flow — it moves the image down the
+ * page rather than sitting on it. It carries the collection page's own title
+ * style, so it is deliberately given no size or weight here: whatever that
+ * style says is what it should look like.
+ */
+.image-stage-name {
+  align-self: flex-start;
+  max-width: 100%;
+  margin-bottom: 0.75rem;
+}
+
+.image-stage-step {
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.image-stage-step.is-previous { left: 0.5rem; }
+.image-stage-step.is-next { right: 0.5rem; }
+
+/* In the flow beneath the picture and its metadata, never over the photograph:
+   a control laid on the image covers the thing being looked at. */
+.image-stage-actions {
+  display: flex;
+  gap: 0.25rem;
+  justify-content: flex-end;
+  width: 100%;
+}
+
+/* Already positioned by their row, so they only need to sit in it. */
+.image-stage-actions > .image-stage-action {
+  position: static;
+}
+
+/* --- Lightbox ------------------------------------------------------------ */
+
+.lightbox-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.92);
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #e8eaed;
+}
+
+/* Over a near-black backdrop the stage fills the window. */
+.lightbox-backdrop .image-stage {
+  width: 100vw;
+  height: 100vh;
+}
+
+/*
+ * The simple one-image lightbox a story uses. It shares the backdrop but not
+ * the collection stage: there is no collection behind it to step through, and
+ * no metadata settings to obey.
+ */
+.lightbox-backdrop:has(> .lightbox-stage) {
+  flex-direction: column;
+}
+
+.lightbox-stage {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  min-height: 0;
+}
+
+.lightbox-stage img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.lightbox-bar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.875rem 1.25rem;
+  font-size: 0.875rem;
+  flex-wrap: wrap;
+}
+
+.lightbox-bar button {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: inherit;
+  border-radius: var(--radius);
+  padding: 0.35rem 0.7rem;
+}
+
+/*
+ * A file field. The drop area is the control — the file input behind it only
+ * exists to open the picker — so it carries the field styling and the whole
+ * box is clickable.
+ */
+.form-dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  padding: 1.5rem 1rem;
+  border: 1px dashed currentColor;
+  border-radius: var(--radius);
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 150ms ease, background 150ms ease;
+}
+
+.form-dropzone:hover,
+.form-dropzone.is-dragging {
+  border-style: solid;
+  background: rgba(127, 127, 127, 0.08);
+}
+
+/* Inert on the builder canvas, where the field is a preview. */
+.form-dropzone[data-disabled="true"] {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.form-dropzone[data-disabled="true"]:hover {
+  border-style: dashed;
+  background: none;
+}
+
+/* Files attached to a submission: a thumbnail where one is possible, always a
+   name, and always a link to the file itself. */
+.submission-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.submission-files a {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  max-width: 6rem;
+  color: inherit;
+  font-size: 0.75rem;
+  text-decoration: none;
+}
+
+.submission-files a:hover {
+  color: var(--admin-accent);
+}
+
+.submission-files img,
+.submission-files video {
+  display: block;
+  width: 4rem;
+  height: 4rem;
+  object-fit: cover;
+  border-radius: var(--radius);
+  background: var(--admin-bg);
+}
+
+.submission-files span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* What has been attached: a thumbnail where one is possible, a name always. */
+.form-dropzone-files {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.75rem;
+}
+
+.form-dropzone-files li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  max-width: 6rem;
+}
+
+.form-dropzone-files img,
+.form-dropzone-files video {
+  display: block;
+  width: 4rem;
+  height: 4rem;
+  object-fit: cover;
+  border-radius: var(--radius);
+}
+
+/* A long file name truncates rather than widening the whole row. */
+.form-dropzone-files span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A form carries its own width, so it centres itself within whatever holds it —
+   a page shell, a page block, or the builder canvas. */
+.form-shell,
+.builder-canvas-content {
+  margin: 0 auto;
+  min-width: 0;
+}
+
+.no-context-menu {
+  -webkit-touch-callout: none;
+  user-select: none;
+}
+
+.share-row {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 1rem;
+}
+
+/* An icon-only control, dressed by the collection's share style. Carries no
+   button chrome of its own so that style has nothing to undo — the size comes
+   from the icon, not from padding. */
+.collection-share {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.75;
+  transition: opacity 150ms ease;
+}
+
+.collection-share:hover {
+  opacity: 1;
+}
+
+/* ----------------------------------------------------------- 10. Stories */
+
+/* Story slots carry no spacing of their own: margins and padding belong to the
+   style editor, so a template controls them rather than fighting a stylesheet.
+   Wrapped in `:where()` so every rule here has zero specificity and any named
+   or local style wins without needing `!important`. */
+
+:where(.story-headline) {
+  font-size: 2.25rem;
+  margin: 0;
+}
+
+:where(.story-subheadline) {
+  font-size: 1.25rem;
+  font-weight: 400;
+  margin: 0;
+}
+
+.story-meta {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+:where(.story-meta) {
+  font-size: 0.875rem;
+  margin: 0;
+}
+
+.story-meta span + span::before {
+  content: "·";
+  margin-right: 0.75rem;
+}
+
+.story-feature {
+  margin: 0;
+}
+
+.story-feature img,
+.story-feature video {
+  width: 100%;
+  height: auto;
+}
+
+:where(.story-feature figcaption),
+:where(.story-feature .story-author) {
+  font-size: 0.8125rem;
+  margin: 0;
+}
+
+/* Page and story bodies paint their own content colours, so a page- or
+   template-level override covers the whole area rather than only the text. */
+/* Every rendered layout paints from the content variables, so a page, story or
+   document template that redeclares them for itself is actually seen. Setting
+   the variables without painting from them leaves only the parts that reference
+   them directly — links and borders — following the override. */
+.page-render,
+.story-render,
+.doc-render {
+  background: var(--content-bg);
+  color: var(--content-text);
+}
+
+.draft-banner {
+  background: #6b5b32;
+  color: #fff;
+  text-align: center;
+  padding: 0.5rem;
+  font-size: 0.875rem;
+}
+
+/* --- Story images placed between paragraphs ------------------------------ */
+
+.story-image {
+  margin: 0 0 1.25rem;
+}
+
+.story-image img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+:where(.story-image figcaption) {
+  font-size: 0.8125rem;
+  margin: 0;
+}
+
+/* A trigger only exists to make the image clickable, so it adds no chrome. */
+.story-image-trigger {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: zoom-in;
+  color: inherit;
+}
+
+/* A clickable image block must not change the picture's size or spacing, so the
+   wrapper contributes nothing of its own. */
+.pb-image-trigger,
+.pb-image-link {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-decoration: none;
+}
+
+.pb-image-trigger {
+  cursor: zoom-in;
+}
+
+.story-image[data-size="small"] { width: 30%; }
+.story-image[data-size="medium"] { width: 50%; }
+.story-image[data-size="large"] { width: 75%; }
+.story-image[data-size="full"] { width: 100%; }
+
+.story-image[data-align="center"] {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.story-image[data-align="left"] {
+  float: left;
+  margin-right: 1.5rem;
+}
+
+.story-image[data-align="right"] {
+  float: right;
+  margin-left: 1.5rem;
+}
+
+/* Nothing can wrap beside a full-width image, so it never floats. */
+.story-image[data-size="full"][data-align="left"],
+.story-image[data-size="full"][data-align="right"] {
+  float: none;
+  margin-left: 0;
+  margin-right: 0;
+}
+
+/* Floated images must not escape the article they belong to. */
+.rich-text::after {
+  content: "";
+  display: table;
+  clear: both;
+}
+
+/* Too narrow to wrap text beside an image; stack instead. */
+@media (max-width: 40rem) {
+  .story-image[data-size] {
+    float: none;
+    width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+  }
+}
+
+/* ----------------------------------------------------- 11. Publications */
+
+.pub-viewer {
+  position: relative;
+  width: 100vw;
+  /* A fixed height, not a minimum: the stage is measured against this box to
+     work out its scale, and a box that grows to fit the unscaled stage would
+     always report that it already fits — leaving the publication full size and
+     running off the screen. Transforms do not change layout, so the stage's
+     footprint stays canvas-sized and is clipped here. */
+  height: 100vh;
+  height: 100dvh;
+  background: #000;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* The stage keeps the authored pixel canvas and is scaled to the viewport, so
+   rem-based text inside keeps its relative size at any screen size. */
+.pub-stage {
+  position: relative;
+  transform-origin: center center;
+  overflow: hidden;
+  /* The stage keeps its authored pixel size and is scaled by the transform.
+     Without this it is a flex item like any other and shrinks to the width of
+     the viewer, so anything wider than the window is squashed — the height
+     stays put and the publication renders at the wrong shape entirely. */
+  flex: none;
+}
+
+.pub-page {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.pub-page[data-transition="fade"] {
+  transition: opacity 450ms ease;
+}
+
+.pub-page[data-transition="slide"] {
+  transition: transform 450ms ease, opacity 450ms ease;
+}
+
+.pub-page[data-transition="flip"] {
+  transition: transform 550ms ease, opacity 300ms ease;
+  backface-visibility: hidden;
+}
+
+.pub-page.is-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.pub-block {
+  position: absolute;
+}
+
+.pub-block img,
+.pub-block video {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.pub-bg {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.pub-bg img,
+.pub-bg video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+@keyframes pub-ken-burns {
+  from { transform: scale(1) translate(0, 0); }
+  to { transform: scale(1.15) translate(-2%, -2%); }
+}
+
+.pub-bg.is-ken-burns img {
+  animation: pub-ken-burns 18s ease-in-out infinite alternate;
+}
+
+.pub-controls {
+  position: fixed;
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 0.5rem;
+  background: rgba(0, 0, 0, 0.55);
+  border-radius: 999px;
+  padding: 0.4rem 0.75rem;
+  z-index: 5;
+}
+
+.pub-controls button {
+  background: transparent;
+  border: none;
+  color: #fff;
+  padding: 0.25rem 0.5rem;
+  border-radius: 999px;
+}
+
+.pub-controls button:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* The publication workspace pans rather than scrolls.
+   `overflow: visible` lets a canvas larger than the space carry on under the
+   side panels, which are painted over it — the editor stays a window onto a
+   surface bigger than itself, instead of shrinking the page to fit. */
+.pub-workspace {
+  position: relative;
+  overflow: visible;
+  padding: 0;
+  touch-action: none;
+  cursor: grab;
+}
+
+.pub-workspace.is-panning {
+  cursor: grabbing;
+}
+
+/* The canvas is clipped to the whole editor body, not to the workspace column,
+   which is what lets it carry on beneath the side panels. It still cannot
+   escape the builder and paint over the admin chrome. */
+.builder-body:has(.pub-workspace) {
+  overflow: hidden;
+}
+
+/* Painted above the panned canvas, so it slides underneath them. */
+.builder-body:has(.pub-workspace) > .builder-outline,
+.builder-body:has(.pub-workspace) > .builder-inspector {
+  position: relative;
+  z-index: 2;
+}
+
+.pub-editor-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  background: #fff;
+  transform-origin: top left;
+  box-shadow: 0 0 0 1px var(--admin-border);
+}
+
+/* The page edge, over the top of everything on it. A block that overhangs
+   stays visible past the line, which is how the overhang is spotted. */
+.pub-editor-bounds {
+  position: absolute;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  outline: 1px solid var(--admin-accent);
+  outline-offset: -1px;
+}
+
+.pub-editor-block {
+  position: absolute;
+  outline: 1px solid transparent;
+}
+
+.pub-editor-block.is-selected {
+  outline: 2px solid var(--admin-accent);
+}
+
+.pub-editor-handle {
+  position: absolute;
+  width: 0.625rem;
+  height: 0.625rem;
+  background: var(--admin-accent);
+  border-radius: 50%;
+  touch-action: none;
+}
+
+/* Stands off the top edge on a stalk, the way a rotation grip is expected to
+   look, so it is not mistaken for a resize corner. */
+.pub-editor-handle.is-rotate {
+  border-radius: 50%;
+  background: var(--admin-panel);
+  box-shadow: 0 0 0 2px var(--admin-accent);
+  cursor: grab;
+}
+
+.pub-editor-handle.is-rotate::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  width: 1px;
+  height: 0.75rem;
+  background: var(--admin-accent);
+}
+
+/* The pages list: ten rows, then it scrolls rather than pushing the page
+   settings below it out of reach. */
+.pub-page-list {
+  max-height: 20rem;
+  overflow-y: auto;
+  margin-bottom: 0.5rem;
+  /* A hairline rather than the platform scrollbar, which is wider than the row
+     actions beside it and pulls the eye away from the list itself. */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
+}
+
+.pub-page-list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.pub-page-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.pub-page-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+}
+
+.pub-page-list:hover::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.pub-zoom {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+/* Where the whole publication is rendered for an export. Off to the side
+   rather than `display: none`, which would leave nothing to capture, and out
+   of the way of clicks and the tab order. */
+.pub-export-stage {
+  position: fixed;
+  top: 0;
+  left: -100000px;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  opacity: 0;
+}
+
+/* Text above a shape rather than in it. Text placed inside is drawn by the
+   shape itself, clipped to its outline — see `.pb-shape-text`.
+
+   A publication block's box is a fixed size, so the label takes its own height
+   and the shape gets what is left, instead of hanging past the bottom. */
+.pub-shape-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  width: 100%;
+  height: 100%;
+}
+
+.pub-shape-label {
+  display: block;
+  flex: 0 0 auto;
+  white-space: pre-wrap;
+}
+
+/* --- Icon search --------------------------------------------------------- */
+
+.icon-search-current {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+  font-size: 0.8125rem;
+  color: var(--admin-muted);
+}
+
+/* Six across, scrolling after a few rows: the library is far too large to lay
+   out in full, and the search above it is the way through. */
+.icon-search-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.2rem;
+  max-height: 11rem;
+  overflow-y: auto;
+  margin-top: 0.4rem;
+  padding: 0.2rem;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--radius);
+}
+
+.icon-search-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1;
+  border: 1px solid transparent;
+  border-radius: 0.25rem;
+  background: transparent;
+  color: var(--admin-text);
+  cursor: pointer;
+}
+
+.icon-search-item:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.icon-search-item.is-selected {
+  border-color: var(--admin-accent);
+  color: var(--admin-accent);
+}
+
+.pub-zoom input {
+  width: 4rem;
+  text-align: center;
+}
+
+/* -------------------------------------------------- 10a. Story editor */
+
+.story-editor-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.story-editor-column {
+  min-width: 0;
+}
+
+@media (max-width: 68rem) {
+  .story-editor-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* What the file says about itself, shown next to wherever it is placed. */
+.media-meta-summary {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
+}
+
+.media-meta-summary .help-text {
+  display: inline-block;
+  overflow-wrap: anywhere;
+}
+
+.story-image-list {
+  list-style: none;
+  margin: 0.75rem 0;
+  padding: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.story-image-row {
+  border: 1px solid var(--admin-border);
+  border-radius: var(--radius);
+  padding: 0.75rem;
+}
+
+.story-image-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+
+.story-image-head img {
+  width: 4rem;
+  height: 4rem;
+  object-fit: cover;
+  border-radius: 0.25rem;
+  flex: none;
+}
+
+/* ------------------------------------------------ 11a. Appearance screen */
+
+/* Settings on the left, live preview on the right. The preview is the larger
+   column because judging colour and spacing needs the room. */
+.appearance-workspace {
+  display: grid;
+  grid-template-columns: 24rem minmax(0, 1fr);
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.appearance-settings {
+  position: sticky;
+  top: 1rem;
+  max-height: calc(100vh - 2rem);
+  overflow-y: auto;
+  margin-bottom: 0;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.appearance-settings::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.appearance-preview-pane {
+  margin-bottom: 0;
+}
+
+/* Save confirmation sits inline beside the Save button in the top row. */
+.save-status {
+  align-self: center;
+  font-size: 0.875rem;
+  color: #81c995;
+}
+
+/* The preview re-creates the public page inside the admin, so it needs the
+   content theme rather than the admin theme. */
+.appearance-preview {
+  border: 1px solid var(--admin-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--content-bg);
+  color: var(--content-text);
+  font-family: var(--body-font);
+}
+
+.appearance-preview-shell {
+  min-height: 32rem;
+}
+
+.appearance-preview .site-main {
+  background: var(--content-bg);
+}
+
+.appearance-preview .page-shell {
+  padding: 2rem 1.25rem 3rem;
+}
+
+.appearance-preview .site-footer {
+  margin-top: 0;
+}
+
+/* One header menu item in the Menu & social tab. */
+.menu-row {
+  border: 1px solid var(--admin-border);
+  border-radius: var(--radius);
+  padding: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+/* Indented so the child links read as belonging to the label above them. */
+.menu-children {
+  margin-top: 0.5rem;
+  padding-left: 0.6rem;
+  border-left: 2px solid var(--admin-border);
+}
+
+/* Nothing inside the preview is interactive. */
+.appearance-preview a,
+.appearance-preview button,
+.appearance-preview input {
+  pointer-events: none;
+}
+
+/* Except the nav's own buttons: opening a dropdown is the only way to see the
+   panel and child-link styles being edited, and the hamburger has to work for
+   the mobile menu to be previewable. The links inside stay inert. */
+.appearance-preview .site-nav-label,
+.appearance-preview .site-nav-toggle {
+  pointer-events: auto;
+}
+
+/* --------------------------------------------------- 11b. Media library */
+
+/* Grid on the left, inspector on the right. The inspector sticks so it stays
+   in view while scrolling a long library. */
+.media-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 22rem;
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.media-workspace > .panel {
+  margin-bottom: 0;
+}
+
+.media-inspector {
+  position: sticky;
+  top: 1rem;
+  max-height: calc(100vh - 2rem);
+  overflow-y: auto;
+}
+
+.media-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr));
+  gap: 0.625rem;
+}
+
+.media-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.35rem;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--admin-text);
+  text-align: left;
+  /* Selection is driven by modifier keys, so text selection must not fight it. */
+  user-select: none;
+}
+
+.media-tile:hover {
+  border-color: var(--admin-accent);
+}
+
+.media-tile.is-selected {
+  border-color: var(--admin-accent);
+  box-shadow: inset 0 0 0 1px var(--admin-accent);
+  background: rgba(138, 180, 248, 0.12);
+}
+
+.media-tile img {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border-radius: 0.25rem;
+}
+
+.media-tile-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1 / 1;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--admin-muted);
+}
+
+.media-tile-name,
+.media-tile-usage {
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.6875rem;
+}
+
+.media-tile-usage {
+  font-size: 0.625rem;
+  color: var(--admin-muted);
+}
+
+.media-tile-check {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  width: 1.1rem;
+  height: 1.1rem;
+  border-radius: 0.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  color: #fff;
+}
+
+.media-tile.is-selected .media-tile-check {
+  background: var(--admin-accent);
+  border-color: var(--admin-accent);
+  color: #0b0f14;
+}
+
+.selection-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+  font-size: 0.875rem;
+}
+
+/* ------------------------------------------------------ Upload dropzone */
+
+.dropzone {
+  border: 2px dashed var(--admin-border);
+  border-radius: var(--radius);
+  padding: 2.5rem 1.25rem;
+  text-align: center;
+  color: var(--admin-muted);
+  background: rgba(255, 255, 255, 0.02);
+  cursor: pointer;
+  transition: border-color 150ms ease, background 150ms ease;
+}
+
+.dropzone:hover,
+.dropzone:focus-visible {
+  border-color: var(--admin-accent);
+  color: var(--admin-text);
+}
+
+.dropzone.is-dragging {
+  border-color: var(--admin-accent);
+  background: rgba(138, 180, 248, 0.12);
+  color: var(--admin-text);
+}
+
+.upload-queue {
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0;
+  max-height: 16rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.upload-queue li {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  font-size: 0.8125rem;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--radius);
+  padding: 0.4rem 0.6rem;
+}
+
+.upload-queue .name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.upload-status {
+  font-size: 0.75rem;
+  color: var(--admin-muted);
+}
+
+.upload-status.is-done { color: #81c995; }
+.upload-status.is-error { color: #f28b82; }
+
+.upload-progress {
+  height: 0.35rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+  margin-top: 0.75rem;
+}
+
+.upload-progress > span {
+  display: block;
+  height: 100%;
+  background: var(--admin-accent);
+  transition: width 200ms ease;
+}
+
+/*
+ * When the stacked admin layout hands scrolling back to the document, hide the
+ * document scrollbar too. `:has()` keeps this scoped to admin pages without a
+ * class on <html>; browsers without it simply show a normal scrollbar.
+ */
+html:has(.admin-shell),
+html:has(.admin-shell) body {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+html:has(.admin-shell)::-webkit-scrollbar,
+html:has(.admin-shell) body::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+/* -------------------------------------------------------- 12. Safe mode */
+
+.nsfw-shield {
+  position: relative;
+}
+
+.nsfw-shield > * {
+  filter: blur(1.75rem);
+  transition: filter 200ms ease;
+}
+
+.nsfw-shield::after {
+  content: "Sensitive content — safe mode is on";
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 1rem;
+  font-size: 0.8125rem;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.safe-mode-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8125rem;
+}
+
+/* ------------------------------------------------------- 13. Responsive */
+
+@media (max-width: 60rem) {
+  /* Stacked layout scrolls the document instead of the main pane. */
+  .admin-shell {
+    grid-template-columns: 1fr;
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+  }
+
+  .admin-main {
+    height: auto;
+    overflow: visible;
+  }
+
+  .admin-sidebar {
+    position: static;
+    height: auto;
+    flex-direction: row;
+    flex-wrap: wrap;
+    border-right: none;
+    border-bottom: 1px solid var(--admin-border);
+  }
+
+  .admin-nav-group {
+    width: 100%;
+  }
+
+  .admin-main {
+    padding: 1.25rem 1rem 3rem;
+  }
+
+  /* The stacked layout has no fixed height to fill, so the builder grows. */
+  .builder {
+    height: auto;
+    min-height: 100vh;
+  }
+
+  .builder-body {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr auto;
+  }
+
+  .builder-outline,
+  .builder-inspector {
+    max-height: 16rem;
+    border-left: none;
+    border-right: none;
+    border-bottom: 1px solid var(--admin-border);
+  }
+
+  /* Side panels drop below the main content rather than squeezing it. */
+  .media-workspace,
+  .appearance-workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .appearance-settings {
+    position: static;
+    max-height: none;
+  }
+
+  .media-inspector {
+    position: static;
+    max-height: none;
+  }
+}
+
+/*
+ * Rows stack only on a narrow portrait screen — a phone held upright. A narrow
+ * desktop window or a phone in landscape keeps its columns side by side.
+ */
+@media (max-width: 48rem) and (orientation: portrait) {
+  .pb-row-inner {
+    flex-wrap: wrap;
+  }
+
+  .pb-row-inner > .pb-column {
+    flex: 0 0 100% !important;
+    max-width: 100% !important;
+  }
+}
+
+/* The builder's mobile preview mirrors that, since the canvas is narrower than
+   the window and cannot trigger the media query itself. */
+.builder-canvas[data-viewport="mobile"] .pb-row-inner {
+  flex-wrap: wrap;
+}
+
+.builder-canvas[data-viewport="mobile"] .pb-row-inner > .pb-column {
+  flex: 0 0 100% !important;
+  max-width: 100% !important;
+}
+
+/* Containers are deliberately absent here: each one emits its own mobile grid
+   from its Layout settings, and a blanket single-column rule would override
+   the very setting the container config exposes. */
+
+@media (max-width: 48rem) {
+  .collection-grid,
+  .collection-mosaic,
+  .collection-masonry {
+    grid-template-columns: repeat(var(--collection-columns-mobile, 1), minmax(0, 1fr));
+  }
+
+  /* Every span collapses to one, so the shape has to come back to the base
+     cell — the tile's own ratio was worked out from a span it no longer has. */
+  .collection-mosaic .collection-item {
+    grid-column: span 1 !important;
+    grid-row: span 1 !important;
+    aspect-ratio: var(--tile-cell, auto) !important;
+  }
+
+  .story-headline {
+    font-size: 1.75rem;
+  }
+}
+
+@media (min-width: 48.0625rem) and (max-width: 64rem) {
+  .collection-grid,
+  .collection-mosaic,
+  .collection-masonry {
+    grid-template-columns: repeat(var(--collection-columns-tablet, 2), minmax(0, 1fr));
+  }
+}
+
+/*
+ * The collection editor's viewport switch, mirroring the two rules above.
+ * The canvas is a narrow box inside a wide window, so it can never trigger a
+ * media query itself — without this the preview would keep its desktop column
+ * count at every width and the switch would only change the frame.
+ */
+.builder-canvas[data-viewport="tablet"] .collection-grid,
+.builder-canvas[data-viewport="tablet"] .collection-mosaic,
+.builder-canvas[data-viewport="tablet"] .collection-masonry {
+  grid-template-columns: repeat(var(--collection-columns-tablet, 2), minmax(0, 1fr));
+}
+
+.builder-canvas[data-viewport="mobile"] .collection-grid,
+.builder-canvas[data-viewport="mobile"] .collection-mosaic,
+.builder-canvas[data-viewport="mobile"] .collection-masonry {
+  grid-template-columns: repeat(var(--collection-columns-mobile, 1), minmax(0, 1fr));
+}
+
+.builder-canvas[data-viewport="mobile"] .collection-mosaic .collection-item {
+  grid-column: span 1 !important;
+  grid-row: span 1 !important;
+  aspect-ratio: var(--tile-cell, auto) !important;
+}
+
+/* A video embed. The iframe carries its own size from the block settings; this
+   only removes the browser's default border and keeps it from overflowing a
+   narrow column. */
+.pb-embed {
+  display: block;
+  border: 0;
+  max-width: 100%;
+}

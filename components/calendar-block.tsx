@@ -1,0 +1,230 @@
+"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+
+import {
+  filterCalendarEvents,
+  monthKeyFromDateKey,
+  monthLabel,
+  monthRange,
+  shiftDateKey,
+  shiftMonthKey,
+  weekLabel,
+  weekRange,
+  type CalendarDisplay,
+  type CalendarEventRecord,
+  type CalendarView,
+} from "@/lib/calendar";
+
+import { calendarStyleClass, type CalendarStyleRecord } from "@/lib/calendar-style";
+
+import type { PageRow } from "@/lib/page-layout";
+import type { PageSources } from "@/lib/page-source-types";
+
+import { CalendarGrid } from "./calendar-grid";
+import { CalendarEventLightbox } from "./calendar-event-lightbox";
+
+/** The inclusive range a view covers, as one cache key. */
+function rangeKey(view: CalendarView, date: string): string {
+  const { start, end } =
+    view === "week" ? weekRange(date) : monthRange(monthKeyFromDateKey(date));
+  return `${start}:${end}`;
+}
+
+/**
+ * The public calendar: the same grid the admin screen draws, plus its own
+ * navigation and an event lightbox.
+ *
+ * Events for the first range are handed down from the server so the page paints
+ * complete and indexable. Moving to another month fetches that range and caches
+ * it, so stepping back and forth does not re-query.
+ */
+export function CalendarBlock({
+  display,
+  style,
+  layouts,
+  sources,
+  initialEvents,
+  /** Today in the calendar's configured zone; "" when the host cannot say. */
+  todayKey,
+  interactive = true,
+}: {
+  display: CalendarDisplay;
+  /** The resolved Calendar Style this calendar wears. */
+  style: CalendarStyleRecord;
+  /** Layouts the style references, keyed by id. */
+  layouts: Record<string, PageRow[]>;
+  /** Records referenced by those layouts' page blocks. */
+  sources: PageSources;
+  initialEvents: CalendarEventRecord[];
+  todayKey: string;
+  interactive?: boolean;
+}) {
+  const [view, setView] = useState<CalendarView>(display.view);
+  // Where the visitor has navigated to; "" means "wherever `todayKey` is".
+  // `todayKey` is always resolved on the server — both the page and the builder
+  // preview supply it — so no date is ever computed during render, where the
+  // server's zone and the browser's could disagree and break hydration.
+  const [anchorOverride, setAnchorOverride] = useState("");
+  const [selected, setSelected] = useState<CalendarEventRecord | null>(null);
+
+  const anchor = anchorOverride || todayKey;
+
+  // Seeded with whatever the server already sent for the opening range.
+  const cache = useRef<Record<string, CalendarEventRecord[]>>(
+    todayKey ? { [rangeKey(display.view, todayKey)]: initialEvents } : {}
+  );
+  const [events, setEvents] = useState<CalendarEventRecord[]>(initialEvents);
+  const [loading, setLoading] = useState(false);
+
+  const load = useCallback(
+    async (currentView: CalendarView, date: string) => {
+      if (!date) return;
+
+      const key = rangeKey(currentView, date);
+      const cached = cache.current[key];
+      if (cached) {
+        setEvents(cached);
+        return;
+      }
+
+      const [start, end] = key.split(":");
+      setLoading(true);
+      try {
+        const response = await fetch(
+          `/api/calendar/events?start=${start}&end=${end}`
+        );
+        if (!response.ok) return;
+        const result = await response.json();
+        const loaded: CalendarEventRecord[] = result.events ?? [];
+        cache.current[key] = loaded;
+        setEvents(loaded);
+      } catch {
+        // A failed fetch leaves the previous range on screen rather than
+        // blanking the calendar.
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
+
+  useEffect(() => {
+    void load(view, anchor);
+  }, [load, view, anchor]);
+
+  if (!anchor) return <div className="pb-calendar is-loading" />;
+
+  const visible = filterCalendarEvents(events, display);
+  const eventBox = style.eventBox[view === "week" ? "week" : "month"];
+  const rangeLabel =
+    view === "week" ? weekLabel(anchor) : monthLabel(monthKeyFromDateKey(anchor));
+
+  const step = (direction: -1 | 1) => {
+    if (view === "week") {
+      setAnchorOverride(shiftDateKey(anchor, direction * 7));
+    } else {
+      setAnchorOverride(`${shiftMonthKey(monthKeyFromDateKey(anchor), direction)}-01`);
+    }
+  };
+
+  const showsToday = todayKey
+    ? view === "week"
+      ? weekRange(anchor).start <= todayKey && todayKey <= weekRange(anchor).end
+      : monthKeyFromDateKey(anchor) === monthKeyFromDateKey(todayKey)
+    : true;
+
+  return (
+    <div
+      // The style's class sits on the wrapper so its rules reach the toolbar as
+      // well as the grid, and so two calendars on a page can wear different
+      // styles without colliding.
+      className={`pb-calendar ${calendarStyleClass(style.slug)} is-${view}${
+        loading ? " is-loading" : ""
+      }`}
+    >
+      {display.showNav || display.showViewSwitch ? (
+        <div className="calendar-toolbar">
+          {display.showNav ? (
+            <button
+              type="button"
+              className="btn btn-sm"
+              aria-label={`Previous ${view}`}
+              onClick={() => step(-1)}
+            >
+              ‹ Prev
+            </button>
+          ) : null}
+
+          <strong className="calendar-month-label">{rangeLabel}</strong>
+
+          {display.showNav ? (
+            <button
+              type="button"
+              className="btn btn-sm"
+              aria-label={`Next ${view}`}
+              onClick={() => step(1)}
+            >
+              Next ›
+            </button>
+          ) : null}
+
+          {display.showNav && !showsToday ? (
+            <button
+              type="button"
+              className="btn btn-sm"
+              onClick={() => setAnchorOverride("")}
+            >
+              Today
+            </button>
+          ) : null}
+
+          {display.showViewSwitch ? (
+            <div className="calendar-view-switch" role="group" aria-label="Calendar view">
+              <button
+                type="button"
+                className={`btn btn-sm${view === "month" ? " is-active" : ""}`}
+                aria-pressed={view === "month"}
+                onClick={() => setView("month")}
+              >
+                Month
+              </button>
+              <button
+                type="button"
+                className={`btn btn-sm${view === "week" ? " is-active" : ""}`}
+                aria-pressed={view === "week"}
+                onClick={() => setView("week")}
+              >
+                Week
+              </button>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      <CalendarGrid
+        view={view}
+        anchorDate={anchor}
+        events={visible}
+        todayKey={todayKey}
+        eventBox={eventBox}
+        layouts={layouts}
+        sources={sources}
+        showWeekdays={display.showWeekdays}
+        onSelectEvent={
+          display.lightbox && interactive ? (event) => setSelected(event) : undefined
+        }
+      />
+
+      {display.lightbox ? (
+        <CalendarEventLightbox
+          event={selected}
+          onClose={() => setSelected(null)}
+          lightbox={style.lightbox}
+          layouts={layouts}
+          sources={sources}
+        />
+      ) : null}
+    </div>
+  );
+}

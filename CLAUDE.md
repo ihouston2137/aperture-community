@@ -1,0 +1,2 @@
+@AGENTS.md
+@BUILD_FROM_SCRATCH.md

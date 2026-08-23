@@ -1,0 +1,44 @@
+{
+  "name": "aperture",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "bcrypt-ts": "^8.0.1",
+    "html-to-image": "^1.11.13",
+    "jose": "^6.2.2",
+    "jspdf": "^4.2.1",
+    "lucide-react": "^1.18.0",
+    "mongoose": "^9.7.3",
+    "next": "16.2.10",
+    "nodemailer": "^9.0.0",
+    "qrcode": "^1.5.4",
+    "quill": "^2.0.3",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "react-quill-new": "^3.8.3",
+    "three": "^0.185.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/nodemailer": "^8.0.1",
+    "@types/qrcode": "^1.5.6",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@types/three": "^0.185.3",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.10",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  },
+  "allowScripts": {
+    "sharp@0.34.5": true,
+    "unrs-resolver@1.12.2": true
+  }
+}

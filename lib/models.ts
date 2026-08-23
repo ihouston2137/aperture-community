@@ -1,0 +1,965 @@
+import mongoose, { Schema, type Model } from "mongoose";
+
+import { BIO_TYPES } from "./bio-types";
+import { CALENDAR_EVENT_STATUSES, CALENDAR_TEMPLATE_KINDS } from "./calendar";
+import { STORY_TEMPLATE_LAYOUT_VERSION } from "./story-template-layout";
+import {
+  MEDIA_CLICK_ACTIONS,
+  STORY_IMAGE_ALIGNMENTS,
+  STORY_IMAGE_SIZES,
+} from "./story-media";
+
+/**
+ * All builder layouts (pages, forms, publications, story templates) are stored
+ * as mixed JSON arrays. The schema layer is deliberately permissive there —
+ * normalization lives in the `lib/*-layout.ts` helpers instead of in Mongoose.
+ */
+
+const Mixed = Schema.Types.Mixed;
+
+/**
+ * Models are typed as `Model<any>` on purpose. A generic `model()` helper
+ * makes the TypeScript checker blow its heap on Mongoose 9's conditional types,
+ * and every read path here already goes through `.lean()` plus the explicit
+ * normalizers in `lib/*-layout.ts`.
+ */
+function model(name: string, schema: Schema): Model<any> {
+  return (mongoose.models[name] as Model<any>) ?? mongoose.model(name, schema);
+}
+
+/* ------------------------------------------------------------------ Access */
+
+export type UserDoc = {
+  _id: mongoose.Types.ObjectId;
+  email: string;
+  passwordHash: string;
+  name: string;
+  mustChangePassword: boolean;
+  roleIds: mongoose.Types.ObjectId[];
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+const UserSchema = new Schema<any>(
+  {
+    email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+    passwordHash: { type: String, required: true },
+    name: { type: String, default: "" },
+    mustChangePassword: { type: Boolean, default: false },
+    roleIds: [{ type: Schema.Types.ObjectId, ref: "Role" }],
+    isActive: { type: Boolean, default: true },
+  },
+  { timestamps: true }
+);
+
+export const User = model("User", UserSchema);
+
+export type RoleDoc = {
+  _id: mongoose.Types.ObjectId;
+  name: string;
+  slug: string;
+  description: string;
+  permissions: string[];
+  isSystem: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+const RoleSchema = new Schema<any>(
+  {
+    name: { type: String, required: true },
+    slug: { type: String, required: true, unique: true },
+    description: { type: String, default: "" },
+    permissions: [{ type: String }],
+    isSystem: { type: Boolean, default: false },
+  },
+  { timestamps: true }
+);
+
+export const Role = model("Role", RoleSchema);
+
+/* --------------------------------------------------- Legacy / home content */
+
+const PhotoSchema = new Schema<any>(
+  {
+    title: { type: String, default: "" },
+    place: { type: String, default: "" },
+    alt: { type: String, default: "" },
+    src: { type: String, default: "" },
+    featured: { type: Boolean, default: false },
+    published: { type: Boolean, default: true },
+    order: { type: Number, default: 0 },
+    orientation: { type: String, default: "landscape" },
+  },
+  { timestamps: true }
+);
+
+export const Photo = model("Photo", PhotoSchema);
+
+const SettingsSchema = new Schema<any>(
+  {
+    photographerName: { type: String, default: "" },
+    location: { type: String, default: "" },
+    bio: { type: String, default: "" },
+    email: { type: String, default: "" },
+    heroTitle: { type: String, default: "" },
+    heroSubtitle: { type: String, default: "" },
+    instagram: { type: String, default: "" },
+    vimeo: { type: String, default: "" },
+  },
+  { timestamps: true }
+);
+
+export const Settings = model("Settings", SettingsSchema);
+
+export const CONTENT_WIDTHS = ["full", "wide", "standard", "narrow"] as const;
+
+const AppearanceSchema = new Schema<any>(
+  {
+    headerBackground: { type: String, default: "#0f1115" },
+    headerText: { type: String, default: "#f5f5f5" },
+    headerAccent: { type: String, default: "#8ab4f8" },
+
+    // Header layout
+    headerWidth: { type: String, enum: CONTENT_WIDTHS, default: "standard" },
+    headerPaddingY: { type: Number, default: 1 },
+    headerSticky: { type: Boolean, default: false },
+    headerBorderEnabled: { type: Boolean, default: true },
+    headerBorderWidth: { type: Number, default: 0.0625 },
+    headerBorderColor: { type: String, default: "#262b33" },
+    headerShadow: { type: Boolean, default: false },
+    headerNavAlign: { type: String, enum: ["left", "center", "right"], default: "right" },
+    headerNavSize: { type: Number, default: 0.9375 },
+    headerNavGap: { type: Number, default: 1.25 },
+    adminBackground: { type: String, default: "#101317" },
+    adminPanel: { type: String, default: "#171b21" },
+    adminText: { type: String, default: "#e8eaed" },
+    adminAccent: { type: String, default: "#8ab4f8" },
+    contentBackground: { type: String, default: "#ffffff" },
+    contentText: { type: String, default: "#16181d" },
+    contentAccent: { type: String, default: "#2b6cb0" },
+    footerBackground: { type: String, default: "#0f1115" },
+    footerText: { type: String, default: "#c9ced6" },
+
+    // Footer layout
+    footerWidth: { type: String, enum: CONTENT_WIDTHS, default: "standard" },
+    footerPaddingY: { type: Number, default: 2 },
+    footerBorderEnabled: { type: Boolean, default: false },
+    footerBorderWidth: { type: Number, default: 0.0625 },
+    footerBorderColor: { type: String, default: "#262b33" },
+    footerAlign: {
+      type: String,
+      enum: ["left", "center", "between"],
+      default: "between",
+    },
+    footerFontSize: { type: Number, default: 0.875 },
+    footerColumnGap: { type: Number, default: 1.5 },
+    footerRowGap: { type: Number, default: 1.25 },
+
+    headingFont: { type: String, default: "system-ui" },
+    bodyFont: { type: String, default: "system-ui" },
+    faviconUrl: { type: String, default: "" },
+    // Per-element text styling for the public header, page body and footer.
+    textStyles: { type: Mixed, default: {} },
+  },
+  { timestamps: true }
+);
+
+export const Appearance = model("Appearance", AppearanceSchema);
+
+const MenuChildSchema = new Schema<any>(
+  {
+    label: { type: String, default: "" },
+    href: { type: String, default: "" },
+    newTab: { type: Boolean, default: false },
+  },
+  { _id: false }
+);
+
+const MenuLinkSchema = new Schema<any>(
+  {
+    label: { type: String, default: "" },
+    href: { type: String, default: "" },
+    newTab: { type: Boolean, default: false },
+    // A `label` is not a link itself; it opens a dropdown of its children.
+    kind: { type: String, enum: ["link", "label"], default: "link" },
+    children: { type: [MenuChildSchema], default: [] },
+    showCaret: { type: Boolean, default: true },
+  },
+  { _id: false }
+);
+
+const SocialLinkSchema = new Schema<any>(
+  {
+    platform: { type: String, default: "" },
+    label: { type: String, default: "" },
+    href: { type: String, default: "" },
+  },
+  { _id: false }
+);
+
+const SiteContentSchema = new Schema<any>(
+  {
+    metaTitle: { type: String, default: "Aperture" },
+    metaDescription: { type: String, default: "" },
+    metaImageUrl: { type: String, default: "" },
+
+    headerBrandText: { type: String, default: "Aperture" },
+    headerBrandHref: { type: String, default: "/" },
+    headerTagline: { type: String, default: "" },
+    logoUrl: { type: String, default: "" },
+    logoMediaId: { type: String, default: "" },
+    logoHeight: { type: Number, default: 40 },
+    showLogo: { type: Boolean, default: false },
+    showBrandText: { type: Boolean, default: true },
+
+    menuLinks: { type: [MenuLinkSchema], default: [] },
+
+    availabilityEnabled: { type: Boolean, default: false },
+    availabilityLabel: { type: String, default: "" },
+    availabilityHref: { type: String, default: "" },
+
+    socialLinks: { type: [SocialLinkSchema], default: [] },
+
+    footerBrandText: { type: String, default: "" },
+    footerLogoUrl: { type: String, default: "" },
+    footerLogoMediaId: { type: String, default: "" },
+    footerLogoHeight: { type: Number, default: 32 },
+    showFooterLogo: { type: Boolean, default: false },
+    footerText: { type: String, default: "" },
+    copyright: { type: String, default: "" },
+
+    // Defaults inherited by collections unless a collection overrides them.
+    collectionTemplateDefaults: { type: Mixed, default: {} },
+    collectionDisplayDefaults: { type: Mixed, default: {} },
+    collectionStyleOverrides: { type: Mixed, default: {} },
+
+    safeModeDefault: { type: Boolean, default: true },
+  },
+  { timestamps: true }
+);
+
+export const SiteContent = model("SiteContent", SiteContentSchema);
+
+/* ------------------------------------------------------------------- Email */
+
+const EmailSettingsSchema = new Schema<any>(
+  {
+    enabled: { type: Boolean, default: false },
+    host: { type: String, default: "" },
+    port: { type: Number, default: 587 },
+    secure: { type: Boolean, default: false },
+    username: { type: String, default: "" },
+    password: { type: String, default: "" },
+    fromName: { type: String, default: "" },
+    fromEmail: { type: String, default: "" },
+    replyTo: { type: String, default: "" },
+    notificationRecipients: [{ type: String }],
+    notifyOnFormSubmission: { type: Boolean, default: true },
+    lastVerifiedAt: { type: Date, default: null },
+  },
+  { timestamps: true }
+);
+
+export const EmailSettings = model("EmailSettings", EmailSettingsSchema);
+
+/* --------------------------------------------------------------- Analytics */
+
+const AnalyticsSettingsSchema = new Schema<any>(
+  {
+    enabled: { type: Boolean, default: true },
+    /**
+     * Which zone's calendar a "day" follows. Every bucket key and every log
+     * file name is derived in this zone, so changing it changes what the
+     * boundaries mean — the processor reprocesses from the logs when it does.
+     */
+    timezone: { type: String, default: "America/New_York" },
+    /** Days of raw log files to keep. 0 keeps them forever. */
+    retentionDays: { type: Number, default: 400 },
+    /** Minutes between scheduled processing runs. */
+    intervalMinutes: { type: Number, default: 15 },
+    /**
+     * Whether the reports open with signed-in traffic filtered out. Both sets
+     * of figures are always stored, so this only chooses which is shown first;
+     * the view can be switched either way at any time.
+     */
+    excludeLoggedInByDefault: { type: Boolean, default: false },
+  },
+  { timestamps: true }
+);
+
+export const AnalyticsSettings = model("AnalyticsSettings", AnalyticsSettingsSchema);
+
+/**
+ * Where the processor left off.
+ *
+ * `lastFinalizedDay` is the guarantee behind "a finished day is processed once
+ * more, then never again": every day after it that has since ended gets one
+ * final pass on the next run, and the marker moves up behind them.
+ */
+const AnalyticsStateSchema = new Schema<any>(
+  {
+    lastFinalizedDay: { type: String, default: "" },
+    lastRunAt: { type: Date, default: null },
+    lastRunMs: { type: Number, default: 0 },
+    lastError: { type: String, default: "" },
+    /** The zone the stored summaries were built under. */
+    timezone: { type: String, default: "" },
+  },
+  { timestamps: true }
+);
+
+export const AnalyticsState = model("AnalyticsState", AnalyticsStateSchema);
+
+export const ANALYTICS_PERIODS = ["hour", "day", "month", "year"] as const;
+
+const AnalyticsSummarySchema = new Schema<any>(
+  {
+    period: { type: String, enum: ANALYTICS_PERIODS, required: true },
+    /** `2026`, `2026-08`, `2026-08-13`, `2026-08-13T14`. Sorts chronologically. */
+    key: { type: String, required: true },
+    /** The instant the bucket opens, for charting without parsing keys. */
+    startedAt: { type: Date, required: true },
+
+    /* Everyone. */
+    visitors: { type: Number, default: 0 },
+    visits: { type: Number, default: 0 },
+    pageViews: { type: Number, default: 0 },
+    /** Collection pictures opened full screen. Never folded into page views. */
+    imageViews: { type: Number, default: 0 },
+    downloads: { type: Number, default: 0 },
+    /**
+     * Hits identified by address rather than by a returned cookie. A high share
+     * means the visitor counts lean on a weaker signal, where people sharing an
+     * address and a browser merge into one.
+     */
+    fallbackHits: { type: Number, default: 0 },
+    sources: { type: Mixed, default: [] },
+    pages: { type: Mixed, default: [] },
+    /** `[{ label, count }]`, by `Collection Name - Image Title`. */
+    images: { type: Mixed, default: [] },
+    files: { type: Mixed, default: [] },
+
+    /** Distinct visitors who were signed in at some point in this bucket. */
+    loggedInVisitors: { type: Number, default: 0 },
+
+    /**
+     * The same figures with every signed-in visitor's traffic removed.
+     *
+     * Stored rather than subtracted at read time because visitors and visits
+     * are distinct counts, which do not subtract: a report cannot work out how
+     * many unique people are left once some of them are taken away. Absent on
+     * summaries written before this existed, where the reader falls back to
+     * the unfiltered figures.
+     */
+    anon: { type: Mixed, default: null },
+
+    timezone: { type: String, default: "" },
+    /** Set once the day is over and has had its final pass. */
+    finalized: { type: Boolean, default: false },
+  },
+  { timestamps: true }
+);
+
+AnalyticsSummarySchema.index({ period: 1, key: 1 }, { unique: true });
+AnalyticsSummarySchema.index({ period: 1, startedAt: 1 });
+
+export const AnalyticsSummary = model("AnalyticsSummary", AnalyticsSummarySchema);
+
+/**
+ * The distinct ids seen on one day, kept apart from the summary that reports it.
+ *
+ * A month's visitor count is not the sum of its days — someone who came on
+ * Monday and Thursday is one visitor, not two — so the only way to roll a month
+ * or a year up exactly is to union the ids underneath it. They live here rather
+ * than on the summary because every chart reads summaries and none of them want
+ * to drag thousands of ids along.
+ */
+const AnalyticsDayIdsSchema = new Schema<any>(
+  {
+    day: { type: String, required: true, unique: true },
+    visitorIds: { type: [String], default: [] },
+    visitIds: { type: [String], default: [] },
+    /**
+     * The subset that was signed in at some point that day. Held as a subset
+     * rather than a separate set so a month's anonymous count is the union of
+     * its days minus the union of these — exact, and computed the same way at
+     * every level.
+     */
+    loggedInVisitorIds: { type: [String], default: [] },
+    loggedInVisitIds: { type: [String], default: [] },
+    /**
+     * Which anonymous id belonged to which signed-in account. This is the
+     * record that ties the two together; it exists so an administrator can see
+     * that a given account's traffic is what the filter is removing.
+     */
+    identities: { type: Mixed, default: [] },
+    /** Set when a day exceeded the cap and its ids are a sample, not the set. */
+    truncated: { type: Boolean, default: false },
+  },
+  { timestamps: true }
+);
+
+export const AnalyticsDayIds = model("AnalyticsDayIds", AnalyticsDayIdsSchema);
+
+/* -------------------------------------------------------- People and media */
+
+export { BIO_TYPES };
+
+const BioSchema = new Schema<any>(
+  {
+    name: { type: String, required: true },
+    slug: { type: String, required: true, unique: true },
+    /*
+     * Not an enum: profiles saved under the older three-way split still hold
+     * `Author` or `Model`, and validating on read would reject them. They are
+     * mapped through `normalizeBioType` wherever the value is used, and rewritten
+     * the next time the profile is saved.
+     */
+    type: { type: String, default: "Person" },
+    title: { type: String, default: "" },
+    location: { type: String, default: "" },
+    description: { type: String, default: "" },
+    headshotMediaId: { type: String, default: "" },
+    headshotUrl: { type: String, default: "" },
+    isPrimary: { type: Boolean, default: false },
+  },
+  { timestamps: true }
+);
+
+export const Bio = model("Bio", BioSchema);
+
+export const MEDIA_TYPES = ["image", "video", "audio", "file"] as const;
+export const MEDIA_PROVIDERS = ["local", "youtube", "vimeo"] as const;
+export const MEDIA_USAGE_KINDS = [
+  "page",
+  "story-feature",
+  "story-content",
+  "collection",
+  "publication",
+  "bio-headshot",
+  "form-content",
+  "form-upload",
+  "site-logo",
+] as const;
+
+export type MediaUsageKind = (typeof MEDIA_USAGE_KINDS)[number];
+
+const MediaUsageSchema = new Schema<any>(
+  {
+    kind: { type: String, enum: MEDIA_USAGE_KINDS, required: true },
+    refId: { type: String, default: "" },
+    label: { type: String, default: "" },
+  },
+  { _id: false }
+);
+
+const MediaAssetSchema = new Schema<any>(
+  {
+    filename: { type: String, default: "" },
+    fileName: { type: String, default: "" },
+    url: { type: String, default: "" },
+    /** Small derivative used by the admin grids; empty when none exists. */
+    thumbnailUrl: { type: String, default: "" },
+    width: { type: Number, default: 0 },
+    height: { type: Number, default: 0 },
+    originalName: { type: String, default: "" },
+    mimeType: { type: String, default: "" },
+    size: { type: Number, default: 0 },
+    title: { type: String, default: "" },
+    alt: { type: String, default: "" },
+    caption: { type: String, default: "" },
+    captureDate: { type: Date, default: null },
+    author: { type: String, default: "" },
+    authorBioId: { type: String, default: "" },
+    subjectBioId: { type: String, default: "" },
+    orientation: { type: String, default: "" },
+    isNsfw: { type: Boolean, default: false },
+    tags: [{ type: String }],
+    mediaType: { type: String, enum: MEDIA_TYPES, default: "image" },
+    provider: { type: String, enum: MEDIA_PROVIDERS, default: "local" },
+    embedUrl: { type: String, default: "" },
+    usage: { type: [MediaUsageSchema], default: [] },
+  },
+  { timestamps: true }
+);
+
+/**
+ * The media library is expected to hold thousands of assets, so every filter
+ * the admin exposes is backed by an index and applied in the database rather
+ * than in the browser.
+ */
+MediaAssetSchema.index({ createdAt: -1 });
+MediaAssetSchema.index({ mediaType: 1, createdAt: -1 });
+MediaAssetSchema.index({ "usage.refId": 1 });
+MediaAssetSchema.index({ "usage.kind": 1, createdAt: -1 });
+// `syncMediaUsage` resolves url-only references back to assets.
+MediaAssetSchema.index({ url: 1 });
+MediaAssetSchema.index({ tags: 1 });
+
+export const MediaAsset = model("MediaAsset", MediaAssetSchema);
+
+/* --------------------------------------------------- Stories & collections */
+
+export const STORY_STATUSES = ["draft", "published"] as const;
+
+/**
+ * Alt text and captions deliberately live on the `MediaAsset`, not here, so one
+ * description follows a file everywhere it is used.
+ */
+/** Per-document content colour overrides; "" means use the site setting. */
+const ColorOverrideSchema = new Schema<any>(
+  {
+    background: { type: String, default: "" },
+    text: { type: String, default: "" },
+    accent: { type: String, default: "" },
+  },
+  { _id: false }
+);
+
+const StoryImageSchema = new Schema<any>(
+  {
+    mediaId: { type: String, default: "" },
+    url: { type: String, default: "" },
+    size: { type: String, enum: STORY_IMAGE_SIZES, default: "medium" },
+    align: { type: String, enum: STORY_IMAGE_ALIGNMENTS, default: "center" },
+    /** Which top-level block of the content the image follows; 0 is above it. */
+    afterParagraph: { type: Number, default: 0 },
+    clickAction: { type: String, enum: MEDIA_CLICK_ACTIONS, default: "none" },
+    linkHref: { type: String, default: "" },
+    linkNewTab: { type: Boolean, default: false },
+    order: { type: Number, default: 0 },
+  },
+  { _id: false }
+);
+
+const StorySchema = new Schema<any>(
+  {
+    headline: { type: String, required: true },
+    slug: { type: String, required: true, unique: true },
+    subHeadline: { type: String, default: "" },
+    category: { type: String, default: "" },
+    location: { type: String, default: "" },
+    author: { type: String, default: "" },
+    authorBioId: { type: String, default: "" },
+    publishDate: { type: Date, default: Date.now },
+    status: { type: String, enum: STORY_STATUSES, default: "draft" },
+
+    featureMediaId: { type: String, default: "" },
+    featureMediaUrl: { type: String, default: "" },
+    featureMediaType: { type: String, default: "image" },
+    featureClickAction: { type: String, enum: MEDIA_CLICK_ACTIONS, default: "none" },
+    featureLinkHref: { type: String, default: "" },
+    featureLinkNewTab: { type: Boolean, default: false },
+
+    // What renders, in what order, and in what type is the template's job.
+    templateId: { type: String, default: "" },
+
+    content: { type: String, default: "" },
+    storyImages: { type: [StoryImageSchema], default: [] },
+  },
+  { timestamps: true }
+);
+
+export const Story = model("Story", StorySchema);
+
+const StoryTemplateSchema = new Schema<any>(
+  {
+    name: { type: String, required: true },
+    slug: { type: String, required: true, unique: true },
+    isDefault: { type: Boolean, default: false },
+    layout: { type: [Mixed], default: [] },
+    /** Absent means the pre-namespace slot names; see story-template-layout. */
+    layoutVersion: { type: Number, default: STORY_TEMPLATE_LAYOUT_VERSION },
+    colors: { type: ColorOverrideSchema, default: () => ({}) },
+  },
+  { timestamps: true }
+);
+
+export const StoryTemplate = model("StoryTemplate", StoryTemplateSchema);
+
+const GalleryImageSchema = new Schema<any>(
+  {
+    url: { type: String, default: "" },
+    filename: { type: String, default: "" },
+    title: { type: String, default: "" },
+    alt: { type: String, default: "" },
+    caption: { type: String, default: "" },
+    captureDate: { type: Date, default: null },
+    tags: [{ type: String }],
+    isNsfw: { type: Boolean, default: false },
+    orientation: { type: String, default: "" },
+  },
+  { timestamps: true }
+);
+
+export const GalleryImage = model("GalleryImage", GalleryImageSchema);
+
+const CollectionSchema = new Schema<any>(
+  {
+    name: { type: String, required: true },
+    slug: { type: String, required: true, unique: true },
+    description: { type: String, default: "" },
+    category: { type: String, default: "" },
+    isPublic: { type: Boolean, default: false },
+
+    imageIds: { type: [String], default: [] },
+    sortMode: {
+      type: String,
+      enum: ["createdAt", "captureDate", "originalName", "custom"],
+      default: "createdAt",
+    },
+    sortDirection: { type: String, enum: ["asc", "desc"], default: "desc" },
+    customOrder: { type: [String], default: [] },
+
+    // Display / layout. A collection's values are laid over the site defaults,
+    // so there is no "use defaults" mode to store.
+    // Not an enum: collections saved when `feed` still existed hold it, and
+    // validating on read would reject them. `resolveCollectionDisplay` maps
+    // anything unrecognised back onto a layout that exists.
+    layoutMode: { type: String, default: "grid" },
+    displayMode: { type: String, enum: ["all", "lazy", "pagination"], default: "all" },
+    pageSize: { type: Number, default: 24 },
+    columnsDesktop: { type: Number, default: 3 },
+    columnsTablet: { type: Number, default: 2 },
+    columnsMobile: { type: Number, default: 1 },
+    mosaicSpans: { type: Mixed, default: {} },
+
+    // Metadata placements
+    overlaySettings: { type: Mixed, default: {} },
+    lightboxSettings: { type: Mixed, default: {} },
+
+    // Sharing / protection. The share control is one copy-link button, so
+    // there are no per-network targets to store.
+    shareEnabled: { type: Boolean, default: true },
+    /** A copy-link button on an opened image, beside its download button. */
+    imageShareEnabled: { type: Boolean, default: false },
+    /** The collection's name in the corner of an opened image. */
+    imageNameEnabled: { type: Boolean, default: false },
+    allowDownload: { type: Boolean, default: false },
+    allowContextMenu: { type: Boolean, default: false },
+
+    /** Full / wide / standard / narrow, the same scale rows use. */
+    pageWidth: { type: String, default: "standard" },
+    /** The frame tiles are held to, and how the media meets it. */
+    imageAspect: { type: String, default: "1:1" },
+    imageFit: { type: String, default: "fill" },
+
+    /** The one image standing for the collection; empty means the first. */
+    featureImageId: { type: String, default: "" },
+
+    // Styles
+    styleOverrides: { type: Mixed, default: {} },
+    /** Category/title/description toggles and their style slots. */
+    header: { type: Mixed, default: {} },
+    /** Style slot for the copy-link button. */
+    share: { type: Mixed, default: {} },
+    imageShare: { type: Mixed, default: {} },
+    /** Style slots for the page as a whole and for every tile. */
+    pageStyle: { type: Mixed, default: {} },
+    imageStyle: { type: Mixed, default: {} },
+    /** Wording and dress of the link back to the gallery. */
+    imageExitLabel: { type: String, default: "View more images" },
+    imageExitStyle: { type: Mixed, default: {} },
+    /** The box around an opened image and its metadata. */
+    imageContentStyle: { type: Mixed, default: {} },
+  },
+  { timestamps: true }
+);
+
+export const Collection = model("Collection", CollectionSchema);
+
+/* ---------------------------------------------------------------- Builders */
+
+const SitePageSchema = new Schema<any>(
+  {
+    title: { type: String, required: true },
+    slug: { type: String, required: true, unique: true },
+    status: { type: String, enum: ["draft", "published"], default: "draft" },
+    isHome: { type: Boolean, default: false },
+    layout: { type: [Mixed], default: [] },
+    colors: { type: ColorOverrideSchema, default: () => ({}) },
+  },
+  { timestamps: true }
+);
+
+export const SitePage = model("SitePage", SitePageSchema);
+
+const FormDefinitionSchema = new Schema<any>(
+  {
+    title: { type: String, required: true },
+    slug: { type: String, required: true, unique: true },
+    status: { type: String, enum: ["draft", "published"], default: "draft" },
+    layout: { type: [Mixed], default: [] },
+    settings: { type: Mixed, default: {} },
+    submissionLayout: { type: [Mixed], default: [] },
+  },
+  { timestamps: true }
+);
+
+export const FormDefinition = model("FormDefinition", FormDefinitionSchema);
+
+const FormSubmissionSchema = new Schema<any>(
+  {
+    formId: { type: String, required: true },
+    formTitle: { type: String, default: "" },
+    data: { type: Mixed, default: {} },
+    fields: { type: [Mixed], default: [] },
+    status: { type: String, enum: ["new", "read", "archived"], default: "new" },
+  },
+  { timestamps: true }
+);
+
+FormSubmissionSchema.index({ formId: 1, createdAt: -1 });
+
+export const FormSubmission = model("FormSubmission", FormSubmissionSchema);
+
+export const ZINE_KINDS = ["zine", "presentation", "post"] as const;
+
+const ZineSchema = new Schema<any>(
+  {
+    title: { type: String, required: true },
+    slug: { type: String, required: true, unique: true },
+    description: { type: String, default: "" },
+    kind: { type: String, enum: ZINE_KINDS, default: "zine" },
+    presentationSize: { type: Mixed, default: { width: 1920, height: 1080 } },
+    postViews: { type: [Mixed], default: [] },
+    /**
+     * Which of `postViews` this post is. A post has several named shapes but
+     * is published as one of them; without this everything falls back to the
+     * first preset, so a post edited as landscape still rendered square.
+     */
+    postView: { type: String, default: "" },
+    /** Named page layouts, each owning the blocks the pages using it show. */
+    pageTemplates: { type: [Mixed], default: [] },
+    /** A publication kept as a starting point rather than published. */
+    isTemplate: { type: Boolean, default: false },
+    status: { type: String, enum: ["draft", "published"], default: "draft" },
+    listed: { type: Boolean, default: true },
+    transition: { type: String, enum: ["none", "fade", "slide", "flip"], default: "fade" },
+    slideshow: { type: Mixed, default: { enabled: false, intervalMs: 6000, loop: true } },
+    audio: { type: Mixed, default: {} },
+    pages: { type: [Mixed], default: [] },
+    repeatedBlocks: { type: [Mixed], default: [] },
+    coverMediaId: { type: String, default: "" },
+    coverUrl: { type: String, default: "" },
+    publishedAt: { type: Date, default: null },
+  },
+  { timestamps: true }
+);
+
+export const Zine = model("Zine", ZineSchema);
+
+/* ---------------------------------------------------------- Design library */
+
+const FontFamilySchema = new Schema<any>(
+  {
+    family: { type: String, required: true, unique: true },
+    category: { type: String, default: "sans-serif" },
+    variants: { type: [String], default: ["400"] },
+    cssUrl: { type: String, default: "" },
+  },
+  { timestamps: true }
+);
+
+export const FontFamily = model("FontFamily", FontFamilySchema);
+
+const CustomStyleSchema = new Schema<any>(
+  {
+    name: { type: String, required: true },
+    slug: { type: String, required: true, unique: true },
+    style: { type: Mixed, default: {} },
+    hoverEnabled: { type: Boolean, default: false },
+    hoverStyle: { type: Mixed, default: {} },
+    transitionDuration: { type: Number, default: 200 },
+  },
+  { timestamps: true }
+);
+
+export const CustomStyle = model("CustomStyle", CustomStyleSchema);
+
+const CustomShapeSchema = new Schema<any>(
+  {
+    name: { type: String, required: true },
+    slug: { type: String, required: true, unique: true },
+    viewBox: { type: String, default: "0 0 100 100" },
+    paths: { type: [String], default: [] },
+  },
+  { timestamps: true }
+);
+
+export const CustomShape = model("CustomShape", CustomShapeSchema);
+
+/* ----------------------------------------------------------- Documentation */
+
+/**
+ * A documentation set: the thing a reader arrives at.
+ *
+ * Documentation is a *grouping* of documents in an order — a user guide, an API
+ * reference — not a loose pile of pages. The set owns the ordering, the
+ * navigation and the template; a page belongs to exactly one.
+ */
+const DocumentationSchema = new Schema<any>(
+  {
+    title: { type: String, required: true },
+    slug: { type: String, required: true, unique: true },
+    status: { type: String, enum: ["draft", "published"], default: "draft" },
+    description: { type: String, default: "" },
+    /** Position among the site's sets. */
+    order: { type: Number, default: 0 },
+    /** Every page in the set renders through this. */
+    templateId: { type: String, default: "" },
+  },
+  { timestamps: true }
+);
+
+export const Documentation = model("Documentation", DocumentationSchema);
+
+/**
+ * One document — one page, one markdown file.
+ *
+ * Named `DocPage` rather than `Document` because Mongoose already owns that
+ * word. It is a "document" everywhere a person reads it.
+ */
+const DocPageSchema = new Schema<any>(
+  {
+    /** The set this page belongs to. A page outside a set is unreachable. */
+    documentationId: { type: String, required: true },
+
+    title: { type: String, required: true },
+    /** Unique within its set, not across the site. */
+    slug: { type: String, required: true },
+    status: { type: String, enum: ["draft", "published"], default: "draft" },
+    description: { type: String, default: "" },
+    category: { type: String, default: "" },
+    tags: [{ type: String }],
+
+    /**
+     * Pages nest inside their set, and the slug stays flat within it — so
+     * `/docs/guide/install` never changes when the page is moved.
+     */
+    parentId: { type: String, default: "" },
+    order: { type: Number, default: 0 },
+
+    /** Markdown-shaped blocks; see `lib/doc-layout.ts`. */
+    content: { type: [Mixed], default: [] },
+    /** Front-matter keys the importer did not claim, kept for export. */
+    frontMatter: { type: Mixed, default: {} },
+    sourceFilename: { type: String, default: "" },
+  },
+  { timestamps: true }
+);
+
+// A set's tree is always read as "the pages of this set, in order".
+DocPageSchema.index({ documentationId: 1, parentId: 1, order: 1 });
+// Slugs are unique per set, which is what lets two sets both have an "Overview".
+DocPageSchema.index({ documentationId: 1, slug: 1 }, { unique: true });
+
+export const DocPage = model("DocPage", DocPageSchema);
+
+const DocTemplateSchema = new Schema<any>(
+  {
+    name: { type: String, required: true },
+    slug: { type: String, required: true, unique: true },
+    isDefault: { type: Boolean, default: false },
+    layout: { type: [Mixed], default: [] },
+    colors: { type: ColorOverrideSchema, default: () => ({}) },
+  },
+  { timestamps: true }
+);
+
+export const DocTemplate = model("DocTemplate", DocTemplateSchema);
+
+const CustomPageBlockSchema = new Schema<any>(
+  {
+    // The name is the block's identity: saving under an existing one replaces it.
+    name: { type: String, required: true },
+    /** Key into the curated icon set, shown in the builder's block list. */
+    icon: { type: String, default: "" },
+    // Only container blocks are saved as reusable page blocks.
+    block: { type: Mixed, required: true },
+  },
+  { timestamps: true }
+);
+
+export const CustomPageBlock = model("CustomPageBlock", CustomPageBlockSchema);
+
+/* ---------------------------------------------------------------- Calendar */
+
+const CalendarEventSchema = new Schema<any>(
+  {
+    // A wall-clock date, not an instant — see lib/calendar.ts for why these are
+    // `YYYY-MM-DD` / `HH:MM` strings rather than Date fields.
+    date: { type: String, required: true },
+    startTime: { type: String, default: "" },
+    endTime: { type: String, default: "" },
+    name: { type: String, default: "" },
+    description: { type: String, default: "" },
+    location: { type: String, default: "" },
+    linkText: { type: String, default: "" },
+    linkUrl: { type: String, default: "" },
+    status: { type: String, enum: CALENDAR_EVENT_STATUSES, default: "draft" },
+    category: { type: String, default: "" },
+    who: { type: [String], default: [] },
+    tags: { type: [String], default: [] },
+  },
+  { timestamps: true }
+);
+
+// The month view is always a range scan over `date`, then a sort by start time.
+CalendarEventSchema.index({ date: 1, startTime: 1 });
+
+export const CalendarEvent = model("CalendarEvent", CalendarEventSchema);
+
+const CalendarSettingsSchema = new Schema<any>(
+  {
+    /**
+     * The IANA zone the stored wall-clock times are expressed in. Empty means
+     * "whatever the server runs in"; it changes how today is resolved, not the
+     * stored strings.
+     */
+    timeZone: { type: String, default: "" },
+    /** Managed vocabularies the event form picks from. */
+    categories: { type: [String], default: [] },
+    who: { type: [String], default: [] },
+    tags: { type: [String], default: [] },
+    /** The Calendar Style a block wears when it names none. */
+    defaultStyleId: { type: String, default: "" },
+  },
+  { timestamps: true }
+);
+
+export const CalendarSettings = model("CalendarSettings", CalendarSettingsSchema);
+
+const CalendarTemplateSchema = new Schema<any>(
+  {
+    name: { type: String, required: true },
+    slug: { type: String, required: true, unique: true },
+    /** `event` arranges an event box; `lightbox` arranges the detail panel. */
+    kind: { type: String, enum: CALENDAR_TEMPLATE_KINDS, default: "event" },
+    /** A page layout whose calendar slots are filled from the event. */
+    layout: { type: [Mixed], default: [] },
+  },
+  { timestamps: true }
+);
+
+export const CalendarTemplate = model("CalendarTemplate", CalendarTemplateSchema);
+
+const CalendarStyleSchema = new Schema<any>(
+  {
+    name: { type: String, required: true },
+    slug: { type: String, required: true, unique: true },
+    /**
+     * One style per box of the calendar, plus the event box and lightbox, whose
+     * contents and appearance both vary by view and screen size. Mixed because
+     * the shape is normalized in `lib/calendar-style.ts` rather than here.
+     */
+    parts: { type: Mixed, default: {} },
+    eventBox: { type: Mixed, default: {} },
+    lightbox: { type: Mixed, default: {} },
+  },
+  { timestamps: true }
+);
+
+export const CalendarStyle = model("CalendarStyle", CalendarStyleSchema);
