@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 
 const MONGODB_URI =
-  process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/aperture-cms";
+  process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/aperture-community-portal";
 
 type MongooseCache = {
   conn: typeof mongoose | null;
