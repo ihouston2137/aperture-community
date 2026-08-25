@@ -32,6 +32,7 @@ export function CalendarEventLightbox({
   lightbox,
   layouts,
   sources,
+  designTime = false,
 }: {
   event: CalendarEventRecord | null;
   onClose: () => void;
@@ -39,6 +40,8 @@ export function CalendarEventLightbox({
   lightbox: CalendarStyleRecord["lightbox"];
   layouts: Record<string, PageRow[]>;
   sources: PageSources;
+  /** True only on the builder canvas. */
+  designTime?: boolean;
 }) {
   useEffect(() => {
     if (!event) return;
@@ -90,6 +93,7 @@ export function CalendarEventLightbox({
                 layout={layouts[group.layoutId]}
                 event={event}
                 sources={sources}
+                designTime={designTime}
               />
             ) : (
               <BuiltInDetail event={event} />

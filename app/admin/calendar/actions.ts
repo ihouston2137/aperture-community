@@ -84,6 +84,8 @@ export async function saveCalendarEventAction(
     category: String(formData.get("category") ?? "").trim(),
     who: readChipField(formData, "who"),
     tags: readChipField(formData, "tags"),
+    rsvpEnabled: formData.get("rsvpEnabled") === "on",
+    attendanceEnabled: formData.get("attendanceEnabled") === "on",
   };
 
   if (id) {
@@ -182,6 +184,8 @@ export async function repeatCalendarEventAction(
       category: source.category ?? "",
       who: Array.isArray(source.who) ? source.who.map(String) : [],
       tags: Array.isArray(source.tags) ? source.tags.map(String) : [],
+      rsvpEnabled: Boolean(source.rsvpEnabled),
+      attendanceEnabled: Boolean(source.attendanceEnabled),
     }))
   );
 

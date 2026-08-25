@@ -13,6 +13,8 @@ import {
 import type { CalendarSlotBlock } from "@/lib/calendar-slot-layout";
 
 import { blockTextProps } from "./block-primitives";
+import { CalendarAttendance } from "./calendar-attendance";
+import { CalendarRsvpButton, CalendarRsvpList } from "./calendar-rsvp";
 
 /**
  * One calendar slot, filled from the event being rendered.
@@ -24,14 +26,83 @@ export function CalendarSlotBlockView({
   block,
   event,
   showPlaceholders = false,
+  designTime = false,
 }: {
   block: CalendarSlotBlock;
   event: CalendarEventRecord | null;
   /** In the builder, an empty slot names itself rather than vanishing. */
   showPlaceholders?: boolean;
+  /**
+   * True only on the builder canvas.
+   *
+   * Distinct from the renderer's `interactive` flag, which an event box turns
+   * off so that the links inside it do not fight the box's own click. The RSVP
+   * button has to work in exactly that case, so it reads this instead.
+   */
+  designTime?: boolean;
 }) {
   const text = slotText(block, event);
   const { className, style } = blockTextProps(block);
+
+  /* ---------------------------------------------------- RSVP and attendance
+
+     These three are the only slots conditional on the event rather than merely
+     empty for it: an event not collecting RSVPs has no button, no list and no
+     register, however the template is arranged. The builder is the exception —
+     it draws them regardless, so they can be placed and styled. */
+
+  if (
+    block.type === "calRsvpButton" ||
+    block.type === "calRsvpList" ||
+    block.type === "calAttendance"
+  ) {
+    const switchedOn =
+      block.type === "calAttendance"
+        ? Boolean(event?.attendanceEnabled)
+        : Boolean(event?.rsvpEnabled);
+
+    if (!event || !switchedOn) {
+      return showPlaceholders ? (
+        <span className={`cal-slot is-placeholder ${className}`} style={style}>
+          {placeholderFor(block)}
+        </span>
+      ) : null;
+    }
+
+    if (block.type === "calRsvpButton") {
+      return (
+        <CalendarRsvpButton
+          block={block}
+          event={event}
+          className={className}
+          style={style}
+          designTime={designTime}
+        />
+      );
+    }
+
+    if (block.type === "calRsvpList") {
+      return (
+        <CalendarRsvpList
+          block={block}
+          event={event}
+          className={className}
+          style={style}
+          designTime={designTime}
+        />
+      );
+    }
+
+    return (
+      <CalendarAttendance
+        block={block}
+        event={event}
+        className={className}
+        style={style}
+        designTime={designTime}
+      />
+    );
+  }
 
   if (block.type === "calLink") {
     const href = sanitizeLinkUrl(event?.linkUrl);
@@ -128,6 +199,12 @@ function placeholderFor(block: CalendarSlotBlock): string {
       return "Who";
     case "calTags":
       return "Tags";
+    case "calRsvpButton":
+      return "RSVP button";
+    case "calRsvpList":
+      return "RSVP list";
+    case "calAttendance":
+      return "Attendance";
     default:
       return "Link";
   }

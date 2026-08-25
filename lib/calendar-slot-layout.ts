@@ -1,3 +1,4 @@
+import type { CalendarTemplateKind } from "./calendar";
 import {
   normalizeBlock,
   normalizePageLayout,
@@ -33,6 +34,9 @@ export const CALENDAR_SLOT_BLOCK_TYPES = [
   "calWho",
   "calTags",
   "calLink",
+  "calRsvpButton",
+  "calRsvpList",
+  "calAttendance",
 ] as const;
 
 export type CalendarSlotBlockType = (typeof CALENDAR_SLOT_BLOCK_TYPES)[number];
@@ -47,7 +51,41 @@ export const CALENDAR_SLOT_LABELS: Record<CalendarSlotBlockType, string> = {
   calWho: "Event who",
   calTags: "Event tags",
   calLink: "Event link",
+  calRsvpButton: "RSVP button",
+  calRsvpList: "RSVP list",
+  calAttendance: "Attendance",
 };
+
+/**
+ * Which template each slot may be placed in.
+ *
+ * The RSVP button belongs in both — a member should be able to answer from the
+ * grid without opening anything. The list and the attendance sheet are detail:
+ * they would not fit an event box, and putting a roster in every cell of a
+ * month view would be neither readable nor cheap.
+ */
+export const CALENDAR_SLOT_KINDS: Record<CalendarSlotBlockType, CalendarTemplateKind[]> = {
+  calName: ["event", "lightbox"],
+  calDate: ["event", "lightbox"],
+  calTime: ["event", "lightbox"],
+  calLocation: ["event", "lightbox"],
+  calDescription: ["event", "lightbox"],
+  calCategory: ["event", "lightbox"],
+  calWho: ["event", "lightbox"],
+  calTags: ["event", "lightbox"],
+  calLink: ["event", "lightbox"],
+  calRsvpButton: ["event", "lightbox"],
+  calRsvpList: ["lightbox"],
+  calAttendance: ["lightbox"],
+};
+
+export function calendarSlotTypesFor(
+  kind: CalendarTemplateKind
+): CalendarSlotBlockType[] {
+  return CALENDAR_SLOT_BLOCK_TYPES.filter((type) =>
+    CALENDAR_SLOT_KINDS[type].includes(kind)
+  );
+}
 
 /** A recognisable glyph for each slot, shown above its name in the palette. */
 export const CALENDAR_SLOT_ICONS: Record<CalendarSlotBlockType, string> = {
@@ -60,6 +98,9 @@ export const CALENDAR_SLOT_ICONS: Record<CalendarSlotBlockType, string> = {
   calWho: "Users",
   calTags: "Tags",
   calLink: "Link",
+  calRsvpButton: "CalendarCheck",
+  calRsvpList: "ListChecks",
+  calAttendance: "ClipboardCheck",
 };
 
 export type CalendarSlotBlock = ResponsiveStyleFields & {
@@ -81,6 +122,32 @@ export type CalendarSlotBlock = ResponsiveStyleFields & {
   /** `calLink`: used when the event names no link text of its own. */
   fallbackText?: string;
   newTab?: boolean;
+
+  /** `calRsvpButton`: what the button says before and after answering. */
+  rsvpText?: string;
+  rsvpGoingText?: string;
+  rsvpNotGoingText?: string;
+  /**
+   * The two answered looks. The block’s own style is the resting one; these
+   * layer over it, so a state need only say what differs.
+   */
+  goingStyle?: StyleValues;
+  goingStyleSlug?: string;
+  notGoingStyle?: StyleValues;
+  notGoingStyleSlug?: string;
+  /** Appends the yes count to the button, e.g. "RSVP · 12 going". */
+  showCount?: boolean;
+
+  /** `calRsvpList`: which answers to list. */
+  rsvpShows?: "both" | "yes" | "no";
+  /** Names, or just how many said each. */
+  namesOrCounts?: "names" | "counts";
+  yesHeading?: string;
+  noHeading?: string;
+
+  /** `calAttendance`: opens with only the members who said yes. */
+  attendanceFromRsvp?: boolean;
+  heading?: string;
 };
 
 export function isCalendarSlotBlock(block: {
@@ -103,6 +170,22 @@ export function createCalendarSlotBlock(
   if (type === "calLink") {
     block.fallbackText = "More details";
     block.newTab = true;
+  }
+  if (type === "calRsvpButton") {
+    block.rsvpText = "RSVP";
+    block.rsvpGoingText = "Going";
+    block.rsvpNotGoingText = "Not going";
+    block.showCount = false;
+  }
+  if (type === "calRsvpList") {
+    block.rsvpShows = "both";
+    block.namesOrCounts = "names";
+    block.yesHeading = "Going";
+    block.noHeading = "Not going";
+  }
+  if (type === "calAttendance") {
+    block.attendanceFromRsvp = true;
+    block.heading = "Attendance";
   }
   return block;
 }
@@ -149,6 +232,37 @@ export function normalizeCalendarSlotBlock(input: unknown): CalendarSlotBlock | 
   if (type === "calLink") {
     block.fallbackText = str(raw.fallbackText, "More details");
     block.newTab = raw.newTab === undefined ? true : Boolean(raw.newTab);
+  }
+
+  if (type === "calRsvpButton") {
+    block.rsvpText = str(raw.rsvpText, "RSVP");
+    block.rsvpGoingText = str(raw.rsvpGoingText, "Going");
+    block.rsvpNotGoingText = str(raw.rsvpNotGoingText, "Not going");
+    block.showCount = Boolean(raw.showCount);
+
+    // The two answered looks, each with its own named-style slot and its own
+    // per-view overrides, exactly like the block’s own style above.
+    for (const key of ["goingStyle", "notGoingStyle"] as const) {
+      const slugKey = `${key}Slug` as "goingStyleSlug" | "notGoingStyleSlug";
+      if (raw[slugKey]) block[slugKey] = str(raw[slugKey]);
+      if (raw[key]) block[key] = normalizeStyleValues(raw[key]);
+      normalizeResponsiveStyle(raw, block, key);
+    }
+  }
+
+  if (type === "calRsvpList") {
+    block.rsvpShows = (["both", "yes", "no"] as const).includes(raw.rsvpShows as "both")
+      ? (raw.rsvpShows as CalendarSlotBlock["rsvpShows"])
+      : "both";
+    block.namesOrCounts = raw.namesOrCounts === "counts" ? "counts" : "names";
+    block.yesHeading = str(raw.yesHeading, "Going");
+    block.noHeading = str(raw.noHeading, "Not going");
+  }
+
+  if (type === "calAttendance") {
+    block.attendanceFromRsvp =
+      raw.attendanceFromRsvp === undefined ? true : Boolean(raw.attendanceFromRsvp);
+    block.heading = str(raw.heading, "Attendance");
   }
 
   return block;

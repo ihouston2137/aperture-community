@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { guardContent } from "@/lib/content-guard";
 
 import { CollectionImageStage } from "@/components/collection-image-stage";
 import { SiteChrome } from "@/components/site-chrome";
@@ -40,6 +41,7 @@ export default async function CollectionImagePage({
 
   const collection = await getCollectionBySlug(slug);
   if (!collection || !collection.isPublic) notFound();
+  await guardContent("collection", collection.id, `/collections/${slug}`);
 
   const index = collection.images.findIndex((image) => image.id === imageId);
   if (index === -1) notFound();

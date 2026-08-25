@@ -1,4 +1,5 @@
 import { connectDB } from "./db";
+import { getMenuById, getMenuViewer, loadMenuFor, type MenuItem } from "./menus";
 import {
   Bio,
   CalendarEvent,
@@ -81,6 +82,8 @@ function toEventRecord(doc: Record<string, any>): CalendarEventRecord {
     category: doc.category ?? "",
     who: Array.isArray(doc.who) ? doc.who.map(String) : [],
     tags: Array.isArray(doc.tags) ? doc.tags.map(String) : [],
+    rsvpEnabled: Boolean(doc.rsvpEnabled),
+    attendanceEnabled: Boolean(doc.attendanceEnabled),
   };
 }
 
@@ -94,6 +97,9 @@ export async function loadPageSources(layout: PageLayout): Promise<PageSources> 
   const bioIds = new Set<string>();
   const collectionIds = new Set<string>();
   const formIds = new Set<string>();
+  // Menu blocks are collected as pairs: the same menu shown twice is filtered
+  // the same way, but each block needs its own entry to read.
+  const menuBlocks: { blockId: string; menuId: string }[] = [];
   const shapeSlugs = new Set<string>();
   const linkPageIds = new Set<string>();
   const linkCollectionIds = new Set<string>();
@@ -116,6 +122,9 @@ export async function loadPageSources(layout: PageLayout): Promise<PageSources> 
       collectionIds.add(block.collectionId);
     }
     if (block.type === "form" && block.formId) formIds.add(block.formId);
+    if (block.type === "menu" && block.menuId) {
+      menuBlocks.push({ blockId: block.id, menuId: block.menuId });
+    }
     if (block.type === "calendar") {
       const display = normalizeCalendarDisplay(block.calendar);
       calendarBlocks.push({ id: block.id, view: display.view });
@@ -350,6 +359,28 @@ export async function loadPageSources(layout: PageLayout): Promise<PageSources> 
     };
   }
 
+  /**
+   * Menu items per block, filtered to whoever is asking.
+   *
+   * One viewer read however many menu blocks a page holds, and the menus
+   * themselves fetched once each — a page with two blocks on one menu resolves
+   * it once and hands both the same list.
+   */
+  const menus: Record<string, MenuItem[]> = {};
+  if (menuBlocks.length > 0) {
+    const viewer = await getMenuViewer();
+    const wanted = [...new Set(menuBlocks.map((entry) => entry.menuId))];
+    const resolved = new Map<string, MenuItem[]>();
+
+    for (const menuId of wanted) {
+      const menu = await getMenuById(menuId);
+      resolved.set(menuId, await loadMenuFor(menu, viewer));
+    }
+    for (const entry of menuBlocks) {
+      menus[entry.blockId] = resolved.get(entry.menuId) ?? [];
+    }
+  }
+
   return {
     storyViews,
     latestStoryView,
@@ -357,6 +388,7 @@ export async function loadPageSources(layout: PageLayout): Promise<PageSources> 
     collections,
     latestCollection,
     forms,
+    menus,
     calendarEvents,
     calendarToday,
     calendarStyles,

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 
 import { MediaField } from "@/app/admin/media/media-picker";
@@ -15,7 +16,6 @@ import {
   type AppearanceValues,
   type ContentWidth,
   type SiteContentValues,
-  type SiteMenuLink,
   type SiteTextElementKey,
 } from "@/lib/site-values";
 
@@ -144,106 +144,6 @@ function LinkRows<T extends Record<string, any>>({
  * The header menu: a flat list of items, each either a link or a label with its
  * own nested list of child links.
  */
-function MenuRows({
-  rows,
-  onChange,
-}: {
-  rows: SiteMenuLink[];
-  onChange: (rows: SiteMenuLink[]) => void;
-}) {
-  const patch = (index: number, changes: Partial<SiteMenuLink>) =>
-    onChange(rows.map((row, i) => (i === index ? { ...row, ...changes } : row)));
-
-  return (
-    <>
-      {rows.map((row, index) => {
-        const isLabel = row.kind === "label";
-        const children = row.children ?? [];
-
-        return (
-          <div key={index} className="menu-row">
-            <SelectField
-              label="Type"
-              value={isLabel ? "label" : "link"}
-              options={[
-                { value: "link", label: "Link" },
-                { value: "label", label: "Label with dropdown" },
-              ]}
-              onChange={(value) =>
-                patch(index, { kind: value as SiteMenuLink["kind"] })
-              }
-            />
-
-            <div className="field">
-              <label>Label</label>
-              <input
-                type="text"
-                value={row.label ?? ""}
-                onChange={(event) => patch(index, { label: event.target.value })}
-              />
-            </div>
-
-            {isLabel ? (
-              <div className="menu-children">
-                <CheckField
-                  label="Show dropdown arrow"
-                  value={row.showCaret !== false}
-                  onChange={(checked) => patch(index, { showCaret: checked })}
-                />
-                <p className="help-text">Dropdown links</p>
-                <LinkRows
-                  rows={children as MenuLink[]}
-                  columns={[
-                    { key: "label", label: "Label" },
-                    { key: "href", label: "Link" },
-                    { key: "newTab", label: "Open in a new tab", type: "checkbox" },
-                  ]}
-                  blank={{ label: "", href: "", newTab: false }}
-                  onChange={(childRows) => patch(index, { children: childRows })}
-                />
-              </div>
-            ) : (
-              <>
-                <div className="field">
-                  <label>Link</label>
-                  <input
-                    type="text"
-                    value={row.href ?? ""}
-                    onChange={(event) => patch(index, { href: event.target.value })}
-                  />
-                </div>
-                <CheckField
-                  label="Open in a new tab"
-                  value={Boolean(row.newTab)}
-                  onChange={(checked) => patch(index, { newTab: checked })}
-                />
-              </>
-            )}
-
-            <button
-              type="button"
-              className="btn btn-danger btn-sm"
-              onClick={() => onChange(rows.filter((_, i) => i !== index))}
-            >
-              Remove
-            </button>
-          </div>
-        );
-      })}
-
-      <button
-        type="button"
-        className="btn btn-sm"
-        onClick={() =>
-          onChange([...rows, { label: "", href: "", newTab: false, kind: "link" }])
-        }
-      >
-        Add
-      </button>
-    </>
-  );
-}
-
 export function AppearanceEditor({
   initialAppearance,
   initialContent,
@@ -711,15 +611,15 @@ export function AppearanceEditor({
             <div className="inspector-section">
               <h3 className="inspector-title">Site menu</h3>
               <p className="help-text">
-                Items shown in the header navigation. A label is not a link
-                itself — it opens a dropdown of the links beneath it.
+                The header navigation moved to its own screen, where each item
+                also carries who is allowed to see it — and therefore who can
+                reach the content behind it.
               </p>
-              <div style={{ marginTop: "0.6rem" }}>
-                <MenuRows
-                  rows={content.menuLinks as SiteMenuLink[]}
-                  onChange={(rows) => setC("menuLinks")(rows)}
-                />
-              </div>
+              <p style={{ marginTop: "0.6rem" }}>
+                <Link className="btn btn-sm" href="/admin/menus">
+                  Edit menus
+                </Link>
+              </p>
             </div>
 
             <div className="inspector-section">

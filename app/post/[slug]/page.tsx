@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { guardContent } from "@/lib/content-guard";
 
 import { PublicationScreen } from "@/components/publication-screen";
 import { connectDB } from "@/lib/db";
@@ -45,6 +46,7 @@ export default async function PostPage({
 
   const post = await findPost(slug);
   if (!post) notFound();
+  await guardContent("publication", String(post._id), `/post/${slug}`);
 
   // Controls appear only when there is more than one page, so a single-frame
   // post still reads as a clean image while a multi-page one can be paged

@@ -5864,3 +5864,950 @@ html:has(.admin-shell) body::-webkit-scrollbar {
   border: 0;
   max-width: 100%;
 }
+
+/* ------------------------------------------------------------------ Account
+   Sign in, register, verify and recover. One frame, so the journey from the
+   registration form to the first sign-in looks like a single thing. */
+
+.auth-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1.5rem;
+  background: var(--admin-bg);
+  color: var(--admin-text);
+}
+
+.auth-card {
+  width: min(30rem, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+
+.auth-panel {
+  margin: 0;
+}
+
+.auth-subtitle {
+  margin: -0.35rem 0 1.1rem;
+  display: block;
+}
+
+.auth-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
+  justify-content: center;
+  font-size: 0.85rem;
+}
+
+.auth-link {
+  color: inherit;
+  opacity: 0.75;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.auth-link:hover {
+  opacity: 1;
+}
+
+.auth-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1.1rem;
+}
+
+/* The six-digit code. Wide tracking and a monospace face so a mistyped digit is
+   visible at a glance, and inputMode numeric so a phone offers the keypad. */
+.auth-code-input {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 1.6rem;
+  letter-spacing: 0.5em;
+  text-align: center;
+  text-indent: 0.5em;
+}
+
+.auth-code-sent {
+  word-break: break-word;
+}
+
+/* ------------------------------------------------------- Account in header
+
+   The top-right corner: a sign-in link, or the member's initials with a menu
+   behind them. It lives outside `.site-nav` so it keeps the corner at mobile
+   widths while the site links collapse behind the hamburger. */
+
+.site-account {
+  display: flex;
+  align-items: center;
+  flex: none;
+  /* Beats `.site-nav`'s `margin-left: auto` to the corner when the nav is
+     centred or left-aligned; harmless when the nav is already pushed right. */
+  margin-left: 0;
+  order: 99;
+}
+
+.site-account-signin {
+  display: inline-flex;
+  align-items: center;
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  color: inherit;
+  font: inherit;
+  font-size: var(--header-nav-size);
+  letter-spacing: 0.01em;
+  opacity: 0.85;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.site-account-signin:hover {
+  opacity: 1;
+  color: var(--header-accent);
+}
+
+.site-account-menu {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.site-account-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  opacity: 0.9;
+}
+
+.site-account-button:hover,
+.site-account-menu[data-open="true"] .site-account-button {
+  opacity: 1;
+}
+
+/* Initials rather than an uploaded picture: every account has a name, no
+   account has to have a photo, and nothing has to be fetched to draw it. */
+.site-account-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  background: var(--header-accent, currentColor);
+  color: var(--header-bg);
+  font-family: var(--heading-font);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1;
+}
+
+.site-account-panel {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  z-index: 25;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 12rem;
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  background: var(--header-bg);
+  /* Neutral rather than the header's border colour, which is transparent
+     whenever the header border is switched off. */
+  border: 1px solid rgba(128, 128, 128, 0.28);
+  box-shadow: 0 0.75rem 2rem rgba(0, 0, 0, 0.28);
+}
+
+.site-account-panel[hidden] {
+  display: none;
+}
+
+.site-account-panel a,
+.site-account-signout {
+  display: block;
+  width: 100%;
+  text-align: left;
+  text-decoration: none;
+  white-space: nowrap;
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  color: inherit;
+  font: inherit;
+  font-size: var(--header-nav-size);
+  opacity: 0.85;
+  cursor: pointer;
+}
+
+.site-account-panel a:hover,
+.site-account-signout:hover {
+  opacity: 1;
+  color: var(--header-accent);
+}
+
+.site-account-identity {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding-bottom: 0.6rem;
+  margin-bottom: 0.15rem;
+  border-bottom: 1px solid rgba(128, 128, 128, 0.28);
+  font-size: 0.8125rem;
+  line-height: 1.35;
+  max-width: 16rem;
+}
+
+.site-account-identity span {
+  opacity: 0.65;
+  overflow-wrap: anywhere;
+}
+
+.site-account-level {
+  font-weight: 600;
+  opacity: 0.9 !important;
+}
+
+@media (max-width: 720px) {
+  /* The hamburger sits to the left of the account corner, so the nav toggle
+     gives up the auto margin it uses to reach the right edge on its own. */
+  .site-header-inner .site-nav-toggle {
+    margin-left: auto;
+  }
+
+  .site-account {
+    margin-left: 0;
+  }
+}
+
+/* ------------------------------------------------------------- Account popup
+
+   Sign in, register and recover, over any page. The forms inside are the same
+   components the full-page routes render. */
+
+.auth-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 1.5rem;
+  overflow-y: auto;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(2px);
+}
+
+/* The admin palette, not the site's: these are forms, and they read as the same
+   forms wherever they are opened from. */
+.auth-dialog {
+  width: min(32rem, 100%);
+  margin: auto;
+  border-radius: 0.75rem;
+  background: var(--admin-bg, #12141a);
+  color: var(--admin-text, #e8eaf0);
+  border: 1px solid rgba(128, 128, 128, 0.28);
+  box-shadow: 0 1.5rem 4rem rgba(0, 0, 0, 0.5);
+}
+
+.auth-dialog-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.1rem 1.25rem 0.5rem;
+}
+
+.auth-dialog-close {
+  margin-left: auto;
+  width: 2rem;
+  height: 2rem;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: 0;
+  border-radius: 0.375rem;
+  color: inherit;
+  font-size: 1.5rem;
+  line-height: 1;
+  opacity: 0.6;
+  cursor: pointer;
+}
+
+.auth-dialog-close:hover {
+  opacity: 1;
+  background: rgba(128, 128, 128, 0.18);
+}
+
+.auth-dialog-body {
+  padding: 0 1.25rem 1.25rem;
+}
+
+.auth-dialog-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
+  padding: 0.9rem 1.25rem;
+  border-top: 1px solid rgba(128, 128, 128, 0.28);
+  font-size: 0.85rem;
+}
+
+/* The footer switches views, so its controls are buttons wearing the link
+   style the account screens already use. */
+.auth-dialog-footer .auth-link {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+}
+
+/* ---------------------------------------------------------- Member dashboard
+
+   The member-side counterpart to the admin dashboard. It renders inside the
+   site chrome, so it takes the site's palette and fonts rather than the
+   admin's — a member never sees the admin theme. */
+
+.member-page {
+  max-width: var(--content-max, 68rem);
+  margin: 0 auto;
+  padding: 3rem 1.25rem 4rem;
+}
+
+.member-header {
+  margin-bottom: 2rem;
+}
+
+.member-title {
+  font-family: var(--heading-font);
+  font-size: clamp(1.75rem, 4vw, 2.5rem);
+  margin: 0 0 0.5rem;
+}
+
+.member-lede {
+  margin: 0;
+  opacity: 0.75;
+  font-size: 1.0625rem;
+}
+
+.member-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(20rem, 100%), 1fr));
+  gap: 1.25rem;
+  align-items: start;
+}
+
+/* Details and account span the row: a form in a narrow column wraps badly. */
+.member-card-wide {
+  grid-column: 1 / -1;
+}
+
+.member-card {
+  padding: 1.25rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(128, 128, 128, 0.28);
+  background: rgba(128, 128, 128, 0.06);
+}
+
+.member-card-title {
+  font-family: var(--heading-font);
+  font-size: 1rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.7;
+  margin: 0 0 1rem;
+}
+
+.member-facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.5rem 1.25rem;
+  margin: 0;
+  font-size: 0.9375rem;
+}
+
+.member-facts dt {
+  opacity: 0.6;
+}
+
+.member-facts dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+.member-grants {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  font-size: 0.9375rem;
+}
+
+.member-grants > li > strong {
+  display: block;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  opacity: 0.55;
+  margin-bottom: 0.3rem;
+}
+
+.member-grants ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+/* A tick rather than a bullet: this is a list of what is open, not an outline. */
+.member-grants ul li::before {
+  content: "✓";
+  margin-right: 0.5rem;
+  opacity: 0.55;
+}
+
+.member-note {
+  margin: 1rem 0 0;
+  font-size: 0.875rem;
+  opacity: 0.65;
+}
+
+.member-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+/* The dashboard borrows the admin form controls, which are painted for the
+   admin palette. Inside the site chrome they take the site's colours instead. */
+.member-page .field > label,
+.member-page .field-label {
+  color: inherit;
+}
+
+.member-page .field input,
+.member-page .field select,
+.member-page .field textarea {
+  background: rgba(128, 128, 128, 0.1);
+  color: inherit;
+  border-color: rgba(128, 128, 128, 0.35);
+}
+
+/* ------------------------------------------------------ Membership picker
+
+   The "joining as" choice on the registration form. Radios drawn as buttons
+   that are visibly on or off, because the levels are the substance of joining
+   a community rather than a detail to be folded into a dropdown. */
+
+.level-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.35rem;
+}
+
+.level-option {
+  position: relative;
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  flex: 1 1 12rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--admin-border);
+  border-radius: 0.5rem;
+  background: var(--admin-panel);
+  cursor: pointer;
+  transition: border-color 120ms ease, background-color 120ms ease;
+}
+
+.level-option:hover {
+  border-color: var(--admin-accent);
+}
+
+/* The native radio is the accessible control and the source of truth for the
+   on state; it is taken out of sight, not out of the tab order. */
+.level-option input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  padding: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.level-option-mark {
+  flex: none;
+  width: 1rem;
+  height: 1rem;
+  margin-top: 0.1rem;
+  border: 1px solid var(--admin-border);
+  border-radius: 50%;
+  background: transparent;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.level-option-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.level-option-text strong {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.level-option-text span {
+  font-size: 0.8125rem;
+  opacity: 0.65;
+  line-height: 1.35;
+}
+
+.level-option:has(input:checked) {
+  border-color: var(--admin-accent);
+  /* A wash of the accent rather than a solid fill, so the description stays
+     readable at the same contrast as the unselected options. */
+  background: color-mix(in srgb, var(--admin-accent) 12%, var(--admin-panel));
+}
+
+.level-option:has(input:checked) .level-option-mark {
+  border-color: var(--admin-accent);
+  /* The dot is an inset ring, so it needs no extra element to draw. */
+  box-shadow: inset 0 0 0 0.25rem var(--admin-accent);
+}
+
+/* Keyboard focus lands on the hidden radio, so the label shows the ring. */
+.level-option:focus-within {
+  outline: 2px solid var(--admin-accent);
+  outline-offset: 2px;
+}
+
+/* ------------------------------------------------------- RSVP and attendance
+
+   The calendar blocks a member interacts with. All three take their type and
+   colour from the block's own style slot like every other calendar slot; what
+   is here is only the arrangement the style cannot express. */
+
+.cal-rsvp-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.75rem;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: 1.3;
+  cursor: pointer;
+}
+
+.cal-rsvp-button:hover:not(:disabled) {
+  /* A tint of whatever colour the block is already wearing, so the hover works
+     against any style an editor picks. */
+  background: color-mix(in srgb, currentColor 14%, transparent);
+}
+
+/* Answered: filled rather than outlined, so the state reads at a glance in a
+   grid of events. */
+.cal-rsvp-button[data-answer="yes"],
+.cal-rsvp-button[data-answer="no"] {
+  background: color-mix(in srgb, currentColor 18%, transparent);
+  font-weight: 600;
+}
+
+/* In the builder the button is a shape to place and style, not a control. */
+.cal-rsvp-button:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
+.cal-rsvp-dialog .cal-rsvp-event {
+  margin: 0 0 1rem;
+  font-weight: 600;
+}
+
+.cal-rsvp-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+/* The answer already given is ringed, so the popup opens showing where you
+   stand rather than asking a question you have answered. */
+.cal-rsvp-choices .btn[data-selected="true"] {
+  outline: 2px solid var(--admin-accent);
+  outline-offset: 2px;
+}
+
+.cal-rsvp-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  align-items: flex-start;
+}
+
+.cal-rsvp-group {
+  min-width: 8rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.cal-rsvp-heading {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: 600;
+  font-size: 0.9em;
+}
+
+.cal-rsvp-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.4em;
+  padding: 0 0.35em;
+  border-radius: 999px;
+  background: color-mix(in srgb, currentColor 16%, transparent);
+  font-size: 0.85em;
+  font-variant-numeric: tabular-nums;
+}
+
+.cal-rsvp-names {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  font-size: 0.9em;
+}
+
+.cal-rsvp-empty {
+  font-size: 0.9em;
+  opacity: 0.55;
+}
+
+/* --------------------------------------------------------- The register */
+
+.cal-attendance {
+  display: block;
+  width: 100%;
+  padding: 0.85rem;
+  border: 1px solid color-mix(in srgb, currentColor 25%, transparent);
+  border-radius: 0.5rem;
+  text-align: left;
+}
+
+.cal-attendance-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem 0.75rem;
+  margin-bottom: 0.6rem;
+}
+
+.cal-attendance-heading {
+  font-weight: 600;
+}
+
+.cal-attendance-count {
+  margin-left: auto;
+  font-size: 0.85em;
+  opacity: 0.7;
+  font-variant-numeric: tabular-nums;
+}
+
+.cal-attendance-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.9rem;
+  margin-bottom: 0.6rem;
+}
+
+.cal-attendance-search {
+  flex: 1 1 10rem;
+  min-width: 0;
+  padding: 0.3rem 0.5rem;
+  border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
+  border-radius: 0.375rem;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 0.9em;
+}
+
+.cal-attendance-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.85em;
+  cursor: pointer;
+}
+
+/* Scrolls inside itself: a register of a whole membership must not stretch the
+   lightbox past the height of the screen. */
+.cal-attendance-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 18rem;
+  overflow-y: auto;
+}
+
+.cal-attendance-row label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem 0.15rem;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+  cursor: pointer;
+  font-size: 0.9em;
+}
+
+.cal-attendance-name {
+  font-weight: 500;
+}
+
+.cal-attendance-level {
+  font-size: 0.85em;
+  opacity: 0.6;
+}
+
+.cal-attendance-rsvp {
+  margin-left: auto;
+  font-size: 0.8em;
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, currentColor 14%, transparent);
+  white-space: nowrap;
+}
+
+.cal-attendance-rsvp[data-answer="no"] {
+  opacity: 0.6;
+}
+
+.cal-attendance-note {
+  margin: 0.6rem 0 0;
+  font-size: 0.85em;
+  opacity: 0.65;
+}
+
+/* ------------------------------------------------------------- User list
+
+   Search, filters and paging above and below the accounts. The controls write
+   to the URL and the server re-queries, so the list is one page of results
+   whatever size the membership grows to. */
+
+.user-toolbar {
+  padding: 0.9rem;
+  margin-bottom: 0.9rem;
+  border: 1px solid var(--admin-border);
+  border-radius: 0.5rem;
+  background: var(--admin-panel);
+  transition: opacity 120ms ease;
+}
+
+/* Dimmed while the server fetches the next page, so a slow query looks like
+   waiting rather than like nothing having happened. */
+.user-toolbar[data-pending="true"] {
+  opacity: 0.6;
+}
+
+.user-toolbar-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.9rem;
+  margin-top: 0.75rem;
+}
+
+.user-toolbar-summary .help-text {
+  margin: 0;
+}
+
+.user-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 1rem;
+}
+
+.user-pagination .btn[data-current="true"] {
+  border-color: var(--admin-accent);
+  color: var(--admin-accent);
+  font-weight: 600;
+}
+
+.user-pagination-gap {
+  padding: 0 0.15rem;
+  opacity: 0.5;
+}
+
+.user-pagination-count {
+  margin: 0 0 0 auto;
+}
+
+/* ------------------------------------------------------------ Menu editor
+
+   One row per item, with its target and its visibility together — the two
+   questions about a menu item that now matter equally. */
+
+.menu-row-top {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+}
+
+.menu-child-row {
+  padding: 0.7rem;
+  margin-bottom: 0.6rem;
+  border: 1px solid var(--admin-border);
+  border-radius: 0.375rem;
+  background: var(--admin-bg);
+}
+
+/* ------------------------------------------------------------- Menu block
+
+   A named menu on a page: an open list, or a button that drops one down. The
+   block's style slots dress the list, the links and the button; what is here is
+   only the arrangement they cannot express. */
+
+.pb-menu {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+}
+
+.pb-menu-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.pb-menu-list[data-direction="horizontal"] {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  align-items: baseline;
+}
+
+.pb-menu-item {
+  min-width: 0;
+}
+
+.pb-menu-link {
+  text-decoration: none;
+  color: inherit;
+}
+
+.pb-menu-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+/* A group heading is not a link, so it reads as a heading. */
+.pb-menu-group-label {
+  display: block;
+  font-weight: 600;
+  opacity: 0.75;
+  font-size: 0.9em;
+}
+
+.pb-menu-sublist {
+  list-style: none;
+  margin: 0.2rem 0 0;
+  padding: 0 0 0 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.pb-menu-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.8rem;
+  border: 1px solid currentColor;
+  border-radius: 0.375rem;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.pb-menu-caret {
+  width: 0;
+  height: 0;
+  border-left: 0.25rem solid transparent;
+  border-right: 0.25rem solid transparent;
+  border-top: 0.3rem solid currentColor;
+  transition: transform 150ms ease;
+}
+
+.pb-menu.is-dropdown[data-open="true"] .pb-menu-caret {
+  transform: rotate(180deg);
+}
+
+.pb-menu-panel {
+  position: absolute;
+  top: calc(100% + 0.4rem);
+  left: 0;
+  z-index: 20;
+  min-width: 11rem;
+  padding: 0.7rem;
+  border-radius: 0.5rem;
+  /* The page's own surface colours, so a dropdown belongs to the page it is on
+     rather than to the admin. */
+  background: var(--content-bg, var(--page-bg, #ffffff));
+  color: inherit;
+  border: 1px solid rgba(128, 128, 128, 0.28);
+  box-shadow: 0 0.75rem 2rem rgba(0, 0, 0, 0.22);
+}
+
+.pb-menu-panel[hidden] {
+  display: none;
+}
+
+/* On the builder canvas an unchosen menu still has to be visible to place. */
+.pb-menu-empty {
+  display: inline-block;
+  padding: 0.3rem 0.6rem;
+  border: 1px dashed rgba(128, 128, 128, 0.5);
+  border-radius: 0.375rem;
+  font-size: 0.85rem;
+  opacity: 0.6;
+}

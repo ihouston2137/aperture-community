@@ -39,7 +39,19 @@ export type CalendarEventRecord = {
    */
   who: string[];
   tags: string[];
+  /** Collects a Yes or No from members. Every RSVP block hides without it. */
+  rsvpEnabled: boolean;
+  /** Lets a manager record who turned up. The attendance block hides without it. */
+  attendanceEnabled: boolean;
 };
+
+/** A member answer to an event. There are only ever these two. */
+export const RSVP_RESPONSES = ["yes", "no"] as const;
+export type RsvpResponse = (typeof RSVP_RESPONSES)[number];
+
+export function normalizeRsvpResponse(value: unknown): RsvpResponse | null {
+  return RSVP_RESPONSES.includes(value as RsvpResponse) ? (value as RsvpResponse) : null;
+}
 
 /** The managed vocabularies and zone, as the admin screens consume them. */
 export type CalendarSettingsValues = {

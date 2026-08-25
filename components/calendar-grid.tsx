@@ -45,6 +45,8 @@ export type CalendarGridProps = {
   sources: PageSources;
   showWeekdays?: boolean;
   onSelectEvent?: (event: CalendarEventRecord) => void;
+  /** True only on the builder canvas. */
+  designTime?: boolean;
   /** Admin only: the "+" that adds an event on a day. */
   onAddDay?: (dateKey: string) => void;
   emptyDayLabel?: string;
@@ -59,6 +61,7 @@ export function CalendarGrid({
   layouts,
   sources,
   showWeekdays = true,
+  designTime = false,
   onSelectEvent,
   onAddDay,
   emptyDayLabel = "No events",
@@ -143,6 +146,7 @@ export function CalendarGrid({
                         sources={sources}
                         fields={BUILT_IN_EVENT_FIELDS}
                         onSelect={onSelectEvent}
+                        designTime={designTime}
                       />
                     ))
                   )}

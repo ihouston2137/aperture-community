@@ -1,4 +1,10 @@
 import type { CSSProperties } from "react";
+import {
+  menuBlockDirection,
+  menuBlockLayout,
+  type MenuBlockDirection,
+  type MenuBlockLayout,
+} from "./menu-types";
 
 import { ASPECT_RATIOS, aspectRatioCss, type AspectRatio } from "./aspect-ratio";
 import { normalizeCalendarDisplay, type CalendarDisplay } from "./calendar";
@@ -42,6 +48,8 @@ export const PAGE_BLOCK_TYPES = [
   "calendar",
   "eventList",
   "form",
+  // A named menu, placed on a page as a list or a dropdown.
+  "menu",
   "container",
 ] as const;
 
@@ -187,6 +195,13 @@ export type PageBlock = ResponsiveStyleFields & {
   bioId?: string;
   collectionId?: string;
   formId?: string;
+
+  // menu
+  menuId?: string;
+  menuLayout?: MenuBlockLayout;
+  menuDirection?: MenuBlockDirection;
+  /** Closed until opened, for the dropdown form. */
+  menuButtonText?: string;
 
   // container
   container?: ContainerLayout;
@@ -744,6 +759,12 @@ export function normalizeBlock(
     case "form":
       block.formId = str(raw.formId);
       break;
+    case "menu":
+      block.menuId = str(raw.menuId);
+      block.menuLayout = menuBlockLayout(raw.menuLayout);
+      block.menuDirection = menuBlockDirection(raw.menuDirection);
+      block.menuButtonText = str(raw.menuButtonText);
+      break;
     case "container":
       // `normalizeContainerLayout` already runs the normalizer over every
       // cell's blocks. Running the plain one again here would drop the story
@@ -1061,6 +1082,7 @@ export function blockFillsWidth(block: WidthAwareBlock): boolean {
     case "calendar":
     case "eventList":
     case "form":
+    case "menu":
       return true;
     default:
       return false;

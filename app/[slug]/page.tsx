@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { guardContent } from "@/lib/content-guard";
 
 import { PageRenderer } from "@/components/page-renderer";
 import { SiteChrome } from "@/components/site-chrome";
@@ -42,6 +43,7 @@ export default async function CustomPage({
   const { slug } = await params;
   const page = await findPage(slug);
   if (!page) notFound();
+  await guardContent("page", String(page._id), `/${slug}`);
 
   const layout = normalizePageLayout(page.layout, normalizeBlocksWithStorySlots);
   const sources = await loadPageSources(layout);

@@ -5,6 +5,7 @@ import { AnalyticsChart } from "@/components/admin/analytics-chart";
 import { getAnalyticsOverview } from "@/lib/analytics/report";
 import { getAccessContext } from "@/lib/access";
 import { connectDB } from "@/lib/db";
+import { countPendingMembers } from "@/lib/members";
 import { IS_DEV } from "@/lib/dev-reset";
 import {
   Collection,
@@ -25,6 +26,7 @@ const CARDS = [
   { href: "/admin/media", label: "Media", permission: "media.view" },
   { href: "/admin/publications", label: "Publications", permission: "publications.manage" },
   { href: "/admin/forms/submissions", label: "Submissions", permission: "forms.submissions" },
+  { href: "/admin/members", label: "Awaiting approval", permission: "members.approve" },
 ];
 
 export default async function AdminDashboard({
@@ -46,6 +48,9 @@ export default async function AdminDashboard({
       FormSubmission.countDocuments({ status: "new" }),
     ]);
 
+  // Only counted for someone who can act on it.
+  const pendingMembers = can("members.approve") ? await countPendingMembers() : 0;
+
   // Only fetched for a reader who is allowed to see it.
   const analytics =
     can("analytics.view") || can("analytics.manage")
@@ -59,6 +64,7 @@ export default async function AdminDashboard({
     "/admin/media": media,
     "/admin/publications": publications,
     "/admin/forms/submissions": submissions,
+    "/admin/members": pendingMembers,
   };
 
   return (

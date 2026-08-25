@@ -53,6 +53,21 @@ export const adminNavGroups: NavGroup[] = [
     items: [{ href: "/admin/media", label: "Media library", permission: "media.view" }],
   },
   {
+    label: "Community",
+    items: [
+      {
+        href: "/admin/members",
+        label: "Members",
+        anyPermission: ["members.view", "members.approve"],
+      },
+      {
+        href: "/admin/registration",
+        label: "Registration",
+        permission: "registration.manage",
+      },
+    ],
+  },
+  {
     label: "Design",
     items: [
       // Appearance also hosts the site content settings, as a second tab, so
@@ -62,6 +77,7 @@ export const adminNavGroups: NavGroup[] = [
         label: "Appearance & Content",
         anyPermission: ["appearance.manage", "siteContent.manage"],
       },
+      { href: "/admin/menus", label: "Menus", permission: "siteContent.manage" },
       {
         href: "/admin/design-library",
         label: "Design Library",
@@ -83,7 +99,8 @@ export const adminNavGroups: NavGroup[] = [
         anyPermission: ["analytics.view", "analytics.manage"],
       },
       { href: "/admin/email", label: "Email", permission: "email.manage" },
-      { href: "/admin/users", label: "Users & roles", permission: "users.manage" },
+      { href: "/admin/users", label: "Users", permission: "users.manage" },
+      { href: "/admin/roles", label: "Roles", permission: "users.manage" },
       { href: "/admin/change-password", label: "Change password" },
     ],
   },

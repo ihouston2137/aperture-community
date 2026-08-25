@@ -6,6 +6,7 @@ import {
   type CalendarSlotBlockType,
 } from "@/lib/calendar-slot-layout";
 import type { PageBlock } from "@/lib/page-layout";
+import { slotIsStyled } from "@/lib/responsive-style";
 
 import { blockStyleTarget, type OpenStyleEditor } from "./story-block-inspector";
 import { CheckField, SelectField, TextField } from "./settings-fields";
@@ -86,6 +87,101 @@ export function CalendarSlotInspector({
           </>
         ) : null}
 
+        {type === "calRsvpButton" ? (
+          <>
+            <TextField
+              label="Button text"
+              value={block.rsvpText ?? "RSVP"}
+              onChange={(value) => update({ rsvpText: value } as Partial<PageBlock>)}
+            />
+            <TextField
+              label="After saying yes"
+              value={block.rsvpGoingText ?? "Going"}
+              onChange={(value) => update({ rsvpGoingText: value } as Partial<PageBlock>)}
+            />
+            <TextField
+              label="After saying no"
+              value={block.rsvpNotGoingText ?? "Not going"}
+              onChange={(value) =>
+                update({ rsvpNotGoingText: value } as Partial<PageBlock>)
+              }
+            />
+            <CheckField
+              label="Show the going count"
+              value={block.showCount ?? false}
+              onChange={(value) => update({ showCount: value } as Partial<PageBlock>)}
+            />
+            <span className="help-text">
+              The button only appears on events that have RSVPs switched on.
+            </span>
+          </>
+        ) : null}
+
+        {type === "calRsvpList" ? (
+          <>
+            <SelectField
+              label="Lists"
+              value={block.rsvpShows ?? "both"}
+              options={[
+                { value: "both", label: "Going and not going" },
+                { value: "yes", label: "Going only" },
+                { value: "no", label: "Not going only" },
+              ]}
+              onChange={(value) => update({ rsvpShows: value } as Partial<PageBlock>)}
+            />
+            <SelectField
+              label="Shows"
+              value={block.namesOrCounts ?? "names"}
+              options={[
+                { value: "names", label: "Names" },
+                { value: "counts", label: "How many only" },
+              ]}
+              onChange={(value) =>
+                update({ namesOrCounts: value } as Partial<PageBlock>)
+              }
+            />
+            <TextField
+              label="Going heading"
+              value={block.yesHeading ?? "Going"}
+              onChange={(value) => update({ yesHeading: value } as Partial<PageBlock>)}
+            />
+            <TextField
+              label="Not going heading"
+              value={block.noHeading ?? "Not going"}
+              onChange={(value) => update({ noHeading: value } as Partial<PageBlock>)}
+            />
+            <span className="help-text">
+              Only appears on events that have RSVPs switched on.
+            </span>
+          </>
+        ) : null}
+
+        {type === "calAttendance" ? (
+          <>
+            <TextField
+              label="Heading"
+              value={block.heading ?? "Attendance"}
+              onChange={(value) => update({ heading: value } as Partial<PageBlock>)}
+            />
+            <CheckField
+              label="Open filtered to those who said yes"
+              value={block.attendanceFromRsvp ?? true}
+              onChange={(value) =>
+                update({ attendanceFromRsvp: value } as Partial<PageBlock>)
+              }
+            />
+            <span className="help-text">
+              A starting filter, not a limit — the whole membership is one click
+              away, and anyone already ticked stays listed either way.
+            </span>
+            <p className="help-text">
+              Only appears on events taking attendance, and only for people whose
+              role holds “See who attended events” or “Record event attendance”.
+              Everyone else is served nothing at all.
+            </p>
+          </>
+        ) : null}
+
         {type === "calLink" ? (
           <>
             <TextField
@@ -110,16 +206,143 @@ export function CalendarSlotInspector({
         <button
           type="button"
           className="btn btn-sm"
-          onClick={() => onEditStyle(blockStyleTarget(block, "Event field style"), update)}
+          onClick={() =>
+            onEditStyle(
+              blockStyleTarget(
+                block,
+                type === "calRsvpButton" ? "Button style" : "Event field style"
+              ),
+              update
+            )
+          }
         >
           Edit style…
         </button>
         <p className="help-text">
           {block.styleSlug
             ? `Using the “${block.styleSlug}” named style.`
-            : "Set type, colour and spacing, or save it as a named style to reuse."}
+            : type === "calRsvpButton"
+              ? "How the button looks before anyone answers, and the base the two answered looks build on."
+              : "Set type, colour and spacing, or save it as a named style to reuse."}
         </p>
       </div>
+
+      {type === "calRsvpButton" ? (
+        <div className="inspector-section">
+          <h4 className="inspector-title">Answered states</h4>
+          <p className="help-text" style={{ marginTop: "-0.35rem" }}>
+            A state you style replaces the style above for that answer; one you
+            leave alone looks the same as the resting button. Start from a copy
+            so you are only changing what differs. Click the button on the
+            canvas to step through all three.
+          </p>
+
+          <StateStyleButton
+            label="Going"
+            slugKey="goingStyleSlug"
+            valuesKey="goingStyle"
+            block={block}
+            update={update}
+            onEditStyle={onEditStyle}
+          />
+          <StateStyleButton
+            label="Not going"
+            slugKey="notGoingStyleSlug"
+            valuesKey="notGoingStyle"
+            block={block}
+            update={update}
+            onEditStyle={onEditStyle}
+          />
+        </div>
+      ) : null}
     </>
+  );
+}
+
+/**
+ * One answered look, opened in the same style popup every other slot uses.
+ *
+ * Offers a way back to nothing as well: a state with no style of its own falls
+ * through to the block's, which is the behaviour a template starts with.
+ */
+function StateStyleButton({
+  label,
+  slugKey,
+  valuesKey,
+  block,
+  update,
+  onEditStyle,
+}: {
+  label: string;
+  slugKey: "goingStyleSlug" | "notGoingStyleSlug";
+  valuesKey: "goingStyle" | "notGoingStyle";
+  block: CalendarSlotBlock;
+  update: (patch: Partial<PageBlock>) => void;
+  onEditStyle: OpenStyleEditor;
+}) {
+  const slug = block[slugKey];
+  const values = block[valuesKey];
+  const styled = slotIsStyled(block, valuesKey);
+  // Nothing to copy when the resting look is a named style: that is a slug, not
+  // a set of values, and the state slot would have to name it too.
+  const restingCopy = block.styleSlug ? null : block.textStyle;
+
+  return (
+    <div className="field">
+      <span className="field-label">{label}</span>
+      <div className="admin-list-actions">
+        <button
+          type="button"
+          className="btn btn-sm"
+          onClick={() =>
+            onEditStyle(
+              {
+                title: `${label} style`,
+                slugKey,
+                valuesKey,
+                slug,
+                values,
+                showTypography: true,
+              },
+              update
+            )
+          }
+        >
+          Edit style…
+        </button>
+        {styled ? (
+          <button
+            type="button"
+            className="btn btn-sm"
+            onClick={() =>
+              update({ [slugKey]: "", [valuesKey]: undefined } as Partial<PageBlock>)
+            }
+          >
+            Clear
+          </button>
+        ) : (
+          // Because a styled state replaces the resting look rather than adding
+          // to it, starting from a copy is what makes "change just the colour" a
+          // one-step job.
+          <button
+            type="button"
+            className="btn btn-sm"
+            disabled={!restingCopy}
+            onClick={() =>
+              update({ [valuesKey]: { ...restingCopy } } as Partial<PageBlock>)
+            }
+          >
+            Copy resting style
+          </button>
+        )}
+      </div>
+      <span className="help-text">
+        {slug
+          ? `Using the “${slug}” named style.`
+          : styled
+            ? "Replaces the resting style for this answer."
+            : "Looks the same as the resting button."}
+      </span>
+    </div>
   );
 }

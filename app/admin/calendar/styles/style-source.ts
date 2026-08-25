@@ -52,6 +52,8 @@ export async function loadStyleEditorSource() {
     category: doc.category ?? "",
     who: Array.isArray(doc.who) ? doc.who.map(String) : [],
     tags: Array.isArray(doc.tags) ? doc.tags.map(String) : [],
+    rsvpEnabled: Boolean(doc.rsvpEnabled),
+    attendanceEnabled: Boolean(doc.attendanceEnabled),
   }));
 
   const layouts: Record<string, PageRow[]> = {};

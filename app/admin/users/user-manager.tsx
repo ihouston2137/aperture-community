@@ -5,31 +5,46 @@ import { useEffect, useState, useTransition } from "react";
 
 import { Panel } from "@/components/admin-ui";
 import { ModalPortal } from "@/components/modal-portal";
+import { fullName, type MemberSummary } from "@/lib/member-types";
+import {
+  MEMBERSHIP_STATUSES,
+  membershipStatusLabels,
+  type RoleKind,
+} from "@/lib/permissions";
+
+import type { UserQuery } from "@/lib/user-query-types";
 
 import { deleteUserAction, saveUserAction } from "./actions";
+import { UserFilters, UserPagination } from "./user-filters";
 
-export type UserRecord = {
-  _id: string;
-  email: string;
-  name: string;
-  isActive: boolean;
-  mustChangePassword: boolean;
-  roleIds: string[];
-  /** The signed-in account, which cannot delete or deactivate itself. */
+export type UserRecord = MemberSummary & {
+  /** The signed-in account, which cannot lock itself out. */
   isSelf: boolean;
 };
 
 /** Just enough of a role to offer it in the picker. */
-export type RoleOption = { _id: string; name: string };
+export type RoleOption = { _id: string; name: string; kind: RoleKind };
 
 type DialogState = { mode: "create" } | { mode: "edit"; user: UserRecord } | null;
 
 export function UserManager({
   users,
   roles,
+  query,
+  total,
+  overall,
+  page,
+  pageCount,
 }: {
+  /** One page of accounts, already searched and filtered by the server. */
   users: UserRecord[];
   roles: RoleOption[];
+  query: UserQuery;
+  /** Matching the filters, and existing at all, so an empty page can explain itself. */
+  total: number;
+  overall: number;
+  page: number;
+  pageCount: number;
 }) {
   const router = useRouter();
   const [dialog, setDialog] = useState<DialogState>(null);
@@ -48,24 +63,47 @@ export function UserManager({
         </button>
       </div>
 
+      <UserFilters query={query} roles={roles} total={total} overall={overall} />
+
+      {users.length === 0 ? (
+        <p className="help-text" style={{ marginTop: "0.75rem" }}>
+          {overall === 0
+            ? "No accounts yet. Add the first one above."
+            : "No accounts match these filters."}
+        </p>
+      ) : null}
+
       <ul className="admin-list">
         {users.map((user) => {
-          const named = user.roleIds.map(roleName).filter(Boolean);
+          const levels = user.communityRoleIds.map(roleName).filter(Boolean);
+          const managing = user.managementRoleIds.map(roleName).filter(Boolean);
 
           return (
             <li key={user._id} className="admin-list-item">
               <div>
-                <h3>{user.name || user.email}</h3>
+                <h3>{fullName(user)}</h3>
                 <div className="admin-list-meta">
-                  {user.name ? `${user.email} · ` : ""}
-                  {named.length > 0 ? named.join(", ") : "No roles"}
+                  {user.email}
+                  {user.phone ? ` · ${user.phone}` : ""}
+                  {levels.length > 0 ? ` · ${levels.join(", ")}` : ""}
+                  {managing.length > 0 ? ` · manages: ${managing.join(", ")}` : ""}
+                  {levels.length === 0 && managing.length === 0 ? " · no roles" : ""}
+                  {user.emailVerified ? "" : " · email unconfirmed"}
                   {user.mustChangePassword ? " · must change password" : ""}
                   {user.isSelf ? " · you" : ""}
                 </div>
               </div>
 
-              <span className={`badge${user.isActive ? " badge-published" : ""}`}>
-                {user.isActive ? "active" : "inactive"}
+              <span
+                className={`badge${
+                  user.isActive && user.membershipStatus === "active"
+                    ? " badge-published"
+                    : ""
+                }`}
+              >
+                {user.isActive
+                  ? membershipStatusLabels[user.membershipStatus].toLowerCase()
+                  : "inactive"}
               </span>
 
               <div className="admin-list-actions">
@@ -81,6 +119,8 @@ export function UserManager({
           );
         })}
       </ul>
+
+      <UserPagination query={query} page={page} pageCount={pageCount} />
 
       {dialog ? (
         <UserDialog
@@ -148,6 +188,9 @@ function UserDialog({
     });
   }
 
+  const communityRoles = roles.filter((role) => role.kind === "community");
+  const managementRoles = roles.filter((role) => role.kind === "management");
+
   return (
     <ModalPortal>
       <div
@@ -183,6 +226,26 @@ function UserDialog({
 
               <div className="field-grid">
                 <div className="field">
+                  <label htmlFor="user-first-name">First name</label>
+                  <input
+                    id="user-first-name"
+                    type="text"
+                    name="firstName"
+                    defaultValue={user?.firstName ?? ""}
+                    required
+                  />
+                </div>
+                <div className="field">
+                  <label htmlFor="user-last-name">Last name</label>
+                  <input
+                    id="user-last-name"
+                    type="text"
+                    name="lastName"
+                    defaultValue={user?.lastName ?? ""}
+                    required
+                  />
+                </div>
+                <div className="field">
                   <label htmlFor="user-email">Email</label>
                   <input
                     id="user-email"
@@ -194,13 +257,31 @@ function UserDialog({
                   />
                 </div>
                 <div className="field">
-                  <label htmlFor="user-name">Name</label>
+                  <label htmlFor="user-phone">Phone number</label>
                   <input
-                    id="user-name"
-                    type="text"
-                    name="name"
-                    defaultValue={user?.name ?? ""}
+                    id="user-phone"
+                    type="tel"
+                    name="phone"
+                    defaultValue={user?.phone ?? ""}
+                    autoComplete="off"
                   />
+                </div>
+                <div className="field">
+                  <label htmlFor="user-status">Membership</label>
+                  <select
+                    id="user-status"
+                    name="membershipStatus"
+                    defaultValue={user?.membershipStatus ?? "active"}
+                  >
+                    {MEMBERSHIP_STATUSES.map((status) => (
+                      <option key={status} value={status}>
+                        {membershipStatusLabels[status]}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="help-text">
+                    Only an active membership can sign in.
+                  </span>
                 </div>
                 <div className="field">
                   <label htmlFor="user-password">
@@ -222,14 +303,14 @@ function UserDialog({
               </div>
 
               <div className="field" style={{ marginTop: "0.75rem" }}>
-                <span className="field-label">Roles</span>
-                {roles.length === 0 ? (
+                <span className="field-label">Membership level</span>
+                {communityRoles.length === 0 ? (
                   <span className="help-text">
-                    No roles defined yet. Add one below, then assign it here.
+                    No membership levels defined yet. Add one below.
                   </span>
                 ) : (
                   <div className="chip-picker">
-                    {roles.map((role) => (
+                    {communityRoles.map((role) => (
                       <label key={role._id} className="chip-option">
                         <input
                           type="checkbox"
@@ -243,7 +324,33 @@ function UserDialog({
                   </div>
                 )}
                 <span className="help-text">
-                  An account with no roles can sign in but manage nothing.
+                  What this person is in the community, and what they can reach in
+                  the portal.
+                </span>
+              </div>
+
+              <div className="field" style={{ marginTop: "0.75rem" }}>
+                <span className="field-label">Management roles</span>
+                {managementRoles.length === 0 ? (
+                  <span className="help-text">No management roles defined yet.</span>
+                ) : (
+                  <div className="chip-picker">
+                    {managementRoles.map((role) => (
+                      <label key={role._id} className="chip-option">
+                        <input
+                          type="checkbox"
+                          name="roleIds"
+                          value={role._id}
+                          defaultChecked={user?.roleIds.includes(role._id) ?? false}
+                        />
+                        {role.name}
+                      </label>
+                    ))}
+                  </div>
+                )}
+                <span className="help-text">
+                  What this person can administer. An account with none of these
+                  can sign in but manage nothing.
                 </span>
               </div>
 
@@ -255,6 +362,18 @@ function UserDialog({
                 />
                 Active
               </label>
+              <label className="checkbox-row">
+                <input
+                  type="checkbox"
+                  name="emailVerified"
+                  defaultChecked={user ? user.emailVerified : true}
+                />
+                Email address confirmed
+              </label>
+              <span className="help-text">
+                Clearing this asks them for a six-digit code the next time they
+                sign in.
+              </span>
               {user?.isSelf ? (
                 <span className="help-text">
                   This is your own account — you cannot deactivate or delete it.

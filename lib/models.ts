@@ -1,13 +1,24 @@
 import mongoose, { Schema, type Model } from "mongoose";
 
 import { BIO_TYPES } from "./bio-types";
-import { CALENDAR_EVENT_STATUSES, CALENDAR_TEMPLATE_KINDS } from "./calendar";
+import {
+  CALENDAR_EVENT_STATUSES,
+  CALENDAR_TEMPLATE_KINDS,
+  RSVP_RESPONSES,
+} from "./calendar";
+import {
+  MEMBERSHIP_STATUSES,
+  ROLE_KINDS,
+  type MembershipStatus,
+  type RoleKind,
+} from "./permissions";
 import { STORY_TEMPLATE_LAYOUT_VERSION } from "./story-template-layout";
 import {
   MEDIA_CLICK_ACTIONS,
   STORY_IMAGE_ALIGNMENTS,
   STORY_IMAGE_SIZES,
 } from "./story-media";
+import { TWO_FACTOR_MODES, VERIFICATION_PURPOSES } from "./verification-types";
 
 /**
  * All builder layouts (pages, forms, publications, story templates) are stored
@@ -33,9 +44,15 @@ export type UserDoc = {
   _id: mongoose.Types.ObjectId;
   email: string;
   passwordHash: string;
+  firstName: string;
+  lastName: string;
   name: string;
+  phone: string;
   mustChangePassword: boolean;
   roleIds: mongoose.Types.ObjectId[];
+  requestedRoleId: mongoose.Types.ObjectId | null;
+  membershipStatus: MembershipStatus;
+  emailVerifiedAt: Date | null;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -45,9 +62,40 @@ const UserSchema = new Schema<any>(
   {
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     passwordHash: { type: String, required: true },
+    firstName: { type: String, default: "", trim: true },
+    lastName: { type: String, default: "", trim: true },
+    /**
+     * The display name. Kept as its own field rather than derived on read so
+     * accounts created before first and last names existed keep the name they
+     * were given, and so a member can be shown under a name that is not simply
+     * "first last". `composeName()` in `lib/members.ts` keeps it in step.
+     */
     name: { type: String, default: "" },
+    phone: { type: String, default: "", trim: true },
     mustChangePassword: { type: Boolean, default: false },
+    /**
+     * Both kinds of role live here. Reads filter by the role's `kind` — see
+     * `splitRoles()` in `lib/members.ts` — so a member holding a management
+     * role is one account, not two.
+     */
     roleIds: [{ type: Schema.Types.ObjectId, ref: "Role" }],
+    /** The community role asked for at registration, kept for the approver. */
+    requestedRoleId: { type: Schema.Types.ObjectId, ref: "Role", default: null },
+    membershipStatus: {
+      type: String,
+      enum: MEMBERSHIP_STATUSES,
+      default: "active",
+    },
+    /** Null until the six-digit code sent at registration is entered. */
+    emailVerifiedAt: { type: Date, default: null },
+    registeredAt: { type: Date, default: null },
+    /** Stops the new-registration notification going out twice. */
+    registrationNotifiedAt: { type: Date, default: null },
+    approvedAt: { type: Date, default: null },
+    approvedById: { type: Schema.Types.ObjectId, ref: "User", default: null },
+    /** Shown to the approver, and to the member on their own record. */
+    decisionNote: { type: String, default: "" },
+    lastLoginAt: { type: Date, default: null },
     isActive: { type: Boolean, default: true },
   },
   { timestamps: true }
@@ -60,6 +108,8 @@ export type RoleDoc = {
   name: string;
   slug: string;
   description: string;
+  kind: RoleKind;
+  level: number;
   permissions: string[];
   isSystem: boolean;
   createdAt: Date;
@@ -71,6 +121,16 @@ const RoleSchema = new Schema<any>(
     name: { type: String, required: true },
     slug: { type: String, required: true, unique: true },
     description: { type: String, default: "" },
+    /**
+     * `management` roles grant admin permissions; `community` roles are the
+     * membership levels. The two draw from different permission vocabularies
+     * (`permissionGroupsFor()`), so the kind decides what may be stored below.
+     */
+    kind: { type: String, enum: ROLE_KINDS, default: "management" },
+    /** Orders the membership levels. Unused by management roles. */
+    level: { type: Number, default: 0 },
+    /** Offered on the registration form. Community roles only. */
+    openToRegistration: { type: Boolean, default: true },
     permissions: [{ type: String }],
     isSystem: { type: Boolean, default: false },
   },
@@ -78,6 +138,60 @@ const RoleSchema = new Schema<any>(
 );
 
 export const Role = model("Role", RoleSchema);
+
+/**
+ * One six-digit code, hashed. Serves all three flows — confirming an address at
+ * registration, the second factor at sign-in, and password recovery — because
+ * they differ only in what consuming the code is allowed to do.
+ */
+const VerificationCodeSchema = new Schema<any>(
+  {
+    userId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
+    purpose: { type: String, enum: VERIFICATION_PURPOSES, required: true },
+    /** bcrypt, so a dumped collection does not hand over live codes. */
+    codeHash: { type: String, required: true },
+    sentTo: { type: String, default: "" },
+    expiresAt: { type: Date, required: true },
+    /** Wrong guesses so far; the code dies at `MAX_CODE_ATTEMPTS`. */
+    attempts: { type: Number, default: 0 },
+    consumedAt: { type: Date, default: null },
+  },
+  { timestamps: true }
+);
+
+// Mongo drops expired codes on its own, so a stale one is never a live one.
+VerificationCodeSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+
+export const VerificationCode = model("VerificationCode", VerificationCodeSchema);
+
+/**
+ * How joining works: whether registration is open, what a new account is given,
+ * whether a human approves it, and who hears about it. Defaults live in
+ * `lib/auth-settings.ts`; this only stores what was chosen.
+ */
+const AuthSettingsSchema = new Schema<any>(
+  {
+    allowRegistration: { type: Boolean, default: true },
+    /** Whether registrants choose the level they are applying for. */
+    allowRoleRequest: { type: Boolean, default: true },
+    /** Assigned at registration regardless of what was requested. */
+    defaultCommunityRoleId: { type: Schema.Types.ObjectId, ref: "Role", default: null },
+    /** Skips the approval queue: new accounts land `active`. */
+    autoApproveRegistrations: { type: Boolean, default: false },
+    requireEmailVerification: { type: Boolean, default: true },
+    /** `admins` asks only accounts holding a management role for a code. */
+    twoFactorMode: { type: String, enum: TWO_FACTOR_MODES, default: "off" },
+    codeTtlMinutes: { type: Number, default: 15 },
+    /* ------------------------------ New registration notification */
+    notifyOnRegistration: { type: Boolean, default: false },
+    registrationRecipients: [{ type: String }],
+    registrationSubject: { type: String, default: "" },
+    registrationIntro: { type: String, default: "" },
+  },
+  { timestamps: true }
+);
+
+export const AuthSettings = model("AuthSettings", AuthSettingsSchema);
 
 /* --------------------------------------------------- Legacy / home content */
 
@@ -189,6 +303,26 @@ const MenuLinkSchema = new Schema<any>(
   },
   { _id: false }
 );
+
+/**
+ * A named menu: the site header, or one placed on a page by a menu block.
+ *
+ * Items are Mixed and normalized in `lib/menu-types.ts`, the same arrangement
+ * every builder layout uses — the shape nests and grows, and a normalizer beats
+ * a schema at keeping older documents readable.
+ */
+const MenuSchema = new Schema<any>(
+  {
+    name: { type: String, required: true },
+    slug: { type: String, required: true, unique: true },
+    /** The header menu. Exactly one menu carries this. */
+    isSite: { type: Boolean, default: false },
+    items: { type: [Mixed], default: [] },
+  },
+  { timestamps: true }
+);
+
+export const Menu = model("Menu", MenuSchema);
 
 const SocialLinkSchema = new Schema<any>(
   {
@@ -903,6 +1037,10 @@ const CalendarEventSchema = new Schema<any>(
     category: { type: String, default: "" },
     who: { type: [String], default: [] },
     tags: { type: [String], default: [] },
+    /** Collects a Yes or No from members, through the RSVP popup. */
+    rsvpEnabled: { type: Boolean, default: false },
+    /** Lets a manager record who actually turned up. */
+    attendanceEnabled: { type: Boolean, default: false },
   },
   { timestamps: true }
 );
@@ -911,6 +1049,46 @@ const CalendarEventSchema = new Schema<any>(
 CalendarEventSchema.index({ date: 1, startTime: 1 });
 
 export const CalendarEvent = model("CalendarEvent", CalendarEventSchema);
+
+/**
+ * One member answer to one event. Yes or No, and nothing else — an RSVP that
+ * asked for more would be a form, which the site already has.
+ */
+const EventRsvpSchema = new Schema<any>(
+  {
+    eventId: { type: Schema.Types.ObjectId, ref: "CalendarEvent", required: true },
+    userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    response: { type: String, enum: RSVP_RESPONSES, required: true },
+  },
+  { timestamps: true }
+);
+
+// One answer per member per event; changing your mind updates it in place.
+EventRsvpSchema.index({ eventId: 1, userId: 1 }, { unique: true });
+
+export const EventRsvp = model("EventRsvp", EventRsvpSchema);
+
+/**
+ * Who actually turned up, as recorded by someone holding the permission.
+ *
+ * Separate from the RSVP: saying yes and being there are different facts, and a
+ * community that tracks attendance needs to see where they disagree.
+ */
+const EventAttendanceSchema = new Schema<any>(
+  {
+    eventId: { type: Schema.Types.ObjectId, ref: "CalendarEvent", required: true },
+    userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    present: { type: Boolean, default: false },
+    /** Who last changed it, so a disputed record has an author. */
+    recordedById: { type: Schema.Types.ObjectId, ref: "User", default: null },
+    recordedAt: { type: Date, default: null },
+  },
+  { timestamps: true }
+);
+
+EventAttendanceSchema.index({ eventId: 1, userId: 1 }, { unique: true });
+
+export const EventAttendance = model("EventAttendance", EventAttendanceSchema);
 
 const CalendarSettingsSchema = new Schema<any>(
   {

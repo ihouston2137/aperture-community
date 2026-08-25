@@ -4,6 +4,7 @@ import path from "node:path";
 import { connectDB } from "./db";
 import {
   Appearance,
+  AuthSettings,
   Bio,
   Collection,
   CustomPageBlock,
@@ -23,6 +24,7 @@ import {
   Story,
   StoryTemplate,
   User,
+  VerificationCode,
   Zine,
 } from "./models";
 import { runSeed } from "./seed";
@@ -38,6 +40,7 @@ import { runSeed } from "./seed";
 /** Every model, so a new one is a compile error here rather than a leftover. */
 const MODELS = [
   Appearance,
+  AuthSettings,
   Bio,
   Collection,
   CustomPageBlock,
@@ -57,6 +60,7 @@ const MODELS = [
   Story,
   StoryTemplate,
   User,
+  VerificationCode,
   Zine,
 ];
 

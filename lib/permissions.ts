@@ -4,6 +4,22 @@ export type PermissionGroup = {
   permissions: { key: string; label: string }[];
 };
 
+/**
+ * Roles come in two kinds and they do not share a vocabulary.
+ *
+ * A `management` role grants access to parts of `/admin`. A `community` role is
+ * a membership level — its name is the label a member wears in the portal, and
+ * its permissions say what that level can reach on the member side. Both are
+ * created and named by the Administrator; nothing here is a fixed list of
+ * levels, only the set of things a level can be given.
+ */
+export const ROLE_KINDS = ["management", "community"] as const;
+export type RoleKind = (typeof ROLE_KINDS)[number];
+
+export function roleKind(value: unknown): RoleKind {
+  return value === "community" ? "community" : "management";
+}
+
 export const permissionGroups: PermissionGroup[] = [
   {
     key: "content",
@@ -47,6 +63,17 @@ export const permissionGroups: PermissionGroup[] = [
     ],
   },
   {
+    key: "community",
+    label: "Community",
+    permissions: [
+      { key: "members.approve", label: "Approve members and set their level" },
+      { key: "members.view", label: "View the member list" },
+      { key: "registration.manage", label: "Manage registration settings" },
+      { key: "attendance.view", label: "See who attended events" },
+      { key: "attendance.record", label: "Record event attendance" },
+    ],
+  },
+  {
     key: "system",
     label: "System",
     permissions: [
@@ -58,12 +85,63 @@ export const permissionGroups: PermissionGroup[] = [
   },
 ];
 
+/**
+ * What a membership level can be given. Deliberately about reaching things
+ * rather than editing them — anything that edits site content is a management
+ * permission, even when a member holds it.
+ */
+export const communityPermissionGroups: PermissionGroup[] = [
+  {
+    key: "portal",
+    label: "Portal",
+    permissions: [
+      { key: "community.portal", label: "Sign in to the member portal" },
+      { key: "community.directory", label: "Browse the member directory" },
+      { key: "community.directory.contact", label: "See member phone numbers and emails" },
+      { key: "community.profile", label: "Edit their own member profile" },
+    ],
+  },
+  {
+    key: "community-content",
+    label: "Member content",
+    permissions: [
+      { key: "community.calendar", label: "View the community calendar" },
+      { key: "community.docs", label: "Read member documentation" },
+      { key: "community.collections", label: "View member collections" },
+      { key: "community.publications", label: "Read member publications" },
+      { key: "community.media", label: "View member media" },
+    ],
+  },
+  {
+    key: "community-participation",
+    label: "Participation",
+    permissions: [
+      { key: "community.forms", label: "Submit member forms" },
+      { key: "community.events.rsvp", label: "RSVP to events" },
+      { key: "community.events.host", label: "Propose events" },
+      { key: "community.upload", label: "Upload to member collections" },
+    ],
+  },
+];
+
 export const allPermissions: string[] = permissionGroups.flatMap((group) =>
   group.permissions.map((permission) => permission.key)
 );
 
+export const allCommunityPermissions: string[] = communityPermissionGroups.flatMap(
+  (group) => group.permissions.map((permission) => permission.key)
+);
+
+export function permissionGroupsFor(kind: RoleKind): PermissionGroup[] {
+  return kind === "community" ? communityPermissionGroups : permissionGroups;
+}
+
+export function allPermissionsFor(kind: RoleKind): string[] {
+  return kind === "community" ? allCommunityPermissions : allPermissions;
+}
+
 export function permissionLabel(key: string): string {
-  for (const group of permissionGroups) {
+  for (const group of [...permissionGroups, ...communityPermissionGroups]) {
     const found = group.permissions.find((permission) => permission.key === key);
     if (found) return found.label;
   }
@@ -71,3 +149,28 @@ export function permissionLabel(key: string): string {
 }
 
 export const ADMINISTRATOR_ROLE_SLUG = "administrator";
+
+/** The community role seeded on a fresh install, so registration always has a default. */
+export const MEMBER_ROLE_SLUG = "member";
+
+/* ------------------------------------------------------------- Membership */
+
+/**
+ * Where an account sits in the join process. `active` is the only state that
+ * can sign in; everything else is reported to the person at the login form.
+ */
+export const MEMBERSHIP_STATUSES = ["pending", "active", "rejected", "suspended"] as const;
+export type MembershipStatus = (typeof MEMBERSHIP_STATUSES)[number];
+
+export function membershipStatus(value: unknown): MembershipStatus {
+  return MEMBERSHIP_STATUSES.includes(value as MembershipStatus)
+    ? (value as MembershipStatus)
+    : "active";
+}
+
+export const membershipStatusLabels: Record<MembershipStatus, string> = {
+  pending: "Awaiting approval",
+  active: "Active",
+  rejected: "Declined",
+  suspended: "Suspended",
+};

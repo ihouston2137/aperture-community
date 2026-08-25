@@ -24,6 +24,7 @@ import {
   CALENDAR_SLOT_BLOCK_TYPES,
   CALENDAR_SLOT_ICONS,
   CALENDAR_SLOT_LABELS,
+  calendarSlotTypesFor,
   createCalendarSlotBlock,
   isCalendarSlotBlock,
   type CalendarSlotBlock,
@@ -34,16 +35,24 @@ import { emptyPageSources, type PageSources } from "@/lib/page-source-types";
 
 import { saveCalendarTemplateAction } from "../actions";
 
-/** Calendar slots first, then everything the page builder offers. */
-const PALETTE: PaletteItem[] = [
-  ...CALENDAR_SLOT_BLOCK_TYPES.map((type) => ({
-    type,
-    label: CALENDAR_SLOT_LABELS[type],
-    icon: CALENDAR_SLOT_ICONS[type],
-    group: "Event fields",
-  })),
-  ...PAGE_PALETTE.map((item) => ({ ...item, group: "Page blocks" })),
-];
+/**
+ * Calendar slots first, then everything the page builder offers.
+ *
+ * Built per template kind: the RSVP list and the attendance sheet are detail
+ * that belongs in a lightbox, and offering them for an event box would let an
+ * editor place a roster into every cell of a month view.
+ */
+function paletteFor(kind: CalendarTemplateKind): PaletteItem[] {
+  return [
+    ...calendarSlotTypesFor(kind).map((type) => ({
+      type,
+      label: CALENDAR_SLOT_LABELS[type],
+      icon: CALENDAR_SLOT_ICONS[type],
+      group: "Event fields",
+    })),
+    ...PAGE_PALETTE.map((item) => ({ ...item, group: "Page blocks" })),
+  ];
+}
 
 function blockLabel(block: PageBlock): string {
   return (
@@ -111,7 +120,7 @@ export function CalendarTemplateBuilder({
       <LayoutBuilder
         layout={layout}
         onChange={setLayout}
-        palette={PALETTE}
+        palette={paletteFor(template.kind)}
         createBlock={(type) => {
           if ((CALENDAR_SLOT_BLOCK_TYPES as readonly string[]).includes(type)) {
             return createCalendarSlotBlock(
@@ -129,6 +138,7 @@ export function CalendarTemplateBuilder({
               block={block as unknown as CalendarSlotBlock}
               event={event}
               showPlaceholders
+              designTime
             />
           ) : (
             <BlockView block={block} sources={canvasSources} interactive={false} />

@@ -69,6 +69,8 @@ export default async function CalendarPage({
     category: event.category ?? "",
     who: Array.isArray(event.who) ? event.who.map(String) : [],
     tags: Array.isArray(event.tags) ? event.tags.map(String) : [],
+    rsvpEnabled: Boolean(event.rsvpEnabled),
+    attendanceEnabled: Boolean(event.attendanceEnabled),
   }));
 
   // Counts drive the "in use" warnings in settings, so deleting a category or

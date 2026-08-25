@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { guardContent } from "@/lib/content-guard";
 
 import { CollectionGallery } from "@/components/collection-gallery";
 import { CollectionHeader } from "@/components/collection-header";
@@ -37,6 +38,7 @@ export default async function CollectionPage({
   const { slug } = await params;
   const collection = await getCollectionBySlug(slug);
   if (!collection || !collection.isPublic) notFound();
+  await guardContent("collection", collection.id, `/collections/${slug}`);
 
   const siteContent = await getSiteContent();
   const safeMode = await getSafeMode(siteContent.safeModeDefault);

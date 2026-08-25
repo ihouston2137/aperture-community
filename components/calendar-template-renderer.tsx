@@ -26,13 +26,18 @@ export function CalendarTemplateRenderer({
   sources,
   showPlaceholders = false,
   interactive = true,
+  designTime = false,
 }: {
   layout: PageRow[];
   event: CalendarEventRecord | null;
   /** Records referenced by the template's page blocks. */
   sources: PageSources;
   showPlaceholders?: boolean;
+  /** Page blocks only: an event box turns this off so its links do not fight
+   *  the box own click. It says nothing about the calendar slots. */
   interactive?: boolean;
+  /** True only on the builder canvas, where nothing is loaded or saved. */
+  designTime?: boolean;
 }) {
   return (
     <div className="cal-template">
@@ -49,6 +54,7 @@ export function CalendarTemplateRenderer({
                       block={block as CalendarSlotBlock}
                       event={event}
                       showPlaceholders={showPlaceholders}
+                      designTime={designTime}
                     />
                   ) : (
                     <BlockView

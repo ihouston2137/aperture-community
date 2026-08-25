@@ -18,6 +18,7 @@ import {
   CustomStyle,
   FontFamily,
   FormDefinition,
+  Menu,
   SitePage,
   Story,
   StoryTemplate,
@@ -41,6 +42,8 @@ export type BuilderSources = {
   /** Published pages, for linking to. Drafts have no address to point at. */
   pages: { _id: string; label: string }[];
   forms: { _id: string; label: string }[];
+  /** Named menus, for the menu block. */
+  menus: { _id: string; label: string }[];
   templates: { _id: string; label: string }[];
   /** The calendar vocabularies, for a calendar block's filters. */
   calendarCategories: string[];
@@ -77,6 +80,7 @@ export async function loadBuilderSources(): Promise<BuilderSources> {
     collections,
     pages,
     forms,
+    menus,
     templates,
     calendarSettings,
     calendarStyles,
@@ -90,6 +94,7 @@ export async function loadBuilderSources(): Promise<BuilderSources> {
     Collection.find().select("name isPublic").sort({ name: 1 }).lean<any[]>(),
     SitePage.find({ status: "published" }).select("title").sort({ title: 1 }).lean<any[]>(),
     FormDefinition.find().select("title").sort({ title: 1 }).lean<any[]>(),
+    Menu.find().select("name isSite").sort({ isSite: -1, name: 1 }).lean<any[]>(),
     StoryTemplate.find().select("name").sort({ name: 1 }).lean<any[]>(),
     CalendarSettings.findOne()
       .select("categories who tags timeZone defaultStyleId")
@@ -174,6 +179,7 @@ export async function loadBuilderSources(): Promise<BuilderSources> {
       label: page.title || "Untitled page",
     })),
     forms: forms.map((form) => ({ _id: String(form._id), label: form.title })),
+    menus: menus.map((menu) => ({ _id: String(menu._id), label: menu.name })),
     templates: templates.map((template) => ({
       _id: String(template._id),
       label: template.name,

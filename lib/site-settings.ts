@@ -6,30 +6,20 @@ import {
   type AppearanceValues,
   type SiteContentValues,
 } from "./site-values";
+import { mergeSettings } from "./settings-merge";
 
 export * from "./site-values";
-
-function merge<T extends object>(defaults: T, doc: unknown): T {
-  if (!doc || typeof doc !== "object") return { ...defaults };
-  const source = doc as Record<string, unknown>;
-  const out = { ...defaults } as Record<string, unknown>;
-  for (const key of Object.keys(defaults)) {
-    const value = source[key];
-    if (value !== undefined && value !== null) out[key] = value;
-  }
-  return out as T;
-}
 
 export async function getAppearance(): Promise<AppearanceValues> {
   await connectDB();
   const doc = await Appearance.findOne().lean();
-  return merge(defaultAppearance, doc);
+  return mergeSettings(defaultAppearance, doc);
 }
 
 export async function getSiteContent(): Promise<SiteContentValues> {
   await connectDB();
   const doc = await SiteContent.findOne().lean();
-  return merge(defaultSiteContent, doc);
+  return mergeSettings(defaultSiteContent, doc);
 }
 
 export async function getDesignAssets() {

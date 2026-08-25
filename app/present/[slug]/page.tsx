@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { guardContent } from "@/lib/content-guard";
 
 import { PublicationScreen } from "@/components/publication-screen";
 import { connectDB } from "@/lib/db";
@@ -40,6 +41,7 @@ export default async function PresentPage({
   const { slug } = await params;
   const presentation = await findPresentation(slug);
   if (!presentation) notFound();
+  await guardContent("publication", String(presentation._id), `/present/${slug}`);
 
   return <PublicationScreen doc={presentation} />;
 }

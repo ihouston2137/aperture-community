@@ -31,6 +31,7 @@ export function CalendarEventBox({
   sources,
   fields,
   onSelect,
+  designTime = false,
 }: {
   event: CalendarEventRecord;
   /**
@@ -44,6 +45,8 @@ export function CalendarEventBox({
   /** What the built-in arrangement shows. Ignored when a layout is given. */
   fields: CalendarEventField[];
   onSelect?: (event: CalendarEventRecord) => void;
+  /** True only on the builder canvas. */
+  designTime?: boolean;
 }) {
   const body = layout ? (
     <CalendarTemplateRenderer
@@ -51,6 +54,7 @@ export function CalendarEventBox({
       event={event}
       sources={sources}
       interactive={false}
+      designTime={designTime}
     />
   ) : (
     <BuiltInEvent event={event} fields={fields} />

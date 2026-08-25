@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { guardContent } from "@/lib/content-guard";
 
 import { DocRenderer } from "@/components/doc-renderer";
 import { colorOverrideStyle } from "@/lib/color-overrides";
@@ -65,6 +66,10 @@ export default async function DocPage({
     const session = await getSession();
     if (!session || previewId !== String(doc._id)) notFound();
   }
+
+  // The whole set is protected as one: a menu links to the set, and every page
+  // inside it is reached through that link.
+  await guardContent("documentation", set._id, `/docs/${documentation}/${document}`);
 
   const [template, view, tree] = await Promise.all([
     resolveDocTemplate(set.templateId),

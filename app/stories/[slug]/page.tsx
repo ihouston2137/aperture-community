@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { guardContent } from "@/lib/content-guard";
 
 import { SiteChrome } from "@/components/site-chrome";
 import { StoryRenderer } from "@/components/story-renderer";
@@ -51,6 +52,8 @@ export default async function StoryPage({
     const session = await getSession();
     if (!session || previewId !== String(story._id)) notFound();
   }
+
+  await guardContent("story", String(story._id), `/stories/${slug}`);
 
   // The view resolves media metadata from the library, so it is async.
   const [template, view] = await Promise.all([

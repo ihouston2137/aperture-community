@@ -23,6 +23,7 @@ import type { PageSources } from "@/lib/page-source-types";
 
 import { CalendarGrid } from "./calendar-grid";
 import { CalendarEventLightbox } from "./calendar-event-lightbox";
+import { CalendarRsvpProvider } from "./calendar-rsvp-context";
 
 /** The inclusive range a view covers, as one cache key. */
 function rangeKey(view: CalendarView, date: string): string {
@@ -202,29 +203,38 @@ export function CalendarBlock({
         </div>
       ) : null}
 
-      <CalendarGrid
-        view={view}
-        anchorDate={anchor}
-        events={visible}
-        todayKey={todayKey}
-        eventBox={eventBox}
-        layouts={layouts}
-        sources={sources}
-        showWeekdays={display.showWeekdays}
-        onSelectEvent={
-          display.lightbox && interactive ? (event) => setSelected(event) : undefined
-        }
-      />
-
-      {display.lightbox ? (
-        <CalendarEventLightbox
-          event={selected}
-          onClose={() => setSelected(null)}
-          lightbox={style.lightbox}
+      <CalendarRsvpProvider
+        eventIds={visible.map((item) => item._id)}
+        designTime={!interactive}
+      >
+        <CalendarGrid
+          view={view}
+          anchorDate={anchor}
+          events={visible}
+          todayKey={todayKey}
+          eventBox={eventBox}
           layouts={layouts}
           sources={sources}
+          showWeekdays={display.showWeekdays}
+          designTime={!interactive}
+          onSelectEvent={
+            display.lightbox && interactive ? (event) => setSelected(event) : undefined
+          }
         />
-      ) : null}
+
+        {/* Inside the same store as the grid, so answering in a cell and reading
+            the list in the panel are one fact rather than two copies of it. */}
+        {display.lightbox ? (
+          <CalendarEventLightbox
+            event={selected}
+            onClose={() => setSelected(null)}
+            lightbox={style.lightbox}
+            layouts={layouts}
+            sources={sources}
+            designTime={!interactive}
+          />
+        ) : null}
+      </CalendarRsvpProvider>
     </div>
   );
 }

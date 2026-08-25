@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { guardContent } from "@/lib/content-guard";
 
 import { PublicationScreen } from "@/components/publication-screen";
 import { connectDB } from "@/lib/db";
@@ -40,6 +41,7 @@ export default async function ZinePage({
   const { slug } = await params;
   const zine = await findZine(slug);
   if (!zine) notFound();
+  await guardContent("publication", String(zine._id), `/zines/${slug}`);
 
   return <PublicationScreen doc={zine} />;
 }

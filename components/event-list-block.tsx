@@ -15,6 +15,7 @@ import type { PageSources } from "@/lib/page-source-types";
 
 import { styleSlotProps } from "./block-primitives";
 import { CalendarTemplateRenderer } from "./calendar-template-renderer";
+import { CalendarRsvpProvider } from "./calendar-rsvp-context";
 
 /**
  * A run of upcoming events.
@@ -95,41 +96,47 @@ export function EventListBlock({
   }
 
   return (
-    <div className="pb-event-list-shell">
-      <div className={className} style={listStyle.style}>
-        {events.map((event) => (
-          <div
-            key={event._id}
-            className={`pb-event-item ${itemStyle.className}`.trim()}
-            style={itemStyle.style}
-          >
-            {layout ? (
-              <CalendarTemplateRenderer
-                layout={layout}
-                event={event}
-                sources={sources}
-                interactive={interactive}
-              />
-            ) : (
-              <BuiltInItem event={event} />
-            )}
-          </div>
-        ))}
-      </div>
-
-      {settings.pagination && hasMore ? (
-        <div className="pb-event-list-more">
-          <button
-            type="button"
-            className="btn"
-            disabled={loading || !interactive}
-            onClick={loadMore}
-          >
-            {loading ? "Loading…" : "Load more"}
-          </button>
+    <CalendarRsvpProvider
+      eventIds={events.map((event) => event._id)}
+      designTime={!interactive}
+    >
+      <div className="pb-event-list-shell">
+        <div className={className} style={listStyle.style}>
+          {events.map((event) => (
+            <div
+              key={event._id}
+              className={`pb-event-item ${itemStyle.className}`.trim()}
+              style={itemStyle.style}
+            >
+              {layout ? (
+                <CalendarTemplateRenderer
+                  layout={layout}
+                  event={event}
+                  sources={sources}
+                  interactive={interactive}
+                  designTime={!interactive}
+                />
+              ) : (
+                <BuiltInItem event={event} />
+              )}
+            </div>
+          ))}
         </div>
-      ) : null}
-    </div>
+
+        {settings.pagination && hasMore ? (
+          <div className="pb-event-list-more">
+            <button
+              type="button"
+              className="btn"
+              disabled={loading || !interactive}
+              onClick={loadMore}
+            >
+              {loading ? "Loading…" : "Load more"}
+            </button>
+          </div>
+        ) : null}
+      </div>
+    </CalendarRsvpProvider>
   );
 }
 

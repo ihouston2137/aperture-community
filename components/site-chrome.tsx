@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { getAccountHeaderData } from "@/lib/account-header";
+import { ensureSiteMenu, getMenuViewer, loadMenuFor, type MenuItem } from "@/lib/menus";
 import { NSFW_FEATURES_ENABLED } from "@/lib/nsfw";
 import { protectedMediaUrl } from "@/lib/protected-media-url";
 import { getSafeMode } from "@/lib/safe-mode";
@@ -9,17 +11,24 @@ import {
   type AppearanceValues,
   type SiteContentValues,
 } from "@/lib/site-settings";
-import { isMenuLabel } from "@/lib/site-values";
 
+
+import { AccountMenu, type AccountUser } from "./account-menu";
+import type { RegistrationOptions } from "./auth-dialog";
 import { SafeModeToggle } from "./safe-mode-toggle";
 import { SiteNav, SiteNavMenu } from "./site-nav";
 
 function SiteHeader({
   content,
   appearance,
+  account,
+  menu,
 }: {
   content: SiteContentValues;
   appearance: AppearanceValues;
+  account: { user: AccountUser | null; registration: RegistrationOptions };
+  /** Already resolved and filtered to what this viewer may see. */
+  menu: MenuItem[];
 }) {
   const logo = protectedMediaUrl(content.logoUrl);
 
@@ -45,16 +54,16 @@ function SiteHeader({
         ) : null}
 
         <SiteNav>
-          {content.menuLinks.map((link, index) =>
-            isMenuLabel(link) ? (
+          {menu.map((item) =>
+            item.kind === "label" ? (
               <SiteNavMenu
-                key={`${link.label}-${index}`}
-                label={link.label}
-                showCaret={link.showCaret !== false}
+                key={item.id}
+                label={item.label}
+                showCaret={item.showCaret}
               >
-                {(link.children ?? []).map((child, childIndex) => (
+                {item.children.map((child) => (
                   <Link
-                    key={`${child.href}-${childIndex}`}
+                    key={child.id}
                     href={child.href || "/"}
                     target={child.newTab ? "_blank" : undefined}
                     rel={child.newTab ? "noreferrer" : undefined}
@@ -65,12 +74,12 @@ function SiteHeader({
               </SiteNavMenu>
             ) : (
               <Link
-                key={`${link.href}-${index}`}
-                href={link.href || "/"}
-                target={link.newTab ? "_blank" : undefined}
-                rel={link.newTab ? "noreferrer" : undefined}
+                key={item.id}
+                href={item.href || "/"}
+                target={item.newTab ? "_blank" : undefined}
+                rel={item.newTab ? "noreferrer" : undefined}
               >
-                {link.label}
+                {item.label}
               </Link>
             )
           )}
@@ -80,6 +89,10 @@ function SiteHeader({
             </Link>
           ) : null}
         </SiteNav>
+
+        {/* After the nav, so it holds the corner — and outside it, so it stays
+            there when the links collapse behind the hamburger. */}
+        <AccountMenu user={account.user} registration={account.registration} />
       </div>
     </header>
   );
@@ -178,12 +191,26 @@ export async function SiteChrome({
    */
   contentStyle?: React.CSSProperties;
 }) {
-  const [content, appearance] = await Promise.all([getSiteContent(), getAppearance()]);
-  const safeMode = await getSafeMode(content.safeModeDefault);
+  const [content, appearance, account, siteMenu, viewer] = await Promise.all([
+    getSiteContent(),
+    getAppearance(),
+    getAccountHeaderData(),
+    ensureSiteMenu(),
+    getMenuViewer(),
+  ]);
+  const [safeMode, menu] = await Promise.all([
+    getSafeMode(content.safeModeDefault),
+    loadMenuFor(siteMenu, viewer),
+  ]);
 
   return (
     <div className="site-shell">
-      <SiteHeader content={content} appearance={appearance} />
+      <SiteHeader
+        content={content}
+        appearance={appearance}
+        account={account}
+        menu={menu}
+      />
       <main className="site-main" style={contentStyle}>
         {children}
       </main>

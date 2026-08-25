@@ -30,6 +30,8 @@ const SAMPLES: Sample[] = [
     category: "Rehearsal",
     who: ["Marching Band"],
     tags: ["required"],
+    rsvpEnabled: true,
+    attendanceEnabled: true,
   },
   {
     dayOffset: 3,
@@ -44,6 +46,8 @@ const SAMPLES: Sample[] = [
     category: "Performance",
     who: ["Concert Band", "Percussion"],
     tags: ["ticketed", "families"],
+    rsvpEnabled: true,
+    attendanceEnabled: false,
   },
   {
     dayOffset: 5,
@@ -58,6 +62,8 @@ const SAMPLES: Sample[] = [
     category: "Admin",
     who: ["Color Guard"],
     tags: [],
+    rsvpEnabled: false,
+    attendanceEnabled: false,
   },
 ];
 

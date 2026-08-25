@@ -176,6 +176,7 @@ const BLOCK_LABELS: Record<string, string> = {
   calendar: "Calendar",
   eventList: "Event list",
   form: "Form",
+  menu: "Menu",
   container: "Container",
 
   // Story slots. Not in the palette — they are added from a story-bound
@@ -215,6 +216,7 @@ const BLOCK_ICONS: Record<string, string> = {
   calendar: "Calendar",
   eventList: "Rows",
   form: "ClipboardList",
+  menu: "List",
   container: "LayoutGrid",
 };
 
@@ -823,6 +825,54 @@ export function PageBlockInspector({
             ]}
             onChange={(value) => update({ formId: value })}
           />
+        ) : null}
+
+        {block.type === "menu" ? (
+          <>
+            <SelectField
+              label="Menu"
+              value={block.menuId ?? ""}
+              options={[
+                { value: "", label: "Select a menu…" },
+                ...sources.menus.map((menu) => ({ value: menu._id, label: menu.label })),
+              ]}
+              onChange={(value) => update({ menuId: value })}
+            />
+            <span className="help-text">
+              Built under Design › Menus. Items the reader may not see are left
+              out for them.
+            </span>
+
+            <SelectField
+              label="Shows as"
+              value={block.menuLayout ?? "list"}
+              options={[
+                { value: "list", label: "A list of links" },
+                { value: "dropdown", label: "A button that drops down" },
+              ]}
+              onChange={(value) => update({ menuLayout: value as PageBlock["menuLayout"] })}
+            />
+
+            {(block.menuLayout ?? "list") === "dropdown" ? (
+              <TextField
+                label="Button text"
+                value={block.menuButtonText ?? ""}
+                onChange={(value) => update({ menuButtonText: value })}
+              />
+            ) : (
+              <SelectField
+                label="Runs"
+                value={block.menuDirection ?? "vertical"}
+                options={[
+                  { value: "vertical", label: "Down the page" },
+                  { value: "horizontal", label: "Across the page" },
+                ]}
+                onChange={(value) =>
+                  update({ menuDirection: value as PageBlock["menuDirection"] })
+                }
+              />
+            )}
+          </>
         ) : null}
       </div>
 

@@ -102,6 +102,13 @@ export function PreviewHeader({
             <a className="site-cta">{content.availabilityLabel}</a>
           ) : null}
         </SiteNav>
+
+        {/* The account corner, in its signed-out state and inert like the rest
+            of the preview — an editor sizing the header has to see the space it
+            takes up. */}
+        <div className="site-account">
+          <span className="site-account-signin">Sign in</span>
+        </div>
       </div>
     </header>
   );

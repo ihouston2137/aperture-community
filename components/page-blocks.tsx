@@ -64,6 +64,7 @@ import { Panorama } from "./panorama";
 import { QrCode } from "./qr-code";
 import { CustomShapeView, Shape } from "./shape";
 import { FormShell } from "./form-shell";
+import { MenuBlockView } from "./menu-block";
 
 /**
  * The Calendar Style a block wears: its own, else the site default, else the
@@ -409,6 +410,15 @@ export function BlockView({
       if (!form) return <div className="pb-empty-drop">No form selected</div>;
       return <FormShell form={form} interactive={interactive} />;
     }
+
+    case "menu":
+      return (
+        <MenuBlockView
+          block={block}
+          items={sources.menus[block.id] ?? []}
+          interactive={interactive}
+        />
+      );
 
     case "container":
       return (

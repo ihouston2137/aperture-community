@@ -46,6 +46,13 @@ export const STYLE_VALUE_KEYS = [
   "buttonStyle",
   "dropdownStyle",
   "panelStyle",
+  /**
+   * The RSVP button wears one of three looks. These two layer over the block's own
+   * style, so they are last in this list: the per-view stylesheet is emitted in
+   * this order, and a state has to win against the resting style it refines.
+   */
+  "goingStyle",
+  "notGoingStyle",
 ] as const;
 export type StyleValuesKey = (typeof STYLE_VALUE_KEYS)[number];
 
@@ -208,6 +215,23 @@ function slotCss(id: string, host: StyleHost, valuesKey: string): string {
  */
 export function slugKeyFor(valuesKey: string): string {
   return valuesKey === "textStyle" ? "styleSlug" : `${valuesKey}Slug`;
+}
+
+/**
+ * Whether a style slot has been given anything at all — a named style, local
+ * values, or an override for one screen size.
+ *
+ * The question a caller asks when one slot stands in for another: an RSVP
+ * button uses its answered style only if that style exists, and falls back to
+ * the block’s own otherwise.
+ */
+export function slotIsStyled(host: StyleHost, valuesKey: string): boolean {
+  const values = host[valuesKey] as Record<string, unknown> | undefined;
+  return (
+    Boolean(host[slugKeyFor(valuesKey)]) ||
+    Object.keys(values ?? {}).length > 0 ||
+    hasResponsiveStyle(host, valuesKey)
+  );
 }
 
 /** Every overridden slot on one block. Empty for a block with no overrides. */

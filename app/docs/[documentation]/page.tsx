@@ -1,4 +1,5 @@
 import { notFound, redirect } from "next/navigation";
+import { guardContent } from "@/lib/content-guard";
 
 import { firstDocOfSet, getDocSetBySlug } from "@/lib/docs";
 import { getSiteContent } from "@/lib/site-settings";
@@ -39,6 +40,7 @@ export default async function DocSetPage({
 
   const set = await getDocSetBySlug(documentation);
   if (!set || set.status !== "published") notFound();
+  await guardContent("documentation", set._id, `/docs/${documentation}`);
 
   const first = await firstDocOfSet(set._id);
   if (!first) notFound();

@@ -1,4 +1,5 @@
 import type { StoryView } from "@/components/story-blocks";
+import type { MenuItem } from "./menu-types";
 
 import type { CalendarEventRecord } from "./calendar";
 import type { CalendarStyleRecord } from "./calendar-style";
@@ -43,6 +44,12 @@ export type PageSources = {
   latestCollection: ResolvedCollection | null;
   forms: Record<string, FormSummary>;
   /**
+   * Menu items for each menu block, keyed by block id, already resolved and
+   * filtered to the viewer. Keyed by block rather than by menu because two
+   * blocks can show the same menu and each is filtered the same way.
+   */
+  menus: Record<string, MenuItem[]>;
+  /**
    * Published events for each calendar block's opening range, keyed by block
    * id, so the first paint is complete. The block fetches later ranges itself.
    */
@@ -74,6 +81,7 @@ export const emptyPageSources: PageSources = {
   collections: {},
   latestCollection: null,
   forms: {},
+  menus: {},
   calendarEvents: {},
   calendarToday: "",
   calendarStyles: {},

@@ -251,6 +251,39 @@ export function EventDialog({
                 selected={event?.tags ?? []}
                 emptyHint="No tags defined yet."
               />
+
+              {/* Both switches decide whether the matching blocks appear at
+                  all. A template can carry an RSVP button and a register for
+                  every event; only the events switched on here show them. */}
+              <div className="field" style={{ marginTop: "0.9rem" }}>
+                <span className="field-label">Members</span>
+
+                <label className="checkbox-row">
+                  <input
+                    type="checkbox"
+                    name="rsvpEnabled"
+                    defaultChecked={event?.rsvpEnabled ?? false}
+                  />
+                  Collect RSVPs (yes or no)
+                </label>
+                <span className="help-text">
+                  Shows the RSVP button and list wherever the layout places them.
+                  Members answer in a popup; their level needs “RSVP to events”.
+                </span>
+
+                <label className="checkbox-row" style={{ marginTop: "0.5rem" }}>
+                  <input
+                    type="checkbox"
+                    name="attendanceEnabled"
+                    defaultChecked={event?.attendanceEnabled ?? false}
+                  />
+                  Record member attendance
+                </label>
+                <span className="help-text">
+                  Shows the register in the lightbox, to people holding “See who
+                  attended events” or “Record event attendance”.
+                </span>
+              </div>
             </div>
 
             <div className="style-modal-footer">
