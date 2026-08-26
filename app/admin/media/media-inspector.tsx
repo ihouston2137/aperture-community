@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+import { BioPicker } from "@/components/bio-picker";
 import { isPersonBio } from "@/lib/bio-types";
 import { NSFW_FEATURES_ENABLED } from "@/lib/nsfw";
 import { protectedMediaUrl } from "@/lib/protected-media-url";
@@ -61,26 +62,20 @@ export function MediaDetailsFields({
       <div className="field">
         <label>Author profile</label>
         {/* Only a person can take a photograph, so subjects are not offered. */}
-        <select name="authorBioId" defaultValue={asset.authorBioId ?? ""}>
-          <option value="">None</option>
-          {bios.filter(isPersonBio).map((bio) => (
-            <option key={bio._id} value={bio._id}>
-              {bio.name}
-            </option>
-          ))}
-        </select>
+        <BioPicker
+          name="authorBioId"
+          defaultValue={asset.authorBioId ?? ""}
+          options={bios.filter(isPersonBio)}
+        />
       </div>
       <div className="field">
         <label>Subject profile</label>
         {/* Anything can be the subject, a person included. */}
-        <select name="subjectBioId" defaultValue={asset.subjectBioId ?? ""}>
-          <option value="">None</option>
-          {bios.map((bio) => (
-            <option key={bio._id} value={bio._id}>
-              {bio.name}
-            </option>
-          ))}
-        </select>
+        <BioPicker
+          name="subjectBioId"
+          defaultValue={asset.subjectBioId ?? ""}
+          options={bios}
+        />
       </div>
       <div className="field">
         <label>Capture date</label>
@@ -353,17 +348,11 @@ function BulkInspector({
         enabled={enabled("authorBioId")}
         onToggle={toggle("authorBioId")}
       >
-        <select
+        <BioPicker
           value={values.authorBioId ?? ""}
-          onChange={(event) => setValue("authorBioId")(event.target.value)}
-        >
-          <option value="">None</option>
-          {bios.filter(isPersonBio).map((bio) => (
-            <option key={bio._id} value={bio._id}>
-              {bio.name}
-            </option>
-          ))}
-        </select>
+          onChange={setValue("authorBioId")}
+          options={bios.filter(isPersonBio)}
+        />
       </BulkField>
 
       <BulkField
@@ -371,17 +360,11 @@ function BulkInspector({
         enabled={enabled("subjectBioId")}
         onToggle={toggle("subjectBioId")}
       >
-        <select
+        <BioPicker
           value={values.subjectBioId ?? ""}
-          onChange={(event) => setValue("subjectBioId")(event.target.value)}
-        >
-          <option value="">None</option>
-          {bios.map((bio) => (
-            <option key={bio._id} value={bio._id}>
-              {bio.name}
-            </option>
-          ))}
-        </select>
+          onChange={setValue("subjectBioId")}
+          options={bios}
+        />
       </BulkField>
 
       <BulkField

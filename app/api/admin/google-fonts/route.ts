@@ -11,5 +11,7 @@ export async function GET(request: NextRequest) {
   }
 
   const query = request.nextUrl.searchParams.get("q") ?? "";
-  return Response.json({ fonts: searchGoogleFonts(query) });
+  const { fonts, total, complete } = await searchGoogleFonts(query);
+
+  return Response.json({ fonts, total, complete });
 }

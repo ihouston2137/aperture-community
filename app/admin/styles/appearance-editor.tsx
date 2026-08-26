@@ -12,7 +12,10 @@ import { NSFW_FEATURES_ENABLED } from "@/lib/nsfw";
 import {
   CONTENT_WIDTHS,
   CONTENT_WIDTH_LABELS,
+  SIGN_IN_PLACEMENTS,
+  SIGN_IN_PLACEMENT_LABELS,
   SITE_TEXT_ELEMENTS,
+  signInPlacement,
   type AppearanceValues,
   type ContentWidth,
   type SiteContentValues,
@@ -233,6 +236,8 @@ export function AppearanceEditor({
               "logoHeight",
               "availabilityLabel",
               "availabilityHref",
+              "signInPlacement",
+              "signInLabel",
               "footerBrandText",
               "footerLogoUrl",
               "footerLogoMediaId",
@@ -259,6 +264,9 @@ export function AppearanceEditor({
           ) : null}
           {content.availabilityEnabled ? (
             <input type="hidden" name={`${CONTENT_PREFIX}availabilityEnabled`} value="on" />
+          ) : null}
+          {content.signInEnabled ? (
+            <input type="hidden" name={`${CONTENT_PREFIX}signInEnabled`} value="on" />
           ) : null}
           {content.safeModeDefault ? (
             <input type="hidden" name={`${CONTENT_PREFIX}safeModeDefault`} value="on" />
@@ -729,6 +737,45 @@ export function AppearanceEditor({
                 value={content.showBrandText}
                 onChange={setC("showBrandText")}
               />
+            </div>
+
+            <div className="inspector-section">
+              <h3 className="inspector-title">Sign in link</h3>
+              <CheckField
+                label="Offer a way to sign in"
+                value={content.signInEnabled}
+                onChange={setC("signInEnabled")}
+              />
+              <div className="field">
+                <label>Where</label>
+                <select
+                  value={content.signInPlacement}
+                  disabled={!content.signInEnabled}
+                  onChange={(event) =>
+                    setC("signInPlacement")(signInPlacement(event.target.value))
+                  }
+                >
+                  {SIGN_IN_PLACEMENTS.map((placement) => (
+                    <option key={placement} value={placement}>
+                      {SIGN_IN_PLACEMENT_LABELS[placement]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="field">
+                <label>Label</label>
+                <input
+                  type="text"
+                  value={content.signInLabel}
+                  disabled={!content.signInEnabled}
+                  onChange={(event) => setC("signInLabel")(event.target.value)}
+                />
+              </div>
+              <span className="help-text">
+                Only what somebody signed out sees. The menu a signed-in member
+                gets is the same on every site. Colours and size are under Text
+                styles, as “Sign in link”.
+              </span>
             </div>
 
             <div className="inspector-section">

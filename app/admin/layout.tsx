@@ -23,7 +23,7 @@ export default async function AdminLayout({
     <AdminShell
       sidebar={
         <aside className="admin-sidebar">
-          <div className="admin-logo">Aperture</div>
+          <div className="admin-logo">ADMIN</div>
           <AdminNavClient permissions={permissions} />
 
           <div style={{ marginTop: "auto", paddingTop: "1rem" }}>

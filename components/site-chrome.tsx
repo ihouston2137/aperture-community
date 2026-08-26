@@ -13,7 +13,7 @@ import {
 } from "@/lib/site-settings";
 
 
-import { AccountMenu, type AccountUser } from "./account-menu";
+import { AccountMenu, SignInLink, type AccountUser } from "./account-menu";
 import type { RegistrationOptions } from "./auth-dialog";
 import { SafeModeToggle } from "./safe-mode-toggle";
 import { SiteNav, SiteNavMenu } from "./site-nav";
@@ -92,7 +92,14 @@ function SiteHeader({
 
         {/* After the nav, so it holds the corner — and outside it, so it stays
             there when the links collapse behind the hamburger. */}
-        <AccountMenu user={account.user} registration={account.registration} />
+        <AccountMenu
+          user={account.user}
+          registration={account.registration}
+          showSignIn={
+            content.signInEnabled && content.signInPlacement !== "footer"
+          }
+          signInLabel={content.signInLabel || "Sign in"}
+        />
       </div>
     </header>
   );
@@ -102,12 +109,21 @@ function SiteFooter({
   content,
   appearance,
   safeMode,
+  account,
 }: {
   content: SiteContentValues;
   appearance: AppearanceValues;
   safeMode: boolean;
+  account: { user: AccountUser | null; registration: RegistrationOptions };
 }) {
   const footerLogo = content.showFooterLogo ? protectedMediaUrl(content.footerLogoUrl) : "";
+
+  // Only ever offered to somebody signed out: once they are in, the way to
+  // their account is the menu in the header, in the one place it always is.
+  const showSignIn =
+    !account.user &&
+    content.signInEnabled &&
+    content.signInPlacement !== "header";
 
   return (
     <footer className="site-footer">
@@ -140,6 +156,12 @@ function SiteFooter({
           </div>
 
           <div className="site-footer-cell site-social" data-cell="end">
+            {showSignIn ? (
+              <SignInLink
+                registration={account.registration}
+                label={content.signInLabel || "Sign in"}
+              />
+            ) : null}
             {content.socialLinks.map((social, index) => (
               <a
                 key={`${social.href}-${index}`}
@@ -214,7 +236,12 @@ export async function SiteChrome({
       <main className="site-main" style={contentStyle}>
         {children}
       </main>
-      <SiteFooter content={content} appearance={appearance} safeMode={safeMode} />
+      <SiteFooter
+        content={content}
+        appearance={appearance}
+        safeMode={safeMode}
+        account={account}
+      />
     </div>
   );
 }

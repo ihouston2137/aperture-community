@@ -75,7 +75,7 @@ export function MemberDirectory({
           No members match that.
         </p>
       ) : (
-        <ul className="admin-list">
+        <ul className="admin-list" style={{ marginTop: "1rem" }}>
           {shown.map((member) => (
             <MemberRow
               key={member._id}
@@ -102,21 +102,37 @@ function MemberRow({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState("");
+  // Off unless asked for: a level is often corrected or tidied up, and that is
+  // not news the member needs in their inbox.
+  const [notify, setNotify] = useState(false);
 
-  const currentLevel = member.communityRoleIds[0] ?? "";
-  const levelNames = member.communityRoleIds
-    .map((id) => roles.find((role) => role._id === id)?.name)
-    .filter(Boolean);
+  const held = new Set(member.communityRoleIds);
+  const levelNames = roles
+    .filter((role) => held.has(role._id))
+    .map((role) => role.name);
 
-  function changeLevel(roleId: string) {
-    if (!roleId || roleId === currentLevel) return;
+  /**
+   * Turns one level on or off and saves the whole set. A member holds as many
+   * as they have been given, so this is a toggle rather than a choice between
+   * levels — but never down to none, which would move them off this screen.
+   */
+  function toggleLevel(roleId: string) {
+    const next = new Set(held);
+    if (next.has(roleId)) next.delete(roleId);
+    else next.add(roleId);
+
+    if (next.size === 0) {
+      setError("A member needs at least one level. Add another before removing this one.");
+      return;
+    }
+
     setError("");
     startTransition(async () => {
       const formData = new FormData();
       formData.set("id", member._id);
       formData.set("decision", "change");
-      formData.set("roleId", roleId);
-      formData.set("notify", "on");
+      for (const id of next) formData.append("roleId", id);
+      if (notify) formData.set("notify", "on");
 
       const outcome = await decideMembershipAction(formData);
       if (outcome.ok) router.refresh();
@@ -164,19 +180,34 @@ function MemberRow({
 
       {canApprove ? (
         <div className="admin-list-actions">
-          <select
-            value={currentLevel}
-            onChange={(event) => changeLevel(event.target.value)}
-            disabled={pending}
-            aria-label={`Membership level for ${fullName(member)}`}
+          <div
+            className="level-toggles"
+            role="group"
+            aria-label={`Membership levels for ${fullName(member)}`}
           >
-            {currentLevel ? null : <option value="">No level</option>}
             {roles.map((role) => (
-              <option key={role._id} value={role._id}>
+              <button
+                key={role._id}
+                type="button"
+                className="btn btn-sm"
+                aria-pressed={held.has(role._id)}
+                disabled={pending}
+                onClick={() => toggleLevel(role._id)}
+              >
                 {role.name}
-              </option>
+              </button>
             ))}
-          </select>
+          </div>
+
+          <label className="checkbox-row help-text" title="Only applies to level changes">
+            <input
+              type="checkbox"
+              checked={notify}
+              onChange={(event) => setNotify(event.target.checked)}
+              disabled={pending}
+            />
+            Email them
+          </label>
 
           <button
             type="button"

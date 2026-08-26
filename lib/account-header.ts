@@ -2,6 +2,7 @@ import type { AccountUser } from "@/components/account-menu";
 import type { RegistrationOptions } from "@/components/auth-dialog";
 
 import { getUserAccess } from "./access";
+import { sponsorshipAccess } from "./sponsorship-access";
 import { getAuthSettings } from "./auth-settings";
 import { connectDB } from "./db";
 import { getRoleSummaries, splitRoles } from "./members";
@@ -81,7 +82,7 @@ async function readUser(userId: string): Promise<AccountUser | null> {
   // menu belonging to nobody.
   if (!record) return null;
 
-  const { permissions } = await getUserAccess(userId);
+  const { permissions, isAdministrator } = await getUserAccess(userId);
   const roles = await getRoleSummaries();
   const { community } = splitRoles((record.roleIds ?? []).map(String), roles);
 
@@ -91,11 +92,22 @@ async function readUser(userId: string): Promise<AccountUser | null> {
   const label =
     (record.name ?? "").trim() || String(record.email ?? "").split("@")[0] || "Account";
 
+  // Everywhere this account can go beyond its own dashboard. The menu is the
+  // one place these are offered, so it carries the member's own screens as
+  // well as the sections they have been given to work in.
+  const sections: { label: string; href: string }[] = [];
+  if (permissions.includes("community.directory")) {
+    sections.push({ label: "Member directory", href: "/directory" });
+  }
+  if (sponsorshipAccess(permissions).canView) {
+    sections.push({ label: "Sponsorships", href: "/manage/sponsorships" });
+  }
+
   return {
     label,
     initials: initialsOf(label),
-    // Holding only community permissions is not a reason to show an admin link.
-    canManage: permissions.some((permission) => !permission.startsWith("community.")),
+    isAdministrator,
     level: community.map((role) => role.name).join(", "),
+    sections,
   };
 }

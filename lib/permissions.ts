@@ -68,9 +68,36 @@ export const permissionGroups: PermissionGroup[] = [
     permissions: [
       { key: "members.approve", label: "Approve members and set their level" },
       { key: "members.view", label: "View the member list" },
+      { key: "members.relationships", label: "Link members to one another" },
+      { key: "members.groups", label: "Put members into groups" },
       { key: "registration.manage", label: "Manage registration settings" },
       { key: "attendance.view", label: "See who attended events" },
       { key: "attendance.record", label: "Record event attendance" },
+    ],
+  },
+  {
+    key: "sponsorships",
+    label: "Sponsorships",
+    permissions: [
+      {
+        key: "sponsorships.view",
+        label: "Open the sponsorships dashboard and read what is running",
+      },
+      { key: "sponsorships.campaigns", label: "Add and edit campaigns" },
+      { key: "sponsorships.sponsors", label: "Add and edit sponsors" },
+      { key: "sponsorships.donations", label: "Add and edit donations" },
+      {
+        key: "sponsorships.closed",
+        label: "See closed campaigns and what they raised",
+      },
+      {
+        key: "sponsorships.records",
+        label: "Browse every campaign, sponsor and donation on file",
+      },
+      {
+        key: "sponsorships.manage",
+        label: "Everything above, plus levels, benefits and categories",
+      },
     ],
   },
   {

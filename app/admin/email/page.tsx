@@ -3,6 +3,7 @@ import { requirePermission } from "@/lib/access";
 import { getEmailSettings } from "@/lib/email";
 
 import { EmailSettingsForm } from "./settings-form";
+import { EmailTemplateForm } from "./template-form";
 
 export const metadata = { title: "Email" };
 
@@ -14,12 +15,14 @@ export default async function EmailPage() {
     <>
       <AdminHeader
         title="Email"
-        subtitle="SMTP credentials and form submission notifications."
+        subtitle="SMTP credentials, notifications, and the wording of the messages the site sends."
       />
       {/* The stored password is never sent to the browser. */}
       <EmailSettingsForm
         settings={{ ...settings, password: "", hasPassword: Boolean(settings.password) }}
       />
+
+      <EmailTemplateForm overrides={settings.templates} />
     </>
   );
 }

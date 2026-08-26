@@ -12,8 +12,8 @@ export type MemberRoleOption = { _id: string; name: string };
 
 /**
  * Everyone waiting to be let in, each with the level they asked for already
- * selected — approving is one click when the answer is yes, and one change of
- * the picker when it is not.
+ * turned on — approving is one click when the answer is yes, and a tap of the
+ * levels they should hold instead when it is not.
  */
 export function PendingQueue({
   members,
@@ -73,17 +73,28 @@ function PendingRow({
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
   const [open, setOpen] = useState(false);
 
-  // What they asked for wins, then the level they were given at registration,
-  // then the configured default.
-  const [roleId, setRoleId] = useState(
-    member.requestedRoleId ||
-      member.communityRoleIds[0] ||
-      defaultRoleId ||
-      roles[0]?._id ||
-      ""
-  );
+  // What they asked for wins, then the levels they were given at registration,
+  // then the configured default. More than one can be granted at approval.
+  const [roleIds, setRoleIds] = useState<string[]>(() => {
+    const asked = member.requestedRoleId ? [member.requestedRoleId] : [];
+    const start = asked.length
+      ? asked
+      : member.communityRoleIds.length
+        ? member.communityRoleIds
+        : [defaultRoleId || roles[0]?._id || ""];
+    return start.filter((id) => roles.some((role) => role._id === id));
+  });
+
+  function toggleRole(id: string) {
+    setRoleIds((current) =>
+      current.includes(id)
+        ? current.filter((held) => held !== id)
+        : [...current, id]
+    );
+  }
   const [note, setNote] = useState("");
-  const [notify, setNotify] = useState(true);
+  // Deliberately off to start: the admin opts in to telling them.
+  const [notify, setNotify] = useState(false);
 
   const requested = roles.find((role) => role._id === member.requestedRoleId);
 
@@ -93,7 +104,7 @@ function PendingRow({
       const formData = new FormData();
       formData.set("id", member._id);
       formData.set("decision", decision);
-      formData.set("roleId", roleId);
+      for (const id of roleIds) formData.append("roleId", id);
       formData.set("note", note);
       if (notify) formData.set("notify", "on");
 
@@ -133,23 +144,29 @@ function PendingRow({
       {canApprove ? (
         <div style={{ flex: "1 1 100%", marginTop: "0.5rem" }}>
           <div className="admin-list-actions" style={{ flexWrap: "wrap", gap: "0.5rem" }}>
-            <select
-              value={roleId}
-              onChange={(event) => setRoleId(event.target.value)}
-              disabled={pending}
-              aria-label="Membership level"
+            <div
+              className="level-toggles"
+              role="group"
+              aria-label={`Membership levels for ${fullName(member)}`}
             >
               {roles.map((role) => (
-                <option key={role._id} value={role._id}>
+                <button
+                  key={role._id}
+                  type="button"
+                  className="btn btn-sm"
+                  aria-pressed={roleIds.includes(role._id)}
+                  disabled={pending}
+                  onClick={() => toggleRole(role._id)}
+                >
                   {role.name}
-                </option>
+                </button>
               ))}
-            </select>
+            </div>
 
             <button
               type="button"
               className="btn btn-primary btn-sm"
-              disabled={pending || !roleId}
+              disabled={pending || roleIds.length === 0}
               onClick={() => decide("approve")}
             >
               {pending ? "Saving…" : "Approve"}

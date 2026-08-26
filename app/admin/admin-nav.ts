@@ -61,9 +61,56 @@ export const adminNavGroups: NavGroup[] = [
         anyPermission: ["members.view", "members.approve"],
       },
       {
+        href: "/admin/groups",
+        label: "Groups",
+        permission: "members.groups",
+      },
+      {
+        href: "/admin/relationships",
+        label: "Relationships",
+        permission: "members.relationships",
+      },
+      {
         href: "/admin/registration",
         label: "Registration",
         permission: "registration.manage",
+      },
+    ],
+  },
+  {
+    label: "Sponsorships",
+    items: [
+      {
+        href: "/admin/campaigns",
+        label: "Campaigns",
+        anyPermission: [
+          "sponsorships.manage",
+          "sponsorships.view",
+          "sponsorships.campaigns",
+        ],
+      },
+      {
+        href: "/admin/sponsors",
+        label: "Sponsors",
+        anyPermission: [
+          "sponsorships.manage",
+          "sponsorships.view",
+          "sponsorships.sponsors",
+        ],
+      },
+      {
+        href: "/admin/donations",
+        label: "Donations",
+        anyPermission: [
+          "sponsorships.manage",
+          "sponsorships.view",
+          "sponsorships.donations",
+        ],
+      },
+      {
+        href: "/admin/levels",
+        label: "Levels",
+        permission: "sponsorships.manage",
       },
     ],
   },

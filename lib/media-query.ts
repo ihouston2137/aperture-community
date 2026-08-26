@@ -17,6 +17,7 @@ export const CATEGORY_KINDS: Record<Exclude<UsageCategory, "unused">, string[]> 
   story: ["story-feature", "story-content"],
   collection: ["collection"],
   publication: ["publication"],
+  sponsorship: ["sponsor-logo"],
   other: ["bio-headshot", "form-content", "form-upload", "site-logo"],
 };
 

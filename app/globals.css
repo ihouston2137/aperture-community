@@ -1074,6 +1074,10 @@ input, select, textarea {
 .field input[type="url"],
 .field input[type="date"],
 .field input[type="time"],
+/* Left out once, which left a phone number sitting in a plain browser box
+   beside fields that had all been painted. */
+.field input[type="tel"],
+.field input[type="search"],
 .field select,
 .field textarea,
 .input {
@@ -1255,6 +1259,23 @@ input, select, textarea {
   display: flex;
   gap: 0.5rem;
   flex-wrap: wrap;
+}
+
+/* A level a member either holds or does not, one button each. Membership is not
+   a single choice, so these toggle rather than behaving like a picker. */
+.level-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.level-toggles .btn[aria-pressed="true"] {
+  border-color: var(--admin-accent);
+  color: var(--admin-accent);
+}
+
+.level-toggles .btn:disabled {
+  opacity: 0.6;
 }
 
 .badge {
@@ -5869,14 +5890,16 @@ html:has(.admin-shell) body::-webkit-scrollbar {
    Sign in, register, verify and recover. One frame, so the journey from the
    registration form to the first sign-in looks like a single thing. */
 
+/* Between the site header and footer rather than covering the window, so the
+   card is centred in what is left of the page instead of in the viewport. The
+   card itself keeps the admin palette, as the sign-in popup does: these read as
+   the same form wherever they are opened from. */
 .auth-screen {
-  min-height: 100vh;
+  min-height: 55vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 2rem 1.5rem;
-  background: var(--admin-bg);
-  color: var(--admin-text);
+  padding: 3rem 1.5rem;
 }
 
 .auth-card {
@@ -5888,6 +5911,7 @@ html:has(.admin-shell) body::-webkit-scrollbar {
 
 .auth-panel {
   margin: 0;
+  color: var(--admin-text);
 }
 
 .auth-subtitle {
@@ -5971,6 +5995,27 @@ html:has(.admin-shell) body::-webkit-scrollbar {
 .site-account-signin:hover {
   opacity: 1;
   color: var(--header-accent);
+}
+
+/* The same link when it has been placed in the footer. It takes the footer's
+   own size and colour, and the Appearance screen styles it through the same
+   entry as the header one. */
+.site-footer-signin {
+  display: inline-flex;
+  align-items: center;
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  color: inherit;
+  font: inherit;
+  opacity: 0.85;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.site-footer-signin:hover {
+  opacity: 1;
 }
 
 .site-account-menu {
@@ -6207,18 +6252,6 @@ html:has(.admin-shell) body::-webkit-scrollbar {
   font-size: 1.0625rem;
 }
 
-.member-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(20rem, 100%), 1fr));
-  gap: 1.25rem;
-  align-items: start;
-}
-
-/* Details and account span the row: a form in a narrow column wraps badly. */
-.member-card-wide {
-  grid-column: 1 / -1;
-}
-
 .member-card {
   padding: 1.25rem;
   border-radius: 0.75rem;
@@ -6252,39 +6285,946 @@ html:has(.admin-shell) body::-webkit-scrollbar {
   font-weight: 600;
 }
 
-.member-grants {
+/* The thumbnail on a profile row. Same circle as the member's own headshot
+   control, at the size a list wants. */
+.profile-row-headshot {
+  width: 2.5rem;
+  height: 2.5rem;
+  flex: none;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--admin-border);
+  background: rgba(128, 128, 128, 0.12);
+}
+
+/* The placeholders a message can drop in, beside what each one stands for. */
+.email-tokens {
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.3rem 0.75rem;
+  font-size: 0.8125rem;
+}
+
+.email-tokens > div {
+  display: contents;
+}
+
+.email-tokens dt code {
+  background: rgba(128, 128, 128, 0.16);
+  border-radius: 0.25rem;
+  padding: 0.1rem 0.35rem;
+  white-space: nowrap;
+}
+
+.email-tokens dd {
+  margin: 0;
+  color: var(--admin-muted);
+}
+
+/* ---------------------------------------------------------- Sponsor manager
+
+   A section for somebody who runs a campaign rather than the site. It wears the
+   site's own chrome, so the panels inside it borrow the admin's palette the way
+   the member dashboard does. */
+
+.manager-header {
+  margin-bottom: 1.5rem;
+}
+
+/* The way back. Every screen below the top carries one, which is what lets the
+   section do without a tab bar. */
+.manager-crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+  font-size: 0.875rem;
+  opacity: 0.75;
+}
+
+.manager-crumbs a {
+  color: inherit;
+}
+
+.manager-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.manager-card-head .member-card-title {
+  margin: 0;
+}
+
+.manager-card-head > :last-child {
+  margin-left: auto;
+}
+
+.manager-card {
+  margin-bottom: 1.25rem;
+}
+
+/* The panels inside come from the admin, and carry its palette with them. */
+.manager-card .panel,
+.member-page .panel {
+  color: var(--admin-text);
+}
+
+.manager-mine {
   list-style: none;
   margin: 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.85rem;
+  gap: 0.5rem;
   font-size: 0.9375rem;
 }
 
-.member-grants > li > strong {
-  display: block;
-  font-size: 0.75rem;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  opacity: 0.55;
-  margin-bottom: 0.3rem;
+.manager-mine li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.75rem;
 }
 
-.member-grants ul {
+/* A campaign row opens that campaign, so the whole row is the control. */
+.manager-campaign.is-link {
+  display: block;
+  padding: 0.75rem;
+  margin: -0.75rem;
+  border-radius: var(--radius);
+  color: inherit;
+  text-decoration: none;
+}
+
+.manager-campaign.is-link:hover {
+  background: rgba(128, 128, 128, 0.1);
+}
+
+.manager-assignments,
+.manager-gifts {
   list-style: none;
   margin: 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 0.5rem;
 }
 
-/* A tick rather than a bullet: this is a list of what is open, not an outline. */
-.member-grants ul li::before {
-  content: "✓";
-  margin-right: 0.5rem;
+.manager-assignments li,
+.manager-gifts li {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid rgba(128, 128, 128, 0.18);
+  font-size: 0.9375rem;
+}
+
+.manager-assignments li > div,
+.manager-gifts li > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  margin-right: auto;
+  min-width: 0;
+}
+
+.manager-campaigns {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.manager-campaign-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+/* Progress against the goal. Only what has arrived fills it — a pledge is not
+   progress until it turns up. */
+.manager-meter {
+  height: 0.5rem;
+  border-radius: 999px;
+  background: rgba(128, 128, 128, 0.2);
+  overflow: hidden;
+}
+
+.manager-meter > span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--content-accent);
+}
+
+.manager-figures {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin-top: 0.4rem;
+  font-size: 0.9375rem;
+}
+
+.manager-figure-end {
+  margin-left: auto;
+  opacity: 0.7;
+}
+
+.manager-closed {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.9375rem;
+}
+
+.manager-closed a {
+  color: inherit;
+}
+
+.manager-closed li {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: space-between;
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid rgba(128, 128, 128, 0.18);
+}
+
+/* Who has brought in what, across the campaigns being run. Ranked on what has
+   actually arrived; what is still being worked on rides alongside so a member
+   with a full pipeline is not read as having done nothing. */
+.leaderboard {
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  counter-reset: leaderboard;
+}
+
+.leaderboard-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid rgba(128, 128, 128, 0.18);
+  font-size: 0.9375rem;
+}
+
+.leaderboard-row:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.leaderboard-rank {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  flex: none;
+  border-radius: 50%;
+  background: rgba(128, 128, 128, 0.15);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.leaderboard-name {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-right: auto;
+  min-width: 0;
+}
+
+/* Money and in-kind side by side, each labelled, so the two figures are never
+   read as one. */
+.leaderboard-figures {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem 1.5rem;
+}
+
+.leaderboard-figure {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.leaderboard-figure .field-label {
+  /* Small enough to name the column without competing with the figure. */
+  font-size: 0.6875rem;
+}
+
+/* The filter sits in the card head beside the title, not above the rows. */
+.leaderboard-filter {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.leaderboard-filter select {
+  width: auto;
+}
+
+.leaderboard-pending {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+/* ------------------------------------------------- Sponsorship status colour
+
+   One reading of a status wherever it appears: green for what has arrived,
+   yellow for what is being worked on, blue for what has only been proposed, red
+   for what fell through. Declared once here so a colour never means two things. */
+
+.tone-complete {
+  --tone: #34a853;
+}
+
+.tone-in-progress {
+  --tone: #fbbc04;
+}
+
+.tone-proposed {
+  --tone: #4a90e2;
+}
+
+.tone-cancelled {
+  --tone: #e2585d;
+}
+
+/* An in-kind gift is not money and never becomes money, so it is read only as
+   arrived or not — grey rather than a colour that would put it on the same
+   footing as a cheque. */
+.tone-in-kind {
+  --tone: #6b7280;
+}
+
+.tone-in-kind-pending {
+  --tone: #b8bec7;
+}
+
+/* The dot that carries the colour into a line of text. */
+.tone-dot {
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  flex: none;
+  border-radius: 50%;
+  background: var(--tone, currentColor);
+}
+
+/* A status and its figure, read as a key to the bar above it. */
+.tone-key {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1rem;
+  font-size: 0.875rem;
+}
+
+.tone-key li {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+/* A total, carrying its status in the border and the dot. Small enough that a
+   row of them reads as one figure broken up rather than as a list. */
+.tone-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex: none;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid var(--tone, currentColor);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+/* The square that opens a popup from a one-line row. Sized to sit inside the
+   line without pushing it taller. */
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  flex: none;
+  padding: 0;
+  border: 1px solid var(--admin-border);
+  border-radius: 0.3rem;
+  background: none;
+  color: inherit;
+  opacity: 0.6;
+  cursor: pointer;
+}
+
+.icon-btn:hover {
+  opacity: 1;
+  border-color: var(--admin-accent);
+}
+
+.icon-btn.is-danger:hover {
+  border-color: #f28b82;
+  color: #f28b82;
+}
+
+.tone-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex: none;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid var(--tone, currentColor);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+/* The segmented meter. Each status is its own band, laid down in the order the
+   statuses are listed, so the bar fills from what is certain towards what is
+   not. */
+.manager-meter.is-segmented {
+  display: flex;
+}
+
+.manager-meter.is-segmented > span {
+  background: var(--tone, var(--content-accent));
+  border-radius: 0;
+}
+
+.manager-meter.is-segmented > span:first-child {
+  border-radius: 999px 0 0 999px;
+}
+
+.manager-meter.is-segmented > span:last-child {
+  border-radius: 0 999px 999px 0;
+}
+
+/* The key to the colours, at the foot of every screen that uses them. Quiet
+   enough to be ignored by anybody who already knows. */
+.tone-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 2.5rem;
+  margin: 1.75rem 0 0;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(128, 128, 128, 0.2);
+  font-size: 0.8125rem;
+  opacity: 0.75;
+}
+
+.tone-legend .field-label {
+  display: block;
+  margin-bottom: 0.3rem;
+}
+
+.tone-legend ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 1.1rem;
+}
+
+.tone-legend li {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+/* ------------------------------------------------- Sponsors on a campaign */
+
+.sponsor-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* One sponsor, one line: who they are, their level, who has them, and what they
+   have given. Wraps rather than scrolls when the window is too narrow for all
+   four. */
+.sponsor-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid rgba(128, 128, 128, 0.18);
+  font-size: 0.9375rem;
+}
+
+.sponsor-line:last-child {
+  border-bottom: 0;
+}
+
+/* The name and the logo together are the way into that sponsor. */
+.sponsor-line-name {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex: 1 1 12rem;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+.sponsor-line-name:hover strong {
+  text-decoration: underline;
+}
+
+.sponsor-line-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+/* The level is a standing fact about the sponsor; who has them is a working
+   arrangement. Weight and slope say which is which without a label on either. */
+.sponsor-line-cell.is-level {
+  font-weight: 600;
+}
+
+.sponsor-line-cell.is-assigned {
+  font-style: italic;
+  opacity: 0.85;
+}
+
+.sponsor-line-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  margin-left: auto;
+}
+
+/* A fact and the control that changes it, on the sponsor's own page. The gap is
+   wider than a word space so the pencil reads as a separate thing to press
+   rather than as punctuation after the value. */
+.sponsor-row-value {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+/* Reachable-at in one column, where they are in the other. An address is a
+   block of lines and reads badly squeezed in beside a phone number. */
+.sponsor-detail-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(16rem, 100%), 1fr));
+  gap: 1rem 2rem;
+  align-items: start;
+}
+
+.sponsor-address {
+  white-space: pre-line;
+}
+
+/* What a sponsor has given, campaign by campaign. Each bar is drawn against the
+   largest of them, so the rows can be compared by eye. */
+.contrib-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.contrib-row {
+  display: grid;
+  grid-template-columns: minmax(8rem, 14rem) 1fr auto;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.9375rem;
+}
+
+.contrib-name {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.contrib-name a {
+  color: inherit;
+}
+
+.contrib-bar {
+  display: flex;
+  height: 0.75rem;
+  border-radius: 999px;
+  background: rgba(128, 128, 128, 0.15);
+  overflow: hidden;
+}
+
+.contrib-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--tone, var(--content-accent));
+}
+
+.contrib-amount {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.contrib-total {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 1rem 0 0;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(128, 128, 128, 0.28);
+  font-size: 1rem;
+}
+
+@media (max-width: 34rem) {
+  /* The bar is the first thing to go when there is no room for three columns. */
+  .contrib-row {
+    grid-template-columns: 1fr auto;
+  }
+
+  .contrib-bar {
+    grid-column: 1 / -1;
+  }
+}
+
+.sponsor-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.sponsor-header-logo {
+  width: 4rem;
+  height: 4rem;
+  flex: none;
+  border-radius: var(--radius);
+  object-fit: contain;
+  border: 1px solid rgba(128, 128, 128, 0.3);
+  background: rgba(128, 128, 128, 0.1);
+}
+
+/* -------------------------------------------------------------- Sponsorships
+
+   Repeating rows — contacts, links, logos — and the sponsor assignments on a
+   campaign. Each row is its fields plus the control that removes it. */
+
+/* Recognition levels beside the benefits they are made of, on a screen wide
+   enough to hold both. */
+.levels-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(24rem, 100%), 1fr));
+  gap: 0 1.25rem;
+  align-items: start;
+}
+
+.sponsor-row,
+.sponsor-logo-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.5rem 0.75rem;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--admin-border);
+}
+
+.sponsor-row .field,
+.sponsor-logo-row .field {
+  flex: 1 1 10rem;
+  min-width: 0;
+}
+
+.sponsor-row-logo {
+  width: 3rem;
+  height: 3rem;
+  flex: none;
+  border-radius: var(--radius);
+  object-fit: contain;
+  /* Artwork rarely fills a square, and one pressed against the border reads as
+     a mistake. The padding is inside the box, so the box keeps its size. */
+  box-sizing: border-box;
+  padding: 0.25rem;
+  border: 1px solid var(--admin-border);
+  background: rgba(128, 128, 128, 0.12);
+}
+
+/* Smaller on a one-line row, where the height of the line is the constraint. */
+.sponsor-line .sponsor-row-logo {
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0.2rem;
+}
+
+.assignment-row {
+  border: 1px solid var(--admin-border);
+  border-radius: var(--radius);
+  padding: 0.75rem;
+  margin-top: 0.6rem;
+}
+
+.assignment-head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+/* ---------------------------------------------------------- Profile picker
+
+   Choosing a profile by typing its name. Every member of the site carries one,
+   so these lists are far too long to scroll as a dropdown. */
+
+.bio-picker {
+  position: relative;
+}
+
+.bio-picker > input {
+  width: 100%;
+}
+
+/* Portalled to the body and positioned against its field, so a dialog body or
+   a sticky panel cannot clip it. Above every dialog, since it opens over one. */
+.bio-picker-list {
+  position: fixed;
+  z-index: 200;
+  margin: 0;
+  padding: 0.25rem;
+  list-style: none;
+  overflow-y: auto;
+  background: var(--admin-panel);
+  /* Portalled to the body, so it inherits the site's text colour rather than
+     the admin shell's — dark on dark, and unreadable, unless stated here. */
+  color: var(--admin-text);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--radius);
+  box-shadow: 0 0.75rem 2rem rgba(0, 0, 0, 0.45);
+}
+
+.bio-picker-option {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: calc(var(--radius) - 2px);
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.bio-picker-option.is-active {
+  background: rgba(128, 128, 128, 0.18);
+}
+
+.bio-picker-title {
+  margin-left: auto;
+  font-size: 0.75rem;
+  color: var(--admin-muted);
+}
+
+.bio-picker-empty {
+  padding: 0.35rem 0.5rem;
+  font-size: 0.75rem;
+  color: var(--admin-muted);
+}
+
+/* ------------------------------------------------------------ Member directory
+
+   One card per member, on the site's palette rather than the admin's — this is
+   a page members read, not a screen they administer. */
+
+/* Search and the level buttons sit side by side once there is room, and stack
+   under each other when there is not. */
+.directory-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 1rem 1.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.directory-filter-search {
+  flex: 0 1 18rem;
+}
+
+.directory-filter-levels {
+  flex: 1 1 20rem;
+}
+
+.directory-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(20rem, 100%), 1fr));
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.directory-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.directory-head {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+}
+
+.directory-headshot {
+  width: 3.5rem;
+  height: 3.5rem;
+  flex: none;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid rgba(128, 128, 128, 0.35);
+  background: rgba(128, 128, 128, 0.12);
+}
+
+.directory-name {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin: 0;
+  font-family: var(--heading-font);
+  font-size: 1.0625rem;
+}
+
+/* What somebody calls themselves, above the level the community gave them. */
+.directory-title {
+  margin: 0.15rem 0 0;
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.directory-meta,
+.directory-about,
+.directory-contact {
+  margin: 0.25rem 0 0;
+  font-size: 0.875rem;
+}
+
+.directory-meta {
+  opacity: 0.65;
+}
+
+.directory-about {
+  /* Long enough to introduce somebody, short enough that the cards stay even. */
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Relationships read as a label and the people it names. They come last on the
+   card, so they carry the spacer that keeps a row of cards even. */
+.directory-links {
+  margin: auto 0 0;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(128, 128, 128, 0.25);
+  font-size: 0.875rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.directory-links dt {
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
   opacity: 0.55;
+}
+
+.directory-links dd {
+  margin: 0;
+}
+
+.directory-contact {
+  padding-top: 0.5rem;
+}
+
+/* The remove control on a chip that stands for a chosen member. */
+.chip-remove {
+  background: none;
+  border: 0;
+  padding: 0;
+  margin-left: 0.15rem;
+  font: inherit;
+  font-size: 1rem;
+  line-height: 1;
+  color: inherit;
+  opacity: 0.6;
+  cursor: pointer;
+}
+
+.chip-remove:hover {
+  opacity: 1;
+}
+
+/* The member's own headshot control: a preview beside the two things that can
+   be done to it. The admin media library is behind a permission most levels do
+   not hold, so this is a plain upload rather than a picker. */
+.headshot-field {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.headshot-preview {
+  width: 5rem;
+  height: 5rem;
+  flex: none;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid rgba(128, 128, 128, 0.35);
+  background: rgba(128, 128, 128, 0.12);
+}
+
+.headshot-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+/* A label wearing the button style, because the file input inside it is hidden. */
+.headshot-controls .btn {
+  cursor: pointer;
 }
 
 .member-note {
@@ -6299,6 +7239,13 @@ html:has(.admin-shell) body::-webkit-scrollbar {
   align-items: center;
   gap: 0.75rem;
   margin-top: 1rem;
+}
+
+/* A ghost button has no plate behind it, so the admin's near-white text lands
+   on the site's own background and disappears. */
+.member-page .btn-ghost {
+  color: inherit;
+  border-color: rgba(128, 128, 128, 0.35);
 }
 
 /* The dashboard borrows the admin form controls, which are painted for the

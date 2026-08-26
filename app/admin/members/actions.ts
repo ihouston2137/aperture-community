@@ -5,7 +5,8 @@ import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/access";
 import { connectDB } from "@/lib/db";
 import { sendMembershipDecisionEmail } from "@/lib/email";
-import { fullName } from "@/lib/members";
+import { syncMemberProfile } from "@/lib/member-profiles";
+import { fullName, sortRoles, toRoleSummary } from "@/lib/members";
 import { Role, User } from "@/lib/models";
 import { membershipStatus } from "@/lib/permissions";
 import { siteUrl } from "@/lib/registration";
@@ -16,6 +17,7 @@ function revalidate() {
   revalidatePath("/admin/members");
   revalidatePath("/admin/users");
   revalidatePath("/admin/roles");
+  revalidatePath("/admin/profiles");
 }
 
 /**
@@ -46,7 +48,8 @@ export async function decideMembershipAction(
 
   const id = String(formData.get("id") ?? "");
   const decision = String(formData.get("decision") ?? "");
-  const roleId = String(formData.get("roleId") ?? "");
+  // One value per level chosen: a member can hold more than one at a time.
+  const roleIds = [...new Set(formData.getAll("roleId").map(String).filter(Boolean))];
   const note = String(formData.get("note") ?? "").trim().slice(0, 1000);
   const notify = formData.get("notify") === "on";
 
@@ -62,12 +65,23 @@ export async function decideMembershipAction(
 
   let roleName = "";
   if (decision === "approve" || decision === "change") {
-    if (!roleId) return { ok: false, error: "Choose a membership level." };
-    const role = await Role.findOne({ _id: roleId, kind: "community" });
-    if (!role) return { ok: false, error: "That membership level no longer exists." };
+    if (roleIds.length === 0) {
+      return { ok: false, error: "Choose at least one membership level." };
+    }
+    const chosen = await Role.find({
+      _id: { $in: roleIds },
+      kind: "community",
+    }).lean<any[]>();
+    if (chosen.length !== roleIds.length) {
+      return { ok: false, error: "One of those membership levels no longer exists." };
+    }
 
-    roleName = role.name;
-    await setCommunityRoles(user, [String(role._id)]);
+    // Named in the order they are shown on the screen, so the email reads the
+    // way the admin saw it.
+    roleName = sortRoles(chosen.map(toRoleSummary))
+      .map((role) => role.name)
+      .join(", ");
+    await setCommunityRoles(user, chosen.map((role) => String(role._id)));
   }
 
   if (decision === "approve") {
@@ -84,6 +98,9 @@ export async function decideMembershipAction(
 
   user.decisionNote = note;
   await user.save();
+
+  // The level they hold is their profile's title.
+  await syncMemberProfile(String(user._id));
 
   revalidate();
 

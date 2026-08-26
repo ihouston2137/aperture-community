@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { loadMediaOptions } from "@/app/admin/media/media-shared";
+import { BioPicker } from "@/components/bio-picker";
 import { isPersonBio } from "@/lib/bio-types";
 import type { CollectionImage } from "@/lib/collection-types";
 import { NSFW_FEATURES_ENABLED } from "@/lib/nsfw";
@@ -262,31 +263,19 @@ export function SelectionInspector({
         ))}
 
         <FieldRow label="Author profile" enabled={enabled("authorBioId")} onToggle={toggle("authorBioId")}>
-          <select
+          <BioPicker
             value={values.authorBioId ?? ""}
-            onChange={(event) => setValue("authorBioId")(event.target.value)}
-          >
-            <option value="">None</option>
-            {bios.filter(isPersonBio).map((bio) => (
-              <option key={bio._id} value={bio._id}>
-                {bio.name}
-              </option>
-            ))}
-          </select>
+            onChange={setValue("authorBioId")}
+            options={bios.filter(isPersonBio)}
+          />
         </FieldRow>
 
         <FieldRow label="Subject profile" enabled={enabled("subjectBioId")} onToggle={toggle("subjectBioId")}>
-          <select
+          <BioPicker
             value={values.subjectBioId ?? ""}
-            onChange={(event) => setValue("subjectBioId")(event.target.value)}
-          >
-            <option value="">None</option>
-            {bios.map((bio) => (
-              <option key={bio._id} value={bio._id}>
-                {bio.name}
-              </option>
-            ))}
-          </select>
+            onChange={setValue("subjectBioId")}
+            options={bios}
+          />
         </FieldRow>
 
         <FieldRow label="Capture date" enabled={enabled("captureDate")} onToggle={toggle("captureDate")}>

@@ -9,6 +9,7 @@ export const USAGE_CATEGORIES = [
   "story",
   "collection",
   "publication",
+  "sponsorship",
   "other",
   "unused",
 ] as const;
@@ -20,6 +21,7 @@ export const USAGE_CATEGORY_LABELS: Record<UsageCategory, string> = {
   story: "Stories",
   collection: "Collections",
   publication: "Publications",
+  sponsorship: "Sponsorships",
   other: "Other",
   unused: "Unused",
 };

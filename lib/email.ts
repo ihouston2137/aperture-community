@@ -1,10 +1,18 @@
 import nodemailer, { type Transporter } from "nodemailer";
 
 import { connectDB } from "./db";
+import {
+  normalizeTemplateOverrides,
+  renderEmailSubject,
+  renderEmailTemplate,
+  resolveEmailTemplate,
+  type EmailTemplateKey,
+  type EmailTemplateOverride,
+} from "./email-templates";
 import { EmailSettings } from "./models";
 import { richTextToPlainText } from "./rich-text";
 import { mergeSettings } from "./settings-merge";
-import { verificationCopy, type VerificationPurpose } from "./verification-types";
+import { type VerificationPurpose } from "./verification-types";
 
 export type EmailSettingsValues = {
   enabled: boolean;
@@ -19,6 +27,8 @@ export type EmailSettingsValues = {
   notificationRecipients: string[];
   notifyOnFormSubmission: boolean;
   lastVerifiedAt: Date | null;
+  /** Only the wordings an administrator has actually replaced. */
+  templates: EmailTemplateOverride[];
 };
 
 export const defaultEmailSettings: EmailSettingsValues = {
@@ -33,6 +43,7 @@ export const defaultEmailSettings: EmailSettingsValues = {
   replyTo: "",
   notificationRecipients: [],
   notifyOnFormSubmission: true,
+  templates: [],
   lastVerifiedAt: null,
 };
 
@@ -46,6 +57,7 @@ export async function getEmailSettings(): Promise<EmailSettingsValues> {
     notificationRecipients: Array.isArray(settings.notificationRecipients)
       ? settings.notificationRecipients.map(String)
       : [],
+    templates: normalizeTemplateOverrides(settings.templates),
   };
 }
 
@@ -108,6 +120,28 @@ async function sendMail(input: {
   }
 }
 
+/**
+ * Sends one of the templates an administrator can rewrite.
+ *
+ * The wording is read at send time rather than baked into the caller, so a
+ * change in the admin applies to the next message without anything being
+ * redeployed.
+ */
+async function sendTemplate(
+  key: EmailTemplateKey,
+  to: string | string[],
+  values: Record<string, string>
+): Promise<SendResult> {
+  const settings = await getEmailSettings();
+  const template = resolveEmailTemplate(key, settings.templates);
+
+  return sendMail({
+    to,
+    subject: renderEmailSubject(template.subject, values),
+    text: renderEmailTemplate(template.body, values),
+  });
+}
+
 export async function verifyEmailSettings(): Promise<SendResult> {
   const settings = await getEmailSettings();
   const transport = createTransport(settings);
@@ -150,6 +184,22 @@ export async function sendTestEmail(to: string): Promise<SendResult> {
 
 /* ----------------------------------------------------- Account and identity */
 
+/** Which template each flow sends. */
+const codeTemplateKeys: Record<VerificationPurpose, EmailTemplateKey> = {
+  email: "verifyEmail",
+  login: "verifyLogin",
+  password: "verifyPassword",
+};
+
+const decisionTemplateKeys: Record<
+  "approved" | "rejected" | "changed",
+  EmailTemplateKey
+> = {
+  approved: "membershipApproved",
+  changed: "membershipChanged",
+  rejected: "membershipRejected",
+};
+
 /**
  * The six-digit code, for whichever flow asked for it.
  *
@@ -164,31 +214,17 @@ export async function sendVerificationCodeEmail(input: {
   purpose: VerificationPurpose;
   expiresAt: Date;
 }): Promise<SendResult> {
-  const copy = verificationCopy[input.purpose];
   const minutes = Math.max(
     1,
     Math.round((input.expiresAt.getTime() - Date.now()) / 60000)
   );
 
-  const greeting = input.name ? `Hello ${input.name},` : "Hello,";
-  const spaced = input.code.split("").join(" ");
-
-  return sendMail({
-    to: input.to,
-    subject: copy.subject,
-    text: [
-      greeting,
-      "",
-      copy.intro,
-      "",
-      `    ${spaced}`,
-      "",
-      `Your code is ${input.code}. It expires in ${minutes} minute${
-        minutes === 1 ? "" : "s"
-      }.`,
-      "",
-      "If you did not ask for this, you can ignore this email and nothing will change.",
-    ].join("\n"),
+  return sendTemplate(codeTemplateKeys[input.purpose], input.to, {
+    greeting: input.name ? `Hello ${input.name},` : "Hello,",
+    name: input.name,
+    code: input.code,
+    spacedCode: input.code.split("").join(" "),
+    expiresIn: `${minutes} minute${minutes === 1 ? "" : "s"}`,
   });
 }
 
@@ -244,33 +280,12 @@ export async function sendMembershipDecisionEmail(input: {
   note: string;
   siteUrl: string;
 }): Promise<SendResult> {
-  const greeting = input.name ? `Hello ${input.name},` : "Hello,";
-
-  const body: Record<typeof input.decision, string[]> = {
-    approved: [
-      `Your membership has been approved as ${input.roleName}.`,
-      "",
-      `You can sign in here: ${input.siteUrl}`,
-    ],
-    changed: [`Your membership level is now ${input.roleName}.`],
-    rejected: ["Your membership application was not approved."],
-  };
-
-  const subject: Record<typeof input.decision, string> = {
-    approved: "Your membership has been approved",
-    changed: "Your membership level has changed",
-    rejected: "About your membership application",
-  };
-
-  return sendMail({
-    to: input.to,
-    subject: subject[input.decision],
-    text: [
-      greeting,
-      "",
-      ...body[input.decision],
-      ...(input.note.trim() ? ["", input.note.trim()] : []),
-    ].join("\n"),
+  return sendTemplate(decisionTemplateKeys[input.decision], input.to, {
+    greeting: input.name ? `Hello ${input.name},` : "Hello,",
+    name: input.name,
+    level: input.roleName,
+    note: input.note.trim(),
+    signInUrl: input.siteUrl,
   });
 }
 

@@ -1,9 +1,5 @@
 "use client";
 
-import { useState, useTransition } from "react";
-
-import { saveOwnProfileAction } from "./actions";
-
 export type OwnProfile = {
   firstName: string;
   lastName: string;
@@ -12,61 +8,29 @@ export type OwnProfile = {
 };
 
 /**
- * The four fields the community collects, editable by their owner.
+ * The four fields the community collects, as they appear inside the popup.
  *
- * A level without `community.profile` sees the same details read-only rather
- * than a form that would be refused on submit.
+ * Presentational: the card around it owns the save, so it can refuse to close
+ * the popup while one is in flight.
  */
 export function ProfileForm({
   member,
-  canEdit,
   emailVerified,
+  pending,
+  error,
+  onSubmit,
+  onCancel,
 }: {
   member: OwnProfile;
-  canEdit: boolean;
   emailVerified: boolean;
+  pending: boolean;
+  error: string;
+  onSubmit: (formData: FormData) => void;
+  onCancel: () => void;
 }) {
-  const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
-  const [pending, startTransition] = useTransition();
-
-  function save(formData: FormData) {
-    setResult(null);
-    startTransition(async () => {
-      const outcome = await saveOwnProfileAction(formData);
-      setResult({
-        ok: outcome.ok,
-        message: outcome.ok
-          ? outcome.message ?? "Saved."
-          : outcome.error ?? "Could not save your details.",
-      });
-    });
-  }
-
-  if (!canEdit) {
-    return (
-      <>
-        <dl className="member-facts">
-          <dt>Name</dt>
-          <dd>{[member.firstName, member.lastName].filter(Boolean).join(" ") || "—"}</dd>
-          <dt>Email</dt>
-          <dd>{member.email}</dd>
-          <dt>Phone</dt>
-          <dd>{member.phone || "—"}</dd>
-        </dl>
-        <p className="member-note">
-          Ask an administrator to change these — your level cannot edit them.
-        </p>
-      </>
-    );
-  }
-
   return (
-    <form action={save}>
-      {result ? (
-        <div className={`admin-notice${result.ok ? "" : " is-error"}`}>
-          {result.message}
-        </div>
-      ) : null}
+    <form action={onSubmit}>
+      {error ? <div className="admin-notice is-error">{error}</div> : null}
 
       <div className="field-grid">
         <div className="field">
@@ -122,6 +86,14 @@ export function ProfileForm({
       <div className="member-actions">
         <button type="submit" className="btn btn-primary btn-sm" disabled={pending}>
           {pending ? "Saving…" : "Save details"}
+        </button>
+        <button
+          type="button"
+          className="btn btn-sm"
+          disabled={pending}
+          onClick={onCancel}
+        >
+          Cancel
         </button>
       </div>
     </form>

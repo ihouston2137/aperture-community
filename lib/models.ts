@@ -34,8 +34,24 @@ const Mixed = Schema.Types.Mixed;
  * and every read path here already goes through `.lean()` plus the explicit
  * normalizers in `lib/*-layout.ts`.
  */
+/**
+ * Compiles a model once, but never keeps one whose schema has moved on.
+ *
+ * Mongoose caches compiled models on the connection, and a hot reload
+ * re-evaluates this module with fresh schema objects. Returning the cached
+ * model then means writes are validated against the *old* schema, and strict
+ * mode silently drops any field added since — which is invisible until the data
+ * is read back and the new field is missing from every document. Recompiling
+ * when the schema object differs costs nothing in production, where this module
+ * is evaluated once.
+ */
 function model(name: string, schema: Schema): Model<any> {
-  return (mongoose.models[name] as Model<any>) ?? mongoose.model(name, schema);
+  const cached = mongoose.models[name] as Model<any> | undefined;
+  if (cached) {
+    if (cached.schema === schema) return cached;
+    mongoose.deleteModel(name);
+  }
+  return mongoose.model(name, schema);
 }
 
 /* ------------------------------------------------------------------ Access */
@@ -352,6 +368,9 @@ const SiteContentSchema = new Schema<any>(
 
     availabilityEnabled: { type: Boolean, default: false },
     availabilityLabel: { type: String, default: "" },
+    signInEnabled: { type: Boolean, default: true },
+    signInPlacement: { type: String, default: "header" },
+    signInLabel: { type: String, default: "Sign in" },
     availabilityHref: { type: String, default: "" },
 
     socialLinks: { type: [SocialLinkSchema], default: [] },
@@ -392,6 +411,19 @@ const EmailSettingsSchema = new Schema<any>(
     notificationRecipients: [{ type: String }],
     notifyOnFormSubmission: { type: Boolean, default: true },
     lastVerifiedAt: { type: Date, default: null },
+    /*
+     * Only the wordings somebody has actually replaced. A template with no
+     * entry here follows the copy the app ships with, so improving a default
+     * reaches every site that has not overridden it.
+     */
+    templates: [
+      {
+        _id: false,
+        key: { type: String, required: true },
+        subject: { type: String, default: "" },
+        body: { type: String, default: "" },
+      },
+    ],
   },
   { timestamps: true }
 );
@@ -552,6 +584,18 @@ const BioSchema = new Schema<any>(
      * the next time the profile is saved.
      */
     type: { type: String, default: "Person" },
+    /*
+     * Set on the profile every account carries, empty on a profile created by
+     * hand in the admin. It is what keeps a member's name and membership in
+     * step with the account behind them.
+     */
+    userId: { type: String, default: "" },
+    /*
+     * The levels this member holds, written from the account and never typed.
+     * Empty on a profile that belongs to nobody.
+     */
+    membership: { type: String, default: "" },
+    /* What they call themselves, in their own words. Theirs to edit. */
     title: { type: String, default: "" },
     location: { type: String, default: "" },
     description: { type: String, default: "" },
@@ -562,7 +606,226 @@ const BioSchema = new Schema<any>(
   { timestamps: true }
 );
 
+/*
+ * One profile per account, enforced here rather than assumed: a stale compiled
+ * model once let the link be dropped on write, and nothing above the database
+ * noticed until a member had two hundred profiles. Empty and absent `userId`s
+ * are outside the index, so profiles created by hand in the admin are unaffected.
+ */
+BioSchema.index(
+  { userId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { userId: { $type: "string", $gt: "" } },
+  }
+);
+
 export const Bio = model("Bio", BioSchema);
+
+/**
+ * One named link between a member and one or more others.
+ *
+ * A relationship reads differently from each end — a parent is "Parent of"
+ * their children, and the children are "Child of" them — so both wordings are
+ * stored. Neither can be derived from the other, which is why the person
+ * defining the relationship types both.
+ *
+ * Stored as one record rather than a pair per link, because the relationship is
+ * the thing being named: "Parent of" with three children is one fact about one
+ * member, not three facts.
+ */
+const MemberRelationshipSchema = new Schema<any>(
+  {
+    /** The account the relationship is stated from. */
+    memberId: { type: String, required: true, index: true },
+    /** How the others are listed on this member's entry. */
+    label: { type: String, required: true },
+    /** How this member is listed on each of theirs. */
+    reverseLabel: { type: String, default: "" },
+    relatedIds: [{ type: String }],
+  },
+  { timestamps: true }
+);
+
+export const MemberRelationship = model(
+  "MemberRelationship",
+  MemberRelationshipSchema
+);
+
+/**
+ * A named set of members: a committee, a year group, a working party.
+ *
+ * Separate from a membership level, which says what somebody may reach, and
+ * from a relationship, which says how two people stand to one another. A group
+ * says only who is in it.
+ */
+const MemberGroupSchema = new Schema<any>(
+  {
+    name: { type: String, required: true },
+    description: { type: String, default: "" },
+    memberIds: [{ type: String }],
+  },
+  { timestamps: true }
+);
+
+export const MemberGroup = model("MemberGroup", MemberGroupSchema);
+
+/* ------------------------------------------------------------ Sponsorships */
+
+/**
+ * An organisation or person who gives to a campaign.
+ *
+ * Everything beyond the name is optional: a sponsor is often entered the day
+ * somebody first speaks to them, long before anyone knows their industry or
+ * who to ask for.
+ */
+const SponsorSchema = new Schema<any>(
+  {
+    name: { type: String, required: true },
+    type: { type: String, default: "business" },
+    industry: { type: String, default: "" },
+    size: { type: String, default: "" },
+    email: { type: String, default: "" },
+    phone: { type: String, default: "" },
+    address: { type: String, default: "" },
+    website: { type: String, default: "" },
+    /** Anything else they are reachable at — social accounts above all. */
+    links: [{ _id: false, label: { type: String, default: "" }, href: { type: String, default: "" } }],
+    /** Logos cleared for use, so nobody has to ask again before printing one. */
+    logos: [
+      {
+        _id: false,
+        label: { type: String, default: "" },
+        url: { type: String, default: "" },
+        mediaId: { type: String, default: "" },
+        /** The one the site shows. At most one per sponsor. */
+        isPrimary: { type: Boolean, default: false },
+      },
+    ],
+    contacts: [
+      {
+        _id: false,
+        name: { type: String, default: "" },
+        title: { type: String, default: "" },
+        email: { type: String, default: "" },
+        phone: { type: String, default: "" },
+      },
+    ],
+    notes: { type: String, default: "" },
+    /** The tier this sponsor is currently recognised at, if any. */
+    recognitionLevelId: { type: String, default: "" },
+    /** How this community groups its sponsors. A sponsor can carry several. */
+    categoryIds: [{ type: String }],
+  },
+  { timestamps: true }
+);
+
+export const Sponsor = model("Sponsor", SponsorSchema);
+
+/**
+ * A tier sponsors are recognised at.
+ *
+ * Defined by the site rather than fixed by the app, because what the tiers are
+ * called — and how many there are — is a decision each community makes.
+ */
+const RecognitionLevelSchema = new Schema<any>(
+  {
+    name: { type: String, required: true },
+    description: { type: String, default: "" },
+    /** Orders the tiers, highest first. */
+    rank: { type: Number, default: 0 },
+    /** What a sponsor at this level receives. */
+    benefitIds: [{ type: String }],
+    /*
+     * A level given quietly: sponsors recognised at it are never named outside
+     * the signed-in pages where sponsorships are managed. Some people give on
+     * the condition that nobody is told.
+     */
+    isAnonymous: { type: Boolean, default: false },
+  },
+  { timestamps: true }
+);
+
+export const RecognitionLevel = model("RecognitionLevel", RecognitionLevelSchema);
+
+/** A label a site puts on its sponsors, of its own devising. */
+const SponsorCategorySchema = new Schema<any>(
+  {
+    name: { type: String, required: true },
+    description: { type: String, default: "" },
+  },
+  { timestamps: true }
+);
+
+export const SponsorCategory = model("SponsorCategory", SponsorCategorySchema);
+
+/** Something a sponsor receives for being recognised at a level. */
+const SponsorBenefitSchema = new Schema<any>(
+  {
+    name: { type: String, required: true },
+    description: { type: String, default: "" },
+  },
+  { timestamps: true }
+);
+
+export const SponsorBenefit = model("SponsorBenefit", SponsorBenefitSchema);
+
+/** A drive to raise something, over a stretch of time. */
+const SponsorshipCampaignSchema = new Schema<any>(
+  {
+    name: { type: String, required: true },
+    description: { type: String, default: "" },
+    /** `active` while it is being worked on, `closed` once it is done. */
+    status: { type: String, default: "active" },
+    startDate: { type: String, default: "" },
+    endDate: { type: String, default: "" },
+    /** What the campaign is aiming at, in whole cents. Zero for no target. */
+    goalCents: { type: Number, default: 0 },
+    /*
+     * Who looks after which sponsor, for this campaign only. Held here rather
+     * than on the sponsor because the same sponsor can be looked after by
+     * different people from one year's campaign to the next.
+     */
+    assignments: [
+      {
+        _id: false,
+        sponsorId: { type: String, required: true },
+        memberIds: [{ type: String }],
+      },
+    ],
+  },
+  { timestamps: true }
+);
+
+export const SponsorshipCampaign = model(
+  "SponsorshipCampaign",
+  SponsorshipCampaignSchema
+);
+
+/**
+ * One gift, from one sponsor, to one campaign.
+ *
+ * `valueCents` is what it is worth either way: a monetary gift is the amount,
+ * and an in-kind gift is what it stands in for, so a campaign total means the
+ * same thing whichever kind it is made of.
+ */
+const DonationSchema = new Schema<any>(
+  {
+    campaignId: { type: String, required: true, index: true },
+    sponsorId: { type: String, required: true, index: true },
+    kind: { type: String, default: "monetary" },
+    /** proposed, in-progress, complete or cancelled. */
+    status: { type: String, default: "proposed" },
+    date: { type: String, default: "" },
+    valueCents: { type: Number, default: 0 },
+    description: { type: String, default: "" },
+    /** The members credited with bringing it in. */
+    memberIds: [{ type: String }],
+  },
+  { timestamps: true }
+);
+
+export const Donation = model("Donation", DonationSchema);
 
 export const MEDIA_TYPES = ["image", "video", "audio", "file"] as const;
 export const MEDIA_PROVIDERS = ["local", "youtube", "vimeo"] as const;
@@ -573,6 +836,7 @@ export const MEDIA_USAGE_KINDS = [
   "collection",
   "publication",
   "bio-headshot",
+  "sponsor-logo",
   "form-content",
   "form-upload",
   "site-logo",

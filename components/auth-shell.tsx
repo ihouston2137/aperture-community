@@ -1,11 +1,15 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { SiteChrome } from "./site-chrome";
+
 /**
  * The frame every account screen sits in — sign in, register, verify, recover.
  *
  * They share it so the whole join-and-return journey looks like one thing, and
- * so a screen added later inherits the layout instead of restating it.
+ * so a screen added later inherits the layout instead of restating it. The site
+ * header and footer come with it: somebody who has not signed in yet still
+ * needs the way back to the rest of the site.
  */
 export function AuthShell({
   title,
@@ -22,17 +26,19 @@ export function AuthShell({
   notice?: ReactNode;
 }) {
   return (
-    <div className="auth-screen">
-      <div className="auth-card">
-        {notice}
-        <div className="panel auth-panel">
-          <h1 className="panel-title">{title}</h1>
-          {subtitle ? <p className="help-text auth-subtitle">{subtitle}</p> : null}
-          {children}
+    <SiteChrome>
+      <div className="auth-screen">
+        <div className="auth-card">
+          {notice}
+          <div className="panel auth-panel">
+            <h1 className="panel-title">{title}</h1>
+            {subtitle ? <p className="help-text auth-subtitle">{subtitle}</p> : null}
+            {children}
+          </div>
+          {footer ? <div className="auth-footer">{footer}</div> : null}
         </div>
-        {footer ? <div className="auth-footer">{footer}</div> : null}
       </div>
-    </div>
+    </SiteChrome>
   );
 }
 

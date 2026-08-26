@@ -20,8 +20,21 @@ export type AccountUser = {
   label: string;
   /** One or two letters for the avatar. */
   initials: string;
-  /** Shown only to someone who can actually manage something. */
-  canManage: boolean;
+  /**
+   * The site admin is offered to Administrators and to nobody else.
+   *
+   * Holding a management permission is not the same as running the site:
+   * somebody given the donations to enter has a section of their own to work
+   * in, and pointing them at the whole admin would only be pointing them at
+   * screens they cannot use.
+   */
+  isAdministrator: boolean;
+  /**
+   * The sections this account has been given — the sponsorships dashboard
+   * and whatever follows it. Kept as a list so a section added later needs
+   * no change here.
+   */
+  sections: { label: string; href: string }[];
   /** The membership level, shown under the name. Empty for a staff-only account. */
   level: string;
 };
@@ -29,18 +42,27 @@ export type AccountUser = {
 /**
  * The top-right corner of the site header.
  *
- * Signed out it is a sign-in link that opens the popup; signed in it is the
- * member's initials with a menu behind them. It sits outside `.site-nav` on
- * purpose, so it stays in the corner at mobile widths instead of collapsing
- * into the hamburger with the site links.
+ * Signed out it is a sign-in link that opens the popup, and that link can be
+ * turned off or moved to the footer. Signed in it is the member's initials with
+ * a menu behind them, and that is deliberately not configurable: the way back
+ * to your own account should be in the same place on every site built with
+ * this.
+ *
+ * It sits outside `.site-nav` on purpose, so it stays in the corner at mobile
+ * widths instead of collapsing into the hamburger with the site links.
  */
 export function AccountMenu({
   user,
   registration,
+  showSignIn = true,
+  signInLabel = "Sign in",
 }: {
   /** Null when nobody is signed in. */
   user: AccountUser | null;
   registration: RegistrationOptions;
+  /** Whether the signed-out link belongs here. Never affects the menu above. */
+  showSignIn?: boolean;
+  signInLabel?: string;
 }) {
   const dialog = useAuthDialog();
 
@@ -52,6 +74,9 @@ export function AccountMenu({
    */
   const here = usePathname();
 
+  // Nothing to hold the corner: no menu to show, and the link put elsewhere.
+  if (!user && !showSignIn) return null;
+
   return (
     <div className="site-account">
       {user ? (
@@ -62,7 +87,7 @@ export function AccountMenu({
           className="site-account-signin"
           onClick={() => dialog.open("signin")}
         >
-          Sign in
+          {signInLabel}
         </button>
       )}
 
@@ -128,7 +153,19 @@ function SignedIn({ user, here }: { user: AccountUser; here: string }) {
         <Link href="/dashboard" role="menuitem" onClick={() => setOpen(false)}>
           Dashboard
         </Link>
-        {user.canManage ? (
+
+        {user.sections.map((section) => (
+          <Link
+            key={section.href}
+            href={section.href}
+            role="menuitem"
+            onClick={() => setOpen(false)}
+          >
+            {section.label}
+          </Link>
+        ))}
+
+        {user.isAdministrator ? (
           <Link href="/admin" role="menuitem" onClick={() => setOpen(false)}>
             Site admin
           </Link>
@@ -143,5 +180,42 @@ function SignedIn({ user, here }: { user: AccountUser; here: string }) {
         </form>
       </div>
     </div>
+  );
+}
+
+/**
+ * The same sign-in link, for wherever it has been placed outside the header.
+ *
+ * It opens the same popup rather than sending somebody to `/login`, so the
+ * page they were reading is still behind them when they have signed in.
+ */
+export function SignInLink({
+  registration,
+  label,
+  className = "site-footer-signin",
+}: {
+  registration: RegistrationOptions;
+  label: string;
+  className?: string;
+}) {
+  const dialog = useAuthDialog();
+  const here = usePathname();
+
+  return (
+    <>
+      <button type="button" className={className} onClick={() => dialog.open("signin")}>
+        {label}
+      </button>
+
+      {dialog.view ? (
+        <AuthDialog
+          view={dialog.view}
+          onView={dialog.open}
+          onClose={dialog.close}
+          registration={registration}
+          next={here}
+        />
+      ) : null}
+    </>
   );
 }

@@ -6,6 +6,7 @@ import {
   MediaAsset,
   SiteContent,
   SitePage,
+  Sponsor,
   Story,
   Zine,
 } from "./models";
@@ -77,8 +78,17 @@ export function collectMediaRefs(
 export async function buildMediaUsageIndex(): Promise<MediaUsageIndex> {
   await connectDB();
 
-  const [assets, pages, stories, collections, publications, bios, forms, siteContent] =
-    await Promise.all([
+  const [
+    assets,
+    pages,
+    stories,
+    collections,
+    publications,
+    bios,
+    sponsors,
+    forms,
+    siteContent,
+  ] = await Promise.all([
       MediaAsset.find().select("url").lean<any[]>(),
       SitePage.find().select("title layout").lean<any[]>(),
       Story.find()
@@ -89,6 +99,7 @@ export async function buildMediaUsageIndex(): Promise<MediaUsageIndex> {
         .select("title pages repeatedBlocks coverMediaId coverUrl audio")
         .lean<any[]>(),
       Bio.find().select("name headshotMediaId headshotUrl").lean<any[]>(),
+      Sponsor.find().select("name logos").lean<any[]>(),
       FormDefinition.find().select("title layout").lean<any[]>(),
       SiteContent.findOne().select("logoUrl metaImageUrl").lean<any>(),
     ]);
@@ -147,6 +158,20 @@ export async function buildMediaUsageIndex(): Promise<MediaUsageIndex> {
       "publication",
       String(publication._id),
       publication.title || "Untitled publication"
+    );
+  }
+
+  // A sponsor's approved logos are its own category: an asset cleared for use
+  // by the people who gave it is not the same kind of thing as a form upload,
+  // and whoever is about to delete one should be told which sponsor it
+  // belongs to.
+  for (const sponsor of sponsors) {
+    record(
+      sponsor.logos,
+      "sponsorship",
+      "sponsor-logo",
+      String(sponsor._id),
+      `Sponsor: ${sponsor.name || "Untitled"}`
     );
   }
 

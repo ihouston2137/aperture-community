@@ -6,9 +6,11 @@ import { redirect } from "next/navigation";
 import { getAccessContext, requirePermission } from "@/lib/access";
 import { connectDB } from "@/lib/db";
 import { sendTestEmail, verifyEmailSettings } from "@/lib/email";
+import { normalizeTemplateOverrides } from "@/lib/email-templates";
 import { syncMediaUsage } from "@/lib/media-usage-sync";
 import { Appearance, EmailSettings, SiteContent } from "@/lib/models";
 import { sanitizeMediaPath } from "@/lib/protected-media-url";
+import { signInPlacement } from "@/lib/site-values";
 import { unifyLegacyMedia } from "@/lib/unify-media";
 
 import { APPEARANCE_PREFIX, CONTENT_PREFIX } from "./settings-field-names";
@@ -150,6 +152,9 @@ function readSiteContent(formData: FormData): Record<string, unknown> {
 
     availabilityEnabled: get("availabilityEnabled") === "on",
     availabilityLabel: String(get("availabilityLabel") ?? ""),
+    signInEnabled: get("signInEnabled") === "on",
+    signInPlacement: signInPlacement(get("signInPlacement")),
+    signInLabel: String(get("signInLabel") ?? "").trim() || "Sign in",
     availabilityHref: String(get("availabilityHref") ?? ""),
 
     footerBrandText: String(get("footerBrandText") ?? ""),
@@ -248,6 +253,35 @@ export async function saveEmailSettingsAction(formData: FormData) {
 
   await EmailSettings.findOneAndUpdate({}, { $set: update }, { upsert: true });
   revalidatePath("/admin/email");
+}
+
+/**
+ * Saves the wordings an administrator has replaced.
+ *
+ * A template cleared back to blank is dropped rather than stored empty, which
+ * is what puts the default back — there is no separate reset to keep in step.
+ */
+export async function saveEmailTemplatesAction(
+  formData: FormData
+): Promise<{ ok: boolean; error?: string }> {
+  await requirePermission("email.manage");
+  await connectDB();
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(String(formData.get("templates") ?? "[]"));
+  } catch {
+    return { ok: false, error: "Could not read those templates." };
+  }
+
+  await EmailSettings.findOneAndUpdate(
+    {},
+    { $set: { templates: normalizeTemplateOverrides(parsed) } },
+    { upsert: true }
+  );
+
+  revalidatePath("/admin/email");
+  return { ok: true };
 }
 
 export async function verifyEmailAction() {

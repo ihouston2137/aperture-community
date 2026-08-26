@@ -2,12 +2,13 @@
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { compareSync, hashSync } from "bcrypt-ts";
+import { compareSync } from "bcrypt-ts";
 
 import { safeNextPath } from "@/lib/auth-rules";
 import { getAuthSettings } from "@/lib/auth-settings";
 import { connectDB } from "@/lib/db";
 import { User } from "@/lib/models";
+import { changeUserPassword } from "@/lib/passwords";
 import { membershipStatus } from "@/lib/permissions";
 import {
   holdsManagementRole,
@@ -17,7 +18,6 @@ import {
 import { ensureSeed } from "@/lib/seed";
 import { clearPendingAuth, clearSession, createSession, requireSession } from "@/lib/session";
 import { SAFE_MODE_COOKIE } from "@/lib/safe-mode";
-import { clearCodes } from "@/lib/verification";
 
 export type FormState = { error?: string; message?: string } | undefined;
 
@@ -105,35 +105,12 @@ export async function changePasswordAction(
 ): Promise<FormState> {
   const session = await requireSession(true);
 
-  const current = String(formData.get("currentPassword") ?? "");
-  const next = String(formData.get("newPassword") ?? "");
-  const confirm = String(formData.get("confirmPassword") ?? "");
-
-  if (next.length < 10) {
-    return { error: "New password must be at least 10 characters." };
-  }
-  if (next !== confirm) return { error: "New passwords do not match." };
-
-  await connectDB();
-  const user = await User.findById(session.userId);
-  if (!user) return { error: "Account not found." };
-  if (!compareSync(current, user.passwordHash)) {
-    return { error: "Current password is incorrect." };
-  }
-
-  user.passwordHash = hashSync(next, 10);
-  user.mustChangePassword = false;
-  await user.save();
-
-  // Any recovery code outstanding was issued against the old password.
-  await clearCodes(session.userId);
-
-  await createSession({
-    userId: user._id.toString(),
-    email: user.email,
-    name: user.name ?? "",
-    mustChangePassword: false,
+  const result = await changeUserPassword(session.userId, {
+    current: String(formData.get("currentPassword") ?? ""),
+    next: String(formData.get("newPassword") ?? ""),
+    confirm: String(formData.get("confirmPassword") ?? ""),
   });
+  if (!result.ok) return { error: result.error };
 
   redirect("/admin?passwordChanged=1");
 }

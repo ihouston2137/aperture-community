@@ -5,6 +5,7 @@ import { hashSync } from "bcrypt-ts";
 
 import { requirePermission } from "@/lib/access";
 import { connectDB } from "@/lib/db";
+import { syncMemberProfile } from "@/lib/member-profiles";
 import { composeName, isEmailAddress, normalizePhone } from "@/lib/members";
 import { User } from "@/lib/models";
 import { membershipStatus } from "@/lib/permissions";
@@ -69,9 +70,11 @@ export async function saveUserAction(formData: FormData): Promise<UserActionResu
       user.mustChangePassword = true;
     }
     await user.save();
+    // The name and the level shown on their profile are read from the account.
+    await syncMemberProfile(String(user._id));
   } else {
     if (!password) return { ok: false, error: "Set a temporary password." };
-    await User.create({
+    const created = await User.create({
       email,
       firstName,
       lastName,
@@ -87,10 +90,12 @@ export async function saveUserAction(formData: FormData): Promise<UserActionResu
       emailVerifiedAt: emailVerified ? new Date() : null,
       roleIds,
     });
+    await syncMemberProfile(String(created._id));
   }
 
   revalidatePath("/admin/users");
   revalidatePath("/admin/members");
+  revalidatePath("/admin/profiles");
   return { ok: true };
 }
 

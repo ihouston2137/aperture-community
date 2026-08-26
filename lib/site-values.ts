@@ -40,6 +40,23 @@ export const CONTENT_WIDTH_LABELS: Record<ContentWidth, string> = {
  * screen. Each maps to a selector in `app/globals.css`, so the generated rules
  * apply to the live site and to the admin preview alike.
  */
+/** Where the signed-out link is offered. */
+export const SIGN_IN_PLACEMENTS = ["header", "footer", "both"] as const;
+
+export type SignInPlacement = (typeof SIGN_IN_PLACEMENTS)[number];
+
+export const SIGN_IN_PLACEMENT_LABELS: Record<SignInPlacement, string> = {
+  header: "Header",
+  footer: "Footer",
+  both: "Header and footer",
+};
+
+export function signInPlacement(value: unknown): SignInPlacement {
+  return SIGN_IN_PLACEMENTS.includes(value as SignInPlacement)
+    ? (value as SignInPlacement)
+    : "header";
+}
+
 export const SITE_TEXT_ELEMENTS = [
   { key: "headerBrand", group: "Header", label: "Brand text", selector: ".site-brand" },
   { key: "headerTagline", group: "Header", label: "Tagline", selector: ".site-tagline" },
@@ -70,6 +87,14 @@ export const SITE_TEXT_ELEMENTS = [
     selector: '.site-nav[data-open="true"] > a:not(.site-cta)',
   },
   { key: "headerCta", group: "Header", label: "Call to action", selector: ".site-cta" },
+  // One entry for both placements: it is the same link wherever it is put, and
+  // styling it twice would only let the two drift apart.
+  {
+    key: "signIn",
+    group: "Header",
+    label: "Sign in link",
+    selector: ".site-account-signin, .site-footer-signin",
+  },
   {
     key: "headerMenuPanel",
     group: "Header",
@@ -289,6 +314,15 @@ export type SiteContentValues = {
   availabilityEnabled: boolean;
   availabilityLabel: string;
   availabilityHref: string;
+
+  /**
+   * The way in for somebody who has not signed in. Only ever the signed-out
+   * link: the menu a signed-in member sees is not configurable, so the corner
+   * of the header means the same thing on every site.
+   */
+  signInEnabled: boolean;
+  signInPlacement: SignInPlacement;
+  signInLabel: string;
   socialLinks: { platform: string; label: string; href: string }[];
   footerBrandText: string;
   footerLogoUrl: string;
@@ -319,6 +353,10 @@ export const defaultSiteContent: SiteContentValues = {
   availabilityEnabled: false,
   availabilityLabel: "",
   availabilityHref: "",
+
+  signInEnabled: true,
+  signInPlacement: "header",
+  signInLabel: "Sign in",
   socialLinks: [],
   footerBrandText: "",
   footerLogoUrl: "",

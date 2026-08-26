@@ -6,6 +6,7 @@ import { useState } from "react";
 import { MediaDetailsDialog } from "@/app/admin/media/media-details-dialog";
 import { MediaField, MediaPicker } from "@/app/admin/media/media-picker";
 import { RichTextEditor } from "@/components/rich-text-editor";
+import { BioPicker } from "@/components/bio-picker";
 import { isPersonBio } from "@/lib/bio-types";
 import { protectedMediaUrl } from "@/lib/protected-media-url";
 import {
@@ -247,14 +248,13 @@ export function StoryEditor({
               <div className="field">
                 <label>Author profile</label>
                 {/* A story is written by a person, so subjects are not offered. */}
-                <select name="authorBioId" defaultValue={story.authorBioId}>
-                  <option value="">None</option>
-                  {bios.filter(isPersonBio).map((bio) => (
-                    <option key={bio._id} value={bio._id}>
-                      {bio.label}
-                    </option>
-                  ))}
-                </select>
+                <BioPicker
+                  name="authorBioId"
+                  defaultValue={story.authorBioId}
+                  options={bios
+                    .filter(isPersonBio)
+                    .map((bio) => ({ _id: bio._id, name: bio.label }))}
+                />
               </div>
               <div className="field">
                 <label>Publish date</label>

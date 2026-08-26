@@ -10,17 +10,20 @@ import { Bio } from "@/lib/models";
 import { sanitizeMediaPath } from "@/lib/protected-media-url";
 import { slugify, uniqueSlug } from "@/lib/slug";
 
+/** The dialog stays open on failure to show the message, so these report back. */
+export type BioActionResult = { ok: boolean; error?: string };
+
 async function guard() {
   await requirePermission("profiles.manage");
   await connectDB();
 }
 
-export async function saveBioAction(formData: FormData) {
+export async function saveBioAction(formData: FormData): Promise<BioActionResult> {
   await guard();
 
   const id = String(formData.get("id") ?? "");
   const name = String(formData.get("name") ?? "").trim();
-  if (!name) return;
+  if (!name) return { ok: false, error: "A name is required." };
 
   const headshotMediaId = String(formData.get("headshotMediaId") ?? "");
   const headshotUrl = sanitizeMediaPath(String(formData.get("headshotUrl") ?? ""));
@@ -57,16 +60,19 @@ export async function saveBioAction(formData: FormData) {
 
   revalidatePath("/admin/profiles");
   revalidatePath("/", "layout");
+  return { ok: true };
 }
 
-export async function deleteBioAction(formData: FormData) {
+export async function deleteBioAction(formData: FormData): Promise<BioActionResult> {
   await guard();
 
   const id = String(formData.get("id") ?? "");
-  if (!id) return;
+  if (!id) return { ok: false, error: "That profile no longer exists." };
 
   await clearMediaUsage(id);
   await Bio.findByIdAndDelete(id);
 
   revalidatePath("/admin/profiles");
+  revalidatePath("/", "layout");
+  return { ok: true };
 }

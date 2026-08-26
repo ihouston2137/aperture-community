@@ -1,0 +1,172 @@
+"use client";
+
+import { useMemo, useState } from "react";
+
+import { formatDollars, statusTone } from "@/lib/sponsorship-types";
+import type { CreditTotals, MemberCredit } from "@/lib/sponsorships";
+
+/** A member as the board needs them: a name, and the levels they hold. */
+export type BoardMember = { _id: string; name: string; levelIds: string[] };
+
+export type BoardLevel = { _id: string; name: string };
+
+/**
+ * Who has brought in what.
+ *
+ * Ranked on everything that has arrived, with what is still being worked on
+ * riding alongside — a member with a full pipeline and nothing banked yet has
+ * not done nothing, and a board showing only the banked figure would say they
+ * had.
+ *
+ * Money and in-kind are shown apart because they are not the same thing and do
+ * not add: a donated venue and a cheque are both worth having and are not
+ * interchangeable. They are ranked together, though, since both are work the
+ * member did.
+ *
+ * The same component on the whole programme and on one campaign — it is the
+ * same question asked of a different set of donations.
+ */
+export function Leaderboard({
+  entries,
+  members,
+  levels,
+  currentUserId,
+  caption,
+}: {
+  entries: MemberCredit[];
+  members: BoardMember[];
+  /** Membership levels, for narrowing the board to one of them. */
+  levels: BoardLevel[];
+  currentUserId: string;
+  caption: string;
+}) {
+  const [levelId, setLevelId] = useState("");
+
+  const byId = useMemo(() => {
+    const map = new Map<string, BoardMember>();
+    for (const member of members) map.set(member._id, member);
+    return map;
+  }, [members]);
+
+  const shown = useMemo(() => {
+    if (!levelId) return entries;
+    return entries.filter((entry) =>
+      byId.get(entry.memberId)?.levelIds.includes(levelId)
+    );
+  }, [entries, levelId, byId]);
+
+  if (entries.length === 0) return null;
+
+  return (
+    <section className="member-card manager-card">
+      <div className="manager-card-head">
+        <h2 className="member-card-title">Leaderboard</h2>
+
+        {levels.length > 0 ? (
+          <div className="field leaderboard-filter">
+            <label htmlFor="leaderboard-level">Level</label>
+            <select
+              id="leaderboard-level"
+              value={levelId}
+              onChange={(event) => setLevelId(event.target.value)}
+            >
+              <option value="">Every level</option>
+              {levels.map((level) => (
+                <option key={level._id} value={level._id}>
+                  {level.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : null}
+      </div>
+
+      <p className="help-text">{caption}</p>
+
+      {shown.length === 0 ? (
+        <p className="member-note">Nobody at that level has brought anything in.</p>
+      ) : (
+        <ol className="leaderboard">
+          {shown.map((entry, index) => (
+            <li key={entry.memberId} className="leaderboard-row">
+              <span className="leaderboard-rank" aria-hidden="true">
+                {index + 1}
+              </span>
+
+              <span className="leaderboard-name">
+                {byId.get(entry.memberId)?.name ?? "somebody who has gone"}
+                {entry.memberId === currentUserId ? (
+                  <span className="badge">you</span>
+                ) : null}
+                <span className="help-text">
+                  {entry.count} donation{entry.count === 1 ? "" : "s"}
+                </span>
+              </span>
+
+              <span className="leaderboard-figures">
+                <Figure label="Money" totals={entry.monetary} money />
+                <Figure label="In-kind" totals={entry.inKind} money={false} />
+              </span>
+            </li>
+          ))}
+        </ol>
+      )}
+    </section>
+  );
+}
+
+/**
+ * One kind of giving: what arrived, and what has not yet.
+ *
+ * Money carries the status colours; in-kind carries the two greys, the same
+ * reading as everywhere else.
+ */
+function Figure({
+  label,
+  totals,
+  money,
+}: {
+  label: string;
+  totals: CreditTotals;
+  money: boolean;
+}) {
+  const pending = totals.inProgressCents + totals.proposedCents;
+  if (!totals.completeCents && !pending) return null;
+
+  return (
+    <span className="leaderboard-figure">
+      <span className="field-label">{label}</span>
+      <strong>{formatDollars(totals.completeCents)}</strong>
+
+      {pending > 0 ? (
+        <span className="leaderboard-pending">
+          {totals.inProgressCents > 0 ? (
+            <span
+              className={`tone-chip ${
+                money ? statusTone("in-progress") : "tone-in-kind-pending"
+              }`}
+              title={`In progress: ${formatDollars(totals.inProgressCents)}`}
+            >
+              <span className="tone-dot" aria-hidden="true" />
+              <span className="visually-hidden">In progress</span>
+              {formatDollars(totals.inProgressCents)}
+            </span>
+          ) : null}
+
+          {totals.proposedCents > 0 ? (
+            <span
+              className={`tone-chip ${
+                money ? statusTone("proposed") : "tone-in-kind-pending"
+              }`}
+              title={`Proposed: ${formatDollars(totals.proposedCents)}`}
+            >
+              <span className="tone-dot" aria-hidden="true" />
+              <span className="visually-hidden">Proposed</span>
+              {formatDollars(totals.proposedCents)}
+            </span>
+          ) : null}
+        </span>
+      ) : null}
+    </span>
+  );
+}

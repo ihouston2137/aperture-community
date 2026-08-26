@@ -1,0 +1,547 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState, useTransition } from "react";
+
+import { Panel } from "@/components/admin-ui";
+import { BioPicker } from "@/components/bio-picker";
+import { ModalPortal } from "@/components/modal-portal";
+import {
+  DONATION_KINDS,
+  DONATION_KIND_LABELS,
+  DONATION_STATUSES,
+  DONATION_STATUS_LABELS,
+  centsToDollarInput,
+  countsTowardTotals,
+  formatDateLabel,
+  formatDollars,
+  isRealised,
+  type DonationSummary,
+} from "@/lib/sponsorship-types";
+
+import { deleteDonationAction, saveDonationAction } from "./actions";
+
+export type PickerOption = { _id: string; name: string; title?: string };
+
+/**
+ * A closed campaign is still offered — a gift promised while it ran can
+ * arrive after it closes — but it is named as closed so nobody files one
+ * against the wrong drive by accident.
+ */
+export type CampaignOption = PickerOption & { isClosed?: boolean };
+
+type DialogState =
+  | { mode: "create" }
+  | { mode: "edit"; donation: DonationSummary }
+  | null;
+
+/**
+ * Every gift, and who is credited with bringing it in.
+ *
+ * A gift credited to three people counts in full for each of them: the figure
+ * answers "what did this member bring in", not "what share of the total is
+ * theirs", and splitting it would blur those two questions together.
+ */
+export function DonationManager({
+  donations,
+  campaigns,
+  sponsors,
+  members,
+  canManage,
+}: {
+  donations: DonationSummary[];
+  campaigns: CampaignOption[];
+  sponsors: PickerOption[];
+  members: PickerOption[];
+  canManage: boolean;
+}) {
+  const router = useRouter();
+  const [dialog, setDialog] = useState<DialogState>(null);
+  const [query, setQuery] = useState("");
+  const [campaignId, setCampaignId] = useState("");
+  const [kind, setKind] = useState("");
+  const [status, setStatus] = useState("");
+
+  const nameOf = (list: PickerOption[], id: string) =>
+    list.find((entry) => entry._id === id)?.name ?? "one that has gone";
+
+  const shown = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    return donations.filter((donation) => {
+      if (campaignId && donation.campaignId !== campaignId) return false;
+      if (kind && donation.kind !== kind) return false;
+      if (status && donation.status !== status) return false;
+      if (!needle) return true;
+      return [
+        nameOf(sponsors, donation.sponsorId),
+        nameOf(campaigns, donation.campaignId),
+        donation.description,
+        ...donation.memberIds.map((id) => nameOf(members, id)),
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(needle);
+    });
+    // The lookups read from the three lists, which is what actually changes.
+  }, [donations, query, campaignId, kind, status, sponsors, campaigns, members]);
+
+  // Cancelled gifts never happened, so they are left out of the figure — and
+  // what has arrived is reported apart from what is still being worked on.
+  const counted = shown.filter((donation) => countsTowardTotals(donation.status));
+  const shownTotal = counted.reduce((sum, entry) => sum + entry.valueCents, 0);
+  const realisedTotal = counted
+    .filter((entry) => isRealised(entry.status))
+    .reduce((sum, entry) => sum + entry.valueCents, 0);
+
+  return (
+    <Panel title={`Donations (${donations.length})`}>
+      {canManage ? (
+        <div className="panel-actions">
+          <button
+            type="button"
+            className="btn btn-primary btn-sm"
+            onClick={() => setDialog({ mode: "create" })}
+            disabled={campaigns.length === 0 || sponsors.length === 0}
+          >
+            Record a donation
+          </button>
+        </div>
+      ) : null}
+
+      {campaigns.length === 0 || sponsors.length === 0 ? (
+        <p className="help-text">
+          A donation needs a campaign to belong to and a sponsor who gave it —
+          add {campaigns.length === 0 ? "a campaign" : "a sponsor"} first.
+        </p>
+      ) : null}
+
+      <div className="field-grid">
+        <div className="field">
+          <label htmlFor="donation-search">Search</label>
+          <input
+            id="donation-search"
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Sponsor, campaign, member or description"
+          />
+        </div>
+        <div className="field">
+          <label htmlFor="donation-campaign">Campaign</label>
+          <select
+            id="donation-campaign"
+            value={campaignId}
+            onChange={(event) => setCampaignId(event.target.value)}
+          >
+            <option value="">Every campaign</option>
+            {campaigns.map((campaign) => (
+              <option key={campaign._id} value={campaign._id}>
+                {campaign.name}{campaign.isClosed ? " (closed)" : ""}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="field">
+          <label htmlFor="donation-status">Status</label>
+          <select
+            id="donation-status"
+            value={status}
+            onChange={(event) => setStatus(event.target.value)}
+          >
+            <option value="">Every status</option>
+            {DONATION_STATUSES.map((entry) => (
+              <option key={entry} value={entry}>
+                {DONATION_STATUS_LABELS[entry]}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="field">
+          <label htmlFor="donation-kind">Type</label>
+          <select
+            id="donation-kind"
+            value={kind}
+            onChange={(event) => setKind(event.target.value)}
+          >
+            <option value="">Both kinds</option>
+            {DONATION_KINDS.map((entry) => (
+              <option key={entry} value={entry}>
+                {DONATION_KIND_LABELS[entry]}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <p className="help-text" style={{ marginTop: "0.75rem" }}>
+        {shown.length === 0
+          ? "Nothing matches that."
+          : `${shown.length} of ${donations.length} · ${formatDollars(
+              realisedTotal
+            )} in hand${
+              shownTotal > realisedTotal
+                ? `, ${formatDollars(shownTotal - realisedTotal)} still being worked on`
+                : ""
+            }.`}
+      </p>
+
+      {shown.length > 0 ? (
+        <ul className="admin-list" style={{ marginTop: "0.75rem" }}>
+          {shown.map((donation) => (
+            <li key={donation._id} className="admin-list-item">
+              <div style={{ minWidth: 0 }}>
+                <h3>{nameOf(sponsors, donation.sponsorId)}</h3>
+                <div className="admin-list-meta">
+                  {nameOf(campaigns, donation.campaignId)}
+                  {donation.date ? ` · ${formatDateLabel(donation.date)}` : ""}
+                  {` · ${DONATION_KIND_LABELS[donation.kind]}`}
+                  {` · ${DONATION_STATUS_LABELS[donation.status]}`}
+                </div>
+                <div className="admin-list-meta">
+                  {donation.memberIds.length > 0
+                    ? `Credit: ${donation.memberIds
+                        .map((id) => nameOf(members, id))
+                        .join(", ")}`
+                    : "nobody credited"}
+                  {donation.description ? ` · ${donation.description}` : ""}
+                </div>
+              </div>
+
+              <span
+                className={`badge${
+                  isRealised(donation.status)
+                    ? " badge-published"
+                    : countsTowardTotals(donation.status)
+                      ? " badge-draft"
+                      : ""
+                }`}
+              >
+                {formatDollars(donation.valueCents)}
+              </span>
+
+              {canManage ? (
+                <div className="admin-list-actions">
+                  <button
+                    type="button"
+                    className="btn btn-sm"
+                    onClick={() => setDialog({ mode: "edit", donation })}
+                  >
+                    Edit
+                  </button>
+                </div>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      {dialog ? (
+        <DonationDialog
+          donation={dialog.mode === "edit" ? dialog.donation : undefined}
+          campaigns={campaigns}
+          sponsors={sponsors}
+          members={members}
+          onClose={() => setDialog(null)}
+          onSaved={() => {
+            setDialog(null);
+            router.refresh();
+          }}
+        />
+      ) : null}
+    </Panel>
+  );
+}
+
+/**
+ * Record or edit one donation.
+ *
+ * Exported so a campaign's own dashboard can open it against that campaign
+ * without a second editor being written for the purpose.
+ */
+export function DonationDialog({
+  donation,
+  campaigns,
+  sponsors,
+  members,
+  onClose,
+  onSaved,
+}: {
+  donation?: DonationSummary;
+  campaigns: CampaignOption[];
+  sponsors: PickerOption[];
+  members: PickerOption[];
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [sponsorId, setSponsorId] = useState(donation?.sponsorId ?? "");
+  const [memberIds, setMemberIds] = useState<string[]>(donation?.memberIds ?? []);
+  const [error, setError] = useState("");
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [pending, startTransition] = useTransition();
+
+  useEffect(() => {
+    function onKeyDown(keyEvent: KeyboardEvent) {
+      if (keyEvent.key === "Escape" && !pending) onClose();
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [onClose, pending]);
+
+  const nameOf = (id: string) =>
+    members.find((member) => member._id === id)?.name ?? "one that has gone";
+
+  function save(formData: FormData) {
+    setError("");
+    formData.set("sponsorId", sponsorId);
+    for (const id of memberIds) formData.append("memberIds", id);
+
+    startTransition(async () => {
+      const result = await saveDonationAction(formData);
+      if (result.ok) onSaved();
+      else setError(result.error ?? "Could not save that donation.");
+    });
+  }
+
+  function remove() {
+    if (!donation) return;
+    setError("");
+    startTransition(async () => {
+      const formData = new FormData();
+      formData.set("id", donation._id);
+      const result = await deleteDonationAction(formData);
+      if (result.ok) onSaved();
+      else setError(result.error ?? "Could not delete that donation.");
+    });
+  }
+
+  const title = donation ? "Edit donation" : "Record a donation";
+  const today = new Date().toISOString().slice(0, 10);
+
+  return (
+    <ModalPortal>
+      <div
+        className="style-modal-backdrop"
+        onClick={pending ? undefined : onClose}
+        role="presentation"
+      >
+        <div
+          className="style-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-label={title}
+          onClick={(clickEvent) => clickEvent.stopPropagation()}
+        >
+          <form action={save} className="style-modal-form">
+            <div className="style-modal-header">
+              <strong>{title}</strong>
+              <button
+                type="button"
+                className="btn btn-sm"
+                style={{ marginLeft: "auto" }}
+                disabled={pending}
+                onClick={onClose}
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="style-modal-body">
+              {donation ? (
+                <input type="hidden" name="id" value={donation._id} />
+              ) : null}
+              {error ? <div className="admin-notice is-error">{error}</div> : null}
+
+              <div className="field-grid">
+                <div className="field">
+                  <label htmlFor="donation-for">Campaign</label>
+                  <select
+                    id="donation-for"
+                    name="campaignId"
+                    defaultValue={donation?.campaignId ?? campaigns[0]?._id ?? ""}
+                  >
+                    {campaigns.map((campaign) => (
+                      <option key={campaign._id} value={campaign._id}>
+                        {campaign.name}{campaign.isClosed ? " (closed)" : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="field">
+                  <span className="field-label">Sponsor</span>
+                  <BioPicker
+                    options={sponsors}
+                    value={sponsorId}
+                    onChange={setSponsorId}
+                    emptyLabel="Nobody yet"
+                    placeholder="Type a sponsor's name"
+                    disabled={pending}
+                  />
+                </div>
+
+                <div className="field">
+                  <label htmlFor="donation-state">Status</label>
+                  <select
+                    id="donation-state"
+                    name="status"
+                    defaultValue={donation?.status ?? "proposed"}
+                  >
+                    {DONATION_STATUSES.map((entry) => (
+                      <option key={entry} value={entry}>
+                        {DONATION_STATUS_LABELS[entry]}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="help-text">
+                    Only a complete gift counts as in hand. A cancelled one is
+                    left out of every total.
+                  </span>
+                </div>
+
+                <div className="field">
+                  <label htmlFor="donation-type">Type</label>
+                  <select
+                    id="donation-type"
+                    name="kind"
+                    defaultValue={donation?.kind ?? "monetary"}
+                  >
+                    {DONATION_KINDS.map((entry) => (
+                      <option key={entry} value={entry}>
+                        {DONATION_KIND_LABELS[entry]}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="field">
+                  <label htmlFor="donation-date">Date</label>
+                  <input
+                    id="donation-date"
+                    name="date"
+                    type="date"
+                    defaultValue={donation?.date || today}
+                  />
+                </div>
+
+                <div className="field">
+                  <label htmlFor="donation-value">Value</label>
+                  <input
+                    id="donation-value"
+                    name="value"
+                    type="text"
+                    inputMode="decimal"
+                    defaultValue={centsToDollarInput(donation?.valueCents ?? 0)}
+                    placeholder="0.00"
+                    required
+                  />
+                  <span className="help-text">
+                    In dollars. For an in-kind gift, what it is worth.
+                  </span>
+                </div>
+              </div>
+
+              <div className="field" style={{ marginTop: "0.875rem" }}>
+                <label htmlFor="donation-description">Description</label>
+                <textarea
+                  id="donation-description"
+                  name="description"
+                  rows={3}
+                  defaultValue={donation?.description ?? ""}
+                  placeholder="What was given, and anything worth remembering about it."
+                />
+              </div>
+
+              <div className="field" style={{ marginTop: "0.875rem" }}>
+                <span className="field-label">
+                  Credited to ({memberIds.length})
+                </span>
+
+                {memberIds.length > 0 ? (
+                  <div className="chip-picker" style={{ marginBottom: "0.5rem" }}>
+                    {memberIds.map((id) => (
+                      <span key={id} className="chip-option">
+                        {nameOf(id)}
+                        <button
+                          type="button"
+                          className="chip-remove"
+                          aria-label={`Remove ${nameOf(id)}`}
+                          disabled={pending}
+                          onClick={() =>
+                            setMemberIds((current) =>
+                              current.filter((held) => held !== id)
+                            )
+                          }
+                        >
+                          <span aria-hidden="true">×</span>
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+
+                <BioPicker
+                  options={members.filter((member) => !memberIds.includes(member._id))}
+                  value=""
+                  onChange={(id) => {
+                    if (id) setMemberIds((current) => [...current, id]);
+                  }}
+                  emptyLabel="—"
+                  placeholder="Type a name to credit somebody"
+                  disabled={pending}
+                />
+                <span className="help-text">
+                  The members who worked with the sponsor to bring this in. Each
+                  is credited with the full value.
+                </span>
+              </div>
+            </div>
+
+            <div className="style-modal-footer">
+              {donation ? (
+                confirmingDelete ? (
+                  <>
+                    <span className="help-text">Delete this donation?</span>
+                    <button
+                      type="button"
+                      className="btn btn-danger btn-sm"
+                      disabled={pending}
+                      onClick={remove}
+                    >
+                      Yes, delete
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-sm"
+                      disabled={pending}
+                      onClick={() => setConfirmingDelete(false)}
+                    >
+                      Keep
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn btn-danger btn-sm"
+                    disabled={pending}
+                    onClick={() => setConfirmingDelete(true)}
+                  >
+                    Delete donation
+                  </button>
+                )
+              ) : null}
+
+              <button
+                type="submit"
+                className="btn btn-primary btn-sm"
+                style={{ marginLeft: "auto" }}
+                disabled={pending || !sponsorId}
+              >
+                {pending ? "Saving…" : donation ? "Save donation" : "Record it"}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </ModalPortal>
+  );
+}
