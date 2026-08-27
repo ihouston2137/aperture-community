@@ -11,6 +11,7 @@ import {
   normalizeStatus,
   normalizeTimeValue,
   normalizeCalendarTemplateKind,
+  normalizeCalendarPageSettings,
   normalizeVocabulary,
   resolveTimeZone,
   sanitizeLinkUrl,
@@ -227,6 +228,48 @@ export async function saveCalendarSettingsAction(
 
   revalidatePath("/admin/calendar");
   return { ok: true, message: "Calendar settings saved." };
+}
+
+/**
+ * The site's calendar page: whether it exists, what it says, how it displays.
+ *
+ * Stored beside the rest of the calendar settings rather than as a page record,
+ * because it is not a page anybody built — it is a fixed address the calendar
+ * lives at, and its settings are calendar settings.
+ */
+export async function saveCalendarPageAction(
+  formData: FormData
+): Promise<CalendarActionResult> {
+  await guard();
+
+  let display: unknown = null;
+  try {
+    display = JSON.parse(String(formData.get("display") ?? "null"));
+  } catch {
+    // Normalization turns anything unreadable into the defaults, which is a
+    // better outcome than refusing a save over a field nobody typed into.
+    display = null;
+  }
+
+  // Normalized on the way in as well as on the way out, so nothing this stores
+  // can be a shape the calendar does not expect.
+  const page = normalizeCalendarPageSettings({
+    enabled: formData.get("enabled") === "on",
+    title: String(formData.get("title") ?? ""),
+    intro: String(formData.get("intro") ?? ""),
+    display,
+  });
+
+  await CalendarSettings.findOneAndUpdate({}, { $set: { page } }, { upsert: true });
+
+  revalidatePath("/admin/calendar");
+  revalidatePath("/calendar");
+  return {
+    ok: true,
+    message: page.enabled
+      ? "Calendar page saved."
+      : "Calendar page saved, and switched off.",
+  };
 }
 
 /** Builder trees travel as JSON in a hidden field; a bad one is treated as empty. */

@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { requirePermission } from "@/lib/access";
+import { adminExit } from "@/lib/admin-exit";
 import { loadBuilderSources } from "@/lib/builder-sources";
 import { getCollectionById, loadCollectionPresets } from "@/lib/collections";
 import { connectDB } from "@/lib/db";
@@ -17,11 +18,11 @@ export default async function EditCollectionPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ saved?: string }>;
+  searchParams: Promise<{ saved?: string; from?: string }>;
 }) {
   await requirePermission("collections.manage");
   const { id } = await params;
-  const { saved } = await searchParams;
+  const { saved, from } = await searchParams;
 
   await connectDB();
   const doc = await Collection.findById(id).lean<any>();
@@ -42,6 +43,7 @@ export default async function EditCollectionPage({
 
   return (
     <CollectionEditor
+      exit={adminExit(from, { href: "/admin/collections", label: "Collections" })}
       saved={Boolean(saved)}
       onDelete={deleteCollectionAction}
       collection={{

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { AdminHeader, EmptyState, Panel, StatusBadge } from "@/components/admin-ui";
 import { requirePermission } from "@/lib/access";
+import { adminExit } from "@/lib/admin-exit";
 import { connectDB } from "@/lib/db";
 import { buildDocTree, getDocSetById, listDocs, type DocNode } from "@/lib/docs";
 import { DocTemplate } from "@/lib/models";
@@ -19,12 +20,16 @@ export const metadata = { title: "Documentation" };
 
 export default async function DocSetPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ documentation: string }>;
+  searchParams: Promise<{ from?: string }>;
 }) {
   await requirePermission("docs.manage");
 
   const { documentation } = await params;
+  const { from } = await searchParams;
+  const exit = adminExit(from, { href: "/admin/docs", label: "All documentation" });
   const set = await getDocSetById(documentation);
   if (!set) notFound();
 
@@ -43,8 +48,8 @@ export default async function DocSetPage({
         subtitle={`${pages.length} document${pages.length === 1 ? "" : "s"}, in the order a reader moves through them.`}
         actions={
           <>
-            <Link href="/admin/docs" className="btn">
-              All documentation
+            <Link href={exit.href} className="btn">
+              ← {exit.label}
             </Link>
             <Link
               href={`/admin/docs/${set._id}/pages/new`}

@@ -1,5 +1,6 @@
 "use client";
 
+import { Pencil, X } from "lucide-react";
 import { useEffect } from "react";
 
 import type { PageRow } from "@/lib/page-layout";
@@ -29,6 +30,7 @@ import {
 export function CalendarEventLightbox({
   event,
   onClose,
+  onEdit,
   lightbox,
   layouts,
   sources,
@@ -36,6 +38,13 @@ export function CalendarEventLightbox({
 }: {
   event: CalendarEventRecord | null;
   onClose: () => void;
+  /**
+   * Offered only to somebody who may manage events. It floats beside the close
+   * button rather than sitting in the panel, because the panel's contents are a
+   * layout somebody designed — an editing control has no place inside the thing
+   * a visitor is meant to be reading.
+   */
+  onEdit?: (event: CalendarEventRecord) => void;
   /** The style's lightbox: one look, and a layout per screen size. */
   lightbox: CalendarStyleRecord["lightbox"];
   layouts: Record<string, PageRow[]>;
@@ -73,14 +82,33 @@ export function CalendarEventLightbox({
         aria-label={eventLabel(event)}
         onClick={(clickEvent) => clickEvent.stopPropagation()}
       >
-        <button
-          type="button"
-          className="calendar-detail-close is-floating"
-          aria-label="Close"
-          onClick={onClose}
-        >
-          ×
-        </button>
+        {/* A matched pair in the corner: same size, same weight, so neither
+            reads as the more important of the two. Icon-only, with the name in
+            the tooltip and on the accessible label — the panel below them is
+            somebody's designed layout and a word here competes with it. */}
+        <div className="calendar-detail-controls">
+          {onEdit ? (
+            <button
+              type="button"
+              className="calendar-detail-icon"
+              aria-label="Edit this event"
+              title="Edit this event"
+              onClick={() => onEdit(event)}
+            >
+              <Pencil size={16} aria-hidden="true" />
+            </button>
+          ) : null}
+
+          <button
+            type="button"
+            className="calendar-detail-icon"
+            aria-label="Close"
+            title="Close"
+            onClick={onClose}
+          >
+            <X size={16} aria-hidden="true" />
+          </button>
+        </div>
 
         {groups.map((group) => (
           <div

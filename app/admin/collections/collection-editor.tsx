@@ -24,6 +24,7 @@ import {
   PreviewFooter,
 } from "@/components/site-chrome-preview";
 import { StyleEditor } from "@/components/style-editor";
+import type { AdminExit } from "@/lib/admin-exit";
 import { ASPECT_RATIOS, aspectRatioLabel } from "@/lib/aspect-ratio";
 import {
   sortCollectionImages,
@@ -298,7 +299,13 @@ export function CollectionEditor({
   presets = [],
   saved = false,
   onDelete,
+  exit = { href: "/admin/collections", label: "Collections", token: "" },
 }: {
+  /**
+   * Where the way-back link goes. Defaulted to this editor's own list, so only
+   * a caller arriving from somewhere else has to say anything.
+   */
+  exit?: AdminExit;
   collection: CollectionRecord;
   styles: { _id: string; name: string; slug: string }[];
   fonts: string[];
@@ -511,6 +518,10 @@ export function CollectionEditor({
     // One form wraps the whole builder: the topbar carries the name and the
     // save button, and the settings column carries the rest of the fields.
     <form action={saveCollectionAction} className="builder">
+      {/* The way-back token, carried through the save's own redirect —
+          without it, pressing Save silently sends you back to the admin
+          list instead of wherever you came from. */}
+      <input type="hidden" name="from" value={exit.token} />
       {collection._id ? <input type="hidden" name="id" value={collection._id} /> : null}
       <input type="hidden" name="description" value={description} />
       <input type="hidden" name="category" value={category} />
@@ -540,8 +551,8 @@ export function CollectionEditor({
       <input type="hidden" name="sortDirection" value={sortDirection} />
 
       <div className="builder-topbar">
-        <Link href="/admin/collections" className="btn btn-sm" title="Back to Collections">
-          ← Collections
+        <Link href={exit.href} className="btn btn-sm" title={`Back to ${exit.label}`}>
+          ← {exit.label}
         </Link>
         <input
           className="input"

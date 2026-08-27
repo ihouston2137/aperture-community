@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { requirePermission } from "@/lib/access";
+import { adminExit } from "@/lib/admin-exit";
 import { loadBuilderSources } from "@/lib/builder-sources";
 import { connectDB } from "@/lib/db";
 import { normalizeFormLayout, normalizeFormSettings } from "@/lib/form-layout";
@@ -12,11 +13,14 @@ export const metadata = { title: "Edit form" };
 
 export default async function EditFormPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ from?: string }>;
 }) {
   await requirePermission("forms.manage");
   const { id } = await params;
+  const { from } = await searchParams;
 
   await connectDB();
   const doc = await FormDefinition.findById(id).lean<any>();
@@ -35,6 +39,7 @@ export default async function EditFormPage({
         settings: normalizeFormSettings(doc.settings),
       }}
       sources={sources}
+      exit={adminExit(from, { href: "/admin/forms", label: "Forms" })}
     />
   );
 }

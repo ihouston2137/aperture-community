@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { requirePermission } from "@/lib/access";
+import { adminExit } from "@/lib/admin-exit";
 import { loadBuilderSources } from "@/lib/builder-sources";
 import { normalizeColorOverrides } from "@/lib/color-overrides";
 import { connectDB } from "@/lib/db";
@@ -16,11 +17,14 @@ export const metadata = { title: "Edit page" };
 
 export default async function EditPagePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ from?: string }>;
 }) {
   await requirePermission("pages.manage");
   const { id } = await params;
+  const { from } = await searchParams;
 
   await connectDB();
   const doc = await SitePage.findById(id).lean<any>();
@@ -50,6 +54,7 @@ export default async function EditPagePage({
       sources={sources}
       previewSources={previewSources}
       chrome={{ appearance, content }}
+      exit={adminExit(from, { href: "/admin/pages", label: "Pages" })}
     />
   );
 }

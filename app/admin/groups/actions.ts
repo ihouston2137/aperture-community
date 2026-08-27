@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { requirePermission } from "@/lib/access";
 import { connectDB } from "@/lib/db";
-import { normalizeGroupMemberIds } from "@/lib/member-groups";
+import { normalizeGroupMembers } from "@/lib/member-groups";
 import { MemberGroup, User } from "@/lib/models";
 
 /** The dialog stays open on failure to show the message, so these report back. */
@@ -31,9 +31,16 @@ export async function saveGroupAction(
   const description = String(formData.get("description") ?? "")
     .trim()
     .slice(0, 500);
-  const memberIds = normalizeGroupMemberIds(
-    formData.getAll("memberIds").map(String)
-  );
+  // One JSON field rather than two parallel arrays: a member and their title
+  // have to stay together, and index-matched `getAll` lists are one dropped
+  // entry away from giving somebody else's office to the wrong person.
+  let members;
+  try {
+    members = normalizeGroupMembers(JSON.parse(String(formData.get("members") ?? "[]")));
+  } catch {
+    return { ok: false, error: "That list of members could not be read." };
+  }
+  const memberIds = members.map((member) => member.memberId);
 
   if (!name) return { ok: false, error: "Name the group." };
 
@@ -57,10 +64,18 @@ export async function saveGroupAction(
     }
   }
 
-  const payload = { name, description, memberIds };
+  const payload = { name, description, members };
 
-  if (id) await MemberGroup.findByIdAndUpdate(id, payload);
-  else await MemberGroup.create(payload);
+  if (id) {
+    // `memberIds` is the pre-titles shape. Dropped as each group is saved, so
+    // no group is left carrying two answers to who is in it.
+    await MemberGroup.findByIdAndUpdate(id, {
+      $set: payload,
+      $unset: { memberIds: "" },
+    });
+  } else {
+    await MemberGroup.create(payload);
+  }
 
   revalidate();
   return { ok: true };

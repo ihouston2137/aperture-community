@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { withExit } from "@/lib/admin-exit";
 import { requirePermission } from "@/lib/access";
 import { connectDB } from "@/lib/db";
 import { clearMediaUsage, syncMediaUsage } from "@/lib/media-usage-sync";
@@ -183,9 +184,12 @@ export async function savePublicationAction(formData: FormData) {
   // the canvas for a different size and orientation.
   const editorView = String(formData.get("editorView") ?? "").trim();
   redirect(
-    `/admin/publications/${id}/edit?saved=1${
-      editorView ? `&view=${encodeURIComponent(editorView)}` : ""
-    }`
+    withExit(
+      `/admin/publications/${id}/edit?saved=1${
+        editorView ? `&view=${encodeURIComponent(editorView)}` : ""
+      }`,
+      formData.get("from")
+    )
   );
 }
 

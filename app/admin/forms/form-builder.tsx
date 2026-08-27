@@ -21,6 +21,7 @@ import {
 import { FormFieldView, FormPlaceholderStyle } from "@/components/form-shell";
 import { RichTextEditor } from "@/components/rich-text-editor";
 import { StyleEditor } from "@/components/style-editor";
+import type { AdminExit } from "@/lib/admin-exit";
 import type { BuilderSources } from "@/lib/builder-sources";
 import { styleSlotProps } from "@/lib/display-templates";
 import {
@@ -151,9 +152,15 @@ function FieldPreview({
 export function FormBuilder({
   form,
   sources,
+  exit = { href: "/admin/forms", label: "Forms", token: "" },
 }: {
   form: FormRecord;
   sources: BuilderSources;
+  /**
+   * Where the way-back link goes. Defaulted to this editor's own list, so only
+   * a caller arriving from somewhere else has to say anything.
+   */
+  exit?: AdminExit;
 }) {
   const [layout, setLayout] = useState<PageRow[]>(form.layout);
   const [title, setTitle] = useState(form.title);
@@ -187,6 +194,10 @@ export function FormBuilder({
   return (
     <>
       <form action={saveFormAction} id="form-form">
+        {/* The way-back token, carried through the save's own redirect —
+            without it, pressing Save silently sends you back to the admin
+            list instead of wherever you came from. */}
+        <input type="hidden" name="from" value={exit.token} />
         {form._id ? <input type="hidden" name="id" value={form._id} /> : null}
         <input type="hidden" name="layout" value={JSON.stringify(layout)} />
         <input type="hidden" name="settings" value={JSON.stringify(settings)} />
@@ -473,8 +484,8 @@ export function FormBuilder({
             </>
           );
         }}
-        exitHref="/admin/forms"
-        exitLabel="Forms"
+        exitHref={exit.href}
+        exitLabel={exit.label}
         topbar={
           <>
             <input

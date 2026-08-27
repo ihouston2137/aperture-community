@@ -72,7 +72,12 @@ export function CalendarEventBox({
 
   return (
     <div
-      className="calendar-event-box is-clickable"
+      className={`calendar-event-box is-clickable${
+        // Only ever on screen for somebody who may manage events — the public
+        // calendar is published events only — but when it is, it has to be
+        // obvious which ones are not live.
+        event.status === "published" ? "" : " is-draft"
+      }`}
       data-size={sizes.join(" ")}
       role="button"
       tabIndex={0}

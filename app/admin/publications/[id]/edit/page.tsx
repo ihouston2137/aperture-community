@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { requirePermission } from "@/lib/access";
+import { adminExit } from "@/lib/admin-exit";
 import { loadBuilderSources } from "@/lib/builder-sources";
 import { connectDB } from "@/lib/db";
 import { Zine } from "@/lib/models";
@@ -27,11 +28,11 @@ export default async function EditPublicationPage({
 }: {
   params: Promise<{ id: string }>;
   /** `view` carries the post view being edited back across a save. */
-  searchParams: Promise<{ view?: string }>;
+  searchParams: Promise<{ view?: string; from?: string }>;
 }) {
   await requirePermission("publications.manage");
   const { id } = await params;
-  const { view } = await searchParams;
+  const { view, from } = await searchParams;
 
   await connectDB();
   const doc = await Zine.findById(id).lean<any>();
@@ -54,6 +55,7 @@ export default async function EditPublicationPage({
 
   return (
     <PublicationEditor
+      exit={adminExit(from, { href: "/admin/publications", label: "Publications" })}
       publication={{
         _id: String(doc._id),
         title: doc.title ?? "",

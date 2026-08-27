@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 
 import { FormShell } from "@/components/form-shell";
 import { SiteChrome } from "@/components/site-chrome";
+import { guardContent } from "@/lib/content-guard";
 import { connectDB } from "@/lib/db";
 import { normalizeFormLayout } from "@/lib/form-layout";
 import { FormDefinition } from "@/lib/models";
@@ -29,6 +30,11 @@ export default async function PublicFormPage({
   const { slug } = await params;
   const form = await findForm(slug);
   if (!form) notFound();
+
+  // A form can be linked in the navigation and can carry a rule of its own, so
+  // it is guarded like every other kind of content — otherwise a members-only
+  // form would be a members-only *link* to a public form.
+  await guardContent("form", String(form._id), `/forms/${slug}`);
 
   return (
     <SiteChrome>

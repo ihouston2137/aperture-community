@@ -1,7 +1,9 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { AdminHeader, Notice } from "@/components/admin-ui";
 import { checkPermission, requirePermission } from "@/lib/access";
+import { adminExit } from "@/lib/admin-exit";
 import { loadBuilderSources } from "@/lib/builder-sources";
 import { connectDB } from "@/lib/db";
 import { Story } from "@/lib/models";
@@ -19,11 +21,12 @@ export default async function EditStoryPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ saved?: string }>;
+  searchParams: Promise<{ saved?: string; from?: string }>;
 }) {
   await requirePermission("stories.manage");
   const { id } = await params;
-  const { saved } = await searchParams;
+  const { saved, from } = await searchParams;
+  const exit = adminExit(from, { href: "/admin/stories", label: "Stories" });
 
   await connectDB();
   const doc = await Story.findById(id).lean<any>();
@@ -75,12 +78,20 @@ export default async function EditStoryPage({
       <AdminHeader
         title={story.headline || "Edit story"}
         actions={
-          <form action={deleteStoryAction}>
-            <input type="hidden" name="id" value={story._id} />
-            <button type="submit" className="btn btn-danger">
-              Delete
-            </button>
-          </form>
+          <>
+            {/* This editor had no way out of its own — the admin sidebar was
+                the only one. It needs one now that a story can also be opened
+                from the content dashboard, which has no sidebar. */}
+            <Link href={exit.href} className="btn">
+              ← {exit.label}
+            </Link>
+            <form action={deleteStoryAction}>
+              <input type="hidden" name="id" value={story._id} />
+              <button type="submit" className="btn btn-danger">
+                Delete
+              </button>
+            </form>
+          </>
         }
       />
       {saved ? <Notice>Story saved.</Notice> : null}
@@ -92,6 +103,7 @@ export default async function EditStoryPage({
         fonts={sources.fonts}
         mediaMeta={mediaMeta}
         canEditMedia={canEditMedia}
+        exitToken={exit.token}
       />
     </>
   );

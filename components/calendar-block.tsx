@@ -25,6 +25,13 @@ import { CalendarGrid } from "./calendar-grid";
 import { CalendarEventLightbox } from "./calendar-event-lightbox";
 import { CalendarRsvpProvider } from "./calendar-rsvp-context";
 
+export type CalendarManageHandlers = {
+  /** Start a new event on a day — the "+" in a day cell, and the toolbar button. */
+  onAddDay: (dateKey: string) => void;
+  /** Open an existing event for editing. */
+  onEditEvent: (event: CalendarEventRecord) => void;
+};
+
 /** The inclusive range a view covers, as one cache key. */
 function rangeKey(view: CalendarView, date: string): string {
   const { start, end } =
@@ -49,6 +56,8 @@ export function CalendarBlock({
   /** Today in the calendar's configured zone; "" when the host cannot say. */
   todayKey,
   interactive = true,
+  manage,
+  reloadToken = 0,
 }: {
   display: CalendarDisplay;
   /** The resolved Calendar Style this calendar wears. */
@@ -60,6 +69,20 @@ export function CalendarBlock({
   initialEvents: CalendarEventRecord[];
   todayKey: string;
   interactive?: boolean;
+  /**
+   * Editing affordances, for a viewer who holds `calendar.manage`.
+   *
+   * Absent everywhere else, so a calendar on a public page is exactly what it
+   * has always been. The buttons are a convenience only — every action behind
+   * them re-checks the permission on the server.
+   */
+  manage?: CalendarManageHandlers;
+  /**
+   * Bumped when the events themselves have changed, so the cached ranges are
+   * thrown away and the current one re-fetched. Navigation alone does not
+   * change it: moving to a month already loaded should stay instant.
+   */
+  reloadToken?: number;
 }) {
   const [view, setView] = useState<CalendarView>(display.view);
   // Where the visitor has navigated to; "" means "wherever `todayKey` is".
@@ -114,6 +137,17 @@ export function CalendarBlock({
     void load(view, anchor);
   }, [load, view, anchor]);
 
+  // An event was added, edited or deleted. Every cached range could be wrong —
+  // an event can be moved from one month into another — so the lot goes and
+  // the range being looked at is fetched again.
+  const seenToken = useRef(reloadToken);
+  useEffect(() => {
+    if (seenToken.current === reloadToken) return;
+    seenToken.current = reloadToken;
+    cache.current = {};
+    void load(view, anchor);
+  }, [reloadToken, load, view, anchor]);
+
   if (!anchor) return <div className="pb-calendar is-loading" />;
 
   const visible = filterCalendarEvents(events, display);
@@ -144,7 +178,7 @@ export function CalendarBlock({
         loading ? " is-loading" : ""
       }`}
     >
-      {display.showNav || display.showViewSwitch ? (
+      {display.showNav || display.showViewSwitch || manage ? (
         <div className="calendar-toolbar">
           {display.showNav ? (
             <button
@@ -177,6 +211,18 @@ export function CalendarBlock({
               onClick={() => setAnchorOverride("")}
             >
               Today
+            </button>
+          ) : null}
+
+          {manage ? (
+            <button
+              type="button"
+              className="btn btn-sm btn-primary calendar-add-event"
+              // The day being looked at, so a new event lands in the month on
+              // screen rather than always in today's.
+              onClick={() => manage.onAddDay(anchor)}
+            >
+              + New event
             </button>
           ) : null}
 
@@ -217,8 +263,18 @@ export function CalendarBlock({
           sources={sources}
           showWeekdays={display.showWeekdays}
           designTime={!interactive}
+          onAddDay={manage ? manage.onAddDay : undefined}
           onSelectEvent={
-            display.lightbox && interactive ? (event) => setSelected(event) : undefined
+            !interactive
+              ? undefined
+              : display.lightbox
+                ? (event) => setSelected(event)
+                : // With the lightbox off there is nothing for a click to open,
+                  // so for a manager it opens the editor instead of doing
+                  // nothing at all.
+                  manage
+                  ? (event) => manage.onEditEvent(event)
+                  : undefined
           }
         />
 
@@ -228,6 +284,16 @@ export function CalendarBlock({
           <CalendarEventLightbox
             event={selected}
             onClose={() => setSelected(null)}
+            onEdit={
+              manage
+                ? (event) => {
+                    // The panel closes behind the editor: two stacked dialogs
+                    // over one event is a way to lose track of which is which.
+                    setSelected(null);
+                    manage.onEditEvent(event);
+                  }
+                : undefined
+            }
             lightbox={style.lightbox}
             layouts={layouts}
             sources={sources}

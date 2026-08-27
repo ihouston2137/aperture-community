@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { withExit } from "@/lib/admin-exit";
 import { requirePermission } from "@/lib/access";
 import { connectDB } from "@/lib/db";
 import { clearMediaUsage, syncMediaUsage } from "@/lib/media-usage-sync";
@@ -73,7 +74,7 @@ export async function savePageAction(formData: FormData) {
   revalidatePath(`/${slug}`);
   revalidatePath("/");
 
-  redirect(`/admin/pages/${pageId}/edit?saved=1`);
+  redirect(withExit(`/admin/pages/${pageId}/edit?saved=1`, formData.get("from")));
 }
 
 export async function deletePageAction(formData: FormData) {

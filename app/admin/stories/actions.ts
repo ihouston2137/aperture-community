@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { withExit } from "@/lib/admin-exit";
 import { requirePermission } from "@/lib/access";
 import { connectDB } from "@/lib/db";
 import { clearMediaUsage, syncMediaUsage } from "@/lib/media-usage-sync";
@@ -105,7 +106,7 @@ export async function saveStoryAction(formData: FormData) {
   revalidatePath(`/stories/${slug}`);
   revalidatePath("/", "layout");
 
-  redirect(`/admin/stories/${storyId}/edit?saved=1`);
+  redirect(withExit(`/admin/stories/${storyId}/edit?saved=1`, formData.get("from")));
 }
 
 export async function deleteStoryAction(formData: FormData) {

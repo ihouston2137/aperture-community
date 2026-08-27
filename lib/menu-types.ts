@@ -12,6 +12,7 @@ export const MENU_TARGET_TYPES = [
   "collection",
   "publication",
   "documentation",
+  "form",
   "url",
 ] as const;
 export type MenuTargetType = (typeof MENU_TARGET_TYPES)[number];
@@ -22,6 +23,7 @@ export const MENU_TARGET_LABELS: Record<MenuTargetType, string> = {
   collection: "Collection",
   publication: "Publication",
   documentation: "Documentation",
+  form: "Form",
   url: "Web address",
 };
 

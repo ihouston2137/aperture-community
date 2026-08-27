@@ -659,10 +659,35 @@ export const MemberRelationship = model(
  * from a relationship, which says how two people stand to one another. A group
  * says only who is in it.
  */
+/**
+ * One person's place in one group.
+ *
+ * The title is what they are *in this group* — chair, treasurer, captain, first
+ * violin. Deliberately not their membership level, which says what they may
+ * reach across the whole site, and not their profile title, which is theirs and
+ * follows them everywhere. The same person can be Chair of one group and an
+ * ordinary member of the next.
+ */
+const GroupMemberSchema = new Schema<any>(
+  {
+    memberId: { type: String, required: true },
+    title: { type: String, default: "" },
+  },
+  { _id: false }
+);
+
 const MemberGroupSchema = new Schema<any>(
   {
     name: { type: String, required: true },
     description: { type: String, default: "" },
+    members: { type: [GroupMemberSchema], default: [] },
+    /**
+     * Superseded by `members`, which carries a title alongside each id.
+     *
+     * Kept on the schema so a group saved before titles existed still reads
+     * back, and removed from each group the first time it is saved again. Never
+     * written.
+     */
     memberIds: [{ type: String }],
   },
   { timestamps: true }
@@ -900,6 +925,29 @@ export const MediaAsset = model("MediaAsset", MediaAssetSchema);
 
 /* --------------------------------------------------- Stories & collections */
 
+/**
+ * Who may see one record, in its own right.
+ *
+ * Menus have always carried this, because a menu is how people find things and
+ * restricting the way in has to restrict what it leads to. But content that no
+ * menu mentions had nowhere to keep the answer, and so was public by default —
+ * which left no way at all to say "members only" about something that is not in
+ * the navigation.
+ *
+ * The two combine in `loadContentAccess`: a record is as restricted as its own
+ * rule **and** the way in put together, so adding a public link to a
+ * members-only page does not quietly publish it. A record that says nothing —
+ * every record that existed before this field — is `public`, which is exactly
+ * how it behaved before.
+ */
+const ContentVisibilitySchema = new Schema<any>(
+  {
+    mode: { type: String, enum: ["public", "signedIn", "roles"], default: "public" },
+    roleIds: { type: [String], default: [] },
+  },
+  { _id: false }
+);
+
 export const STORY_STATUSES = ["draft", "published"] as const;
 
 /**
@@ -956,6 +1004,8 @@ const StorySchema = new Schema<any>(
 
     content: { type: String, default: "" },
     storyImages: { type: [StoryImageSchema], default: [] },
+
+    visibility: { type: ContentVisibilitySchema, default: () => ({}) },
   },
   { timestamps: true }
 );
@@ -1062,6 +1112,10 @@ const CollectionSchema = new Schema<any>(
     imageExitStyle: { type: Mixed, default: {} },
     /** The box around an opened image and its metadata. */
     imageContentStyle: { type: Mixed, default: {} },
+
+    // Held apart from `isPublic`, which is this kind's published/draft axis.
+    // A collection can be finished and live and still be for members only.
+    visibility: { type: ContentVisibilitySchema, default: () => ({}) },
   },
   { timestamps: true }
 );
@@ -1078,6 +1132,8 @@ const SitePageSchema = new Schema<any>(
     isHome: { type: Boolean, default: false },
     layout: { type: [Mixed], default: [] },
     colors: { type: ColorOverrideSchema, default: () => ({}) },
+
+    visibility: { type: ContentVisibilitySchema, default: () => ({}) },
   },
   { timestamps: true }
 );
@@ -1092,6 +1148,8 @@ const FormDefinitionSchema = new Schema<any>(
     layout: { type: [Mixed], default: [] },
     settings: { type: Mixed, default: {} },
     submissionLayout: { type: [Mixed], default: [] },
+
+    visibility: { type: ContentVisibilitySchema, default: () => ({}) },
   },
   { timestamps: true }
 );
@@ -1143,6 +1201,8 @@ const ZineSchema = new Schema<any>(
     coverMediaId: { type: String, default: "" },
     coverUrl: { type: String, default: "" },
     publishedAt: { type: Date, default: null },
+
+    visibility: { type: ContentVisibilitySchema, default: () => ({}) },
   },
   { timestamps: true }
 );
@@ -1208,6 +1268,8 @@ const DocumentationSchema = new Schema<any>(
     order: { type: Number, default: 0 },
     /** Every page in the set renders through this. */
     templateId: { type: String, default: "" },
+
+    visibility: { type: ContentVisibilitySchema, default: () => ({}) },
   },
   { timestamps: true }
 );
@@ -1368,6 +1430,12 @@ const CalendarSettingsSchema = new Schema<any>(
     tags: { type: [String], default: [] },
     /** The Calendar Style a block wears when it names none. */
     defaultStyleId: { type: String, default: "" },
+    /**
+     * The site's own calendar page at `/calendar` — whether it exists, what it
+     * says, and how it displays. Mixed and normalized on read, the same way a
+     * page block stores its display.
+     */
+    page: { type: Mixed, default: {} },
   },
   { timestamps: true }
 );

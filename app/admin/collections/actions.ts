@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { withExit } from "@/lib/admin-exit";
 import { requirePermission } from "@/lib/access";
 import { connectDB } from "@/lib/db";
 import {
@@ -102,7 +103,9 @@ export async function saveCollectionAction(formData: FormData) {
   revalidatePath(`/collections/${slug}`);
   revalidatePath("/", "layout");
 
-  redirect(`/admin/collections/${collectionId}/edit?saved=1`);
+  redirect(
+    withExit(`/admin/collections/${collectionId}/edit?saved=1`, formData.get("from"))
+  );
 }
 
 /**

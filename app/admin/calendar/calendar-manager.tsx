@@ -18,10 +18,12 @@ import {
   weekLabel,
   weekRange,
   type CalendarEventRecord,
+  type CalendarPageSettings,
   type CalendarSettingsValues,
   type CalendarView,
 } from "@/lib/calendar";
 
+import { CalendarPageSettingsPanel } from "./calendar-page-settings";
 import { CalendarSettingsPanel } from "./calendar-settings";
 import { EventDialog } from "./event-dialog";
 import { RepeatDialog } from "./repeat-dialog";
@@ -53,6 +55,9 @@ export function CalendarManager({
   categoryUsage,
   whoUsage,
   tagUsage,
+  pageSettings,
+  styles,
+  defaultStyleId,
 }: {
   view: CalendarView;
   anchorDate: string;
@@ -65,6 +70,11 @@ export function CalendarManager({
   categoryUsage: Record<string, number>;
   whoUsage: Record<string, number>;
   tagUsage: Record<string, number>;
+  /** The site's own calendar page, set up below the settings it shares. */
+  pageSettings: CalendarPageSettings;
+  /** Saved Calendar Styles, for the page's style picker. */
+  styles: { _id: string; name: string }[];
+  defaultStyleId: string;
 }) {
   const router = useRouter();
   const [dialog, setDialog] = useState<DialogState>(null);
@@ -195,6 +205,15 @@ export function CalendarManager({
         categoryUsage={categoryUsage}
         whoUsage={whoUsage}
         tagUsage={tagUsage}
+      />
+
+      <CalendarPageSettingsPanel
+        settings={pageSettings}
+        styles={styles}
+        defaultStyleId={defaultStyleId}
+        categories={settings.categories}
+        who={settings.who}
+        tags={settings.tags}
       />
 
       {dialog && dialog.mode !== "repeat" ? (

@@ -6,6 +6,7 @@ import {
   normalizeDateKey,
   normalizeStatus,
   normalizeView,
+  normalizeCalendarPageSettings,
   normalizeVocabulary,
   resolveTimeZone,
   systemTimeZone,
@@ -16,7 +17,7 @@ import {
   type CalendarSettingsValues,
 } from "@/lib/calendar";
 import { connectDB } from "@/lib/db";
-import { CalendarEvent, CalendarSettings } from "@/lib/models";
+import { CalendarEvent, CalendarSettings, CalendarStyle } from "@/lib/models";
 
 import { CalendarManager } from "./calendar-manager";
 
@@ -40,6 +41,14 @@ export default async function CalendarPage({
 
   const timeZone = resolveTimeZone(settings.timeZone);
   const todayKey = todayDateKey(settings.timeZone);
+
+  // The calendar page's own settings, and the styles its picker offers.
+  const pageSettings = normalizeCalendarPageSettings(settingsDoc?.page);
+  const styleDocs = await CalendarStyle.find().select("name").sort({ name: 1 }).lean<any[]>();
+  const styles = styleDocs.map((doc) => ({
+    _id: String(doc._id),
+    name: doc.name ?? "",
+  }));
 
   const { view: viewParam, date: dateParam } = await searchParams;
   const view = normalizeView(viewParam);
@@ -110,6 +119,9 @@ export default async function CalendarPage({
       categoryUsage={toUsageMap(categoryUsage)}
       whoUsage={toUsageMap(whoUsage)}
       tagUsage={toUsageMap(tagUsage)}
+      pageSettings={pageSettings}
+      styles={styles}
+      defaultStyleId={String(settingsDoc?.defaultStyleId ?? "")}
     />
   );
 }

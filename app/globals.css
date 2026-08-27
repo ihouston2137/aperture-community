@@ -1974,10 +1974,45 @@ input, select, textarea {
   padding-right: 0;
 }
 
-.calendar-detail-close.is-floating {
+/* The lightbox's own controls: edit (when offered) and close, as one cluster
+   in the corner. Positioning the group means neither button has to know
+   whether the other is there. */
+.calendar-detail-controls {
   position: absolute;
   top: 0.75rem;
   right: 0.75rem;
+  display: flex;
+  gap: 0.35rem;
+  z-index: 2;
+}
+
+/* Not the admin's `.icon-btn`: that one is drawn in the admin palette, and this
+   sits on a panel wearing the site's — or a Calendar Style's — colours. */
+.calendar-detail-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  flex: none;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, currentColor 25%, transparent);
+  border-radius: 0.35rem;
+  background: color-mix(in srgb, currentColor 8%, transparent);
+  color: inherit;
+  opacity: 0.65;
+  cursor: pointer;
+}
+
+.calendar-detail-icon:hover {
+  opacity: 1;
+  border-color: color-mix(in srgb, currentColor 55%, transparent);
+}
+
+.calendar-detail-icon:focus-visible {
+  opacity: 1;
+  outline: 2px solid currentColor;
+  outline-offset: 1px;
 }
 
 /* What shows, as one table: a row per field, a column per size. Every cell is
@@ -3015,17 +3050,6 @@ input, select, textarea {
   margin: 0.35rem 0 0;
   font-size: 1rem;
   color: var(--content-accent);
-}
-
-.calendar-detail-close {
-  margin-left: auto;
-  background: none;
-  border: none;
-  color: inherit;
-  cursor: pointer;
-  font-size: 1.5rem;
-  line-height: 1;
-  padding: 0 0.25rem;
 }
 
 .calendar-detail-location {
@@ -6236,6 +6260,22 @@ html:has(.admin-shell) body::-webkit-scrollbar {
   padding: 3rem 1.25rem 4rem;
 }
 
+/* A member page is a column of reading width. The content dashboard is not —
+   a diagram of a site is as wide as the site is, and cropping it to a reading
+   measure is throwing away the thing it exists to show. */
+.member-page.is-wide {
+  max-width: none;
+  padding-left: 2rem;
+  padding-right: 2rem;
+}
+
+@media (max-width: 40rem) {
+  .member-page.is-wide {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}
+
 .member-header {
   margin-bottom: 2rem;
 }
@@ -6501,6 +6541,732 @@ html:has(.admin-shell) body::-webkit-scrollbar {
   justify-content: space-between;
   padding-bottom: 0.35rem;
   border-bottom: 1px solid rgba(128, 128, 128, 0.18);
+}
+
+/* ------------------------------------------------- Content dashboard rows */
+
+/* How much of a kind there is, beside its heading. Sits between the title and
+   the new-item button, so the count is read before the action. */
+.content-count {
+  font-size: 0.8125rem;
+  opacity: 0.6;
+}
+
+.content-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.content-rows li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid rgba(128, 128, 128, 0.18);
+}
+
+.content-rows li:last-child {
+  border-bottom: 0;
+}
+
+/* The title and its address are one control: the row opens the editor, so the
+   whole of the naming part of it is the link. */
+.content-row.is-link {
+  flex: 1 1 14rem;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.35rem 0.5rem;
+  margin: -0.35rem -0.5rem;
+  border-radius: var(--radius);
+  color: inherit;
+  text-decoration: none;
+}
+
+.content-row.is-link:hover {
+  background: rgba(128, 128, 128, 0.1);
+}
+
+.content-row-title {
+  font-weight: 600;
+}
+
+/* A long slug truncates rather than pushing the badge and buttons onto their
+   own line on a narrow screen. */
+.content-row .help-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Whether it is live. Deliberately not the admin's `.badge` — that palette is
+   built for the dark admin, and this wears the site's own colours. */
+.content-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex: none;
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.7;
+}
+
+.content-state::before {
+  content: "";
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  border: 1px solid currentColor;
+}
+
+.content-state.is-live {
+  opacity: 1;
+}
+
+.content-state.is-live::before {
+  background: currentColor;
+}
+
+.content-row-when {
+  flex: none;
+  min-width: 5.5rem;
+  text-align: right;
+}
+
+.content-row-actions {
+  flex: none;
+  display: flex;
+  gap: 0.35rem;
+  margin-left: auto;
+}
+
+@media (max-width: 40rem) {
+  /* The date is the first thing worth losing: the ordering already says which
+     is most recent. */
+  .content-row-when {
+    display: none;
+  }
+}
+
+/* Managing events from the calendar page itself, for somebody holding
+   `calendar.manage`. None of this is on screen for anybody else. */
+
+.calendar-page-note {
+  margin: 0.75rem 0 0;
+  padding: 0.5rem 0.75rem;
+  border-left: 3px solid rgba(128, 128, 128, 0.45);
+  background: rgba(128, 128, 128, 0.08);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  font-size: 0.875rem;
+  opacity: 0.85;
+}
+
+/* Pushed away from the navigation, so adding an event is not adjacent to
+   stepping a month and cannot be hit by mistake. */
+.calendar-toolbar .calendar-add-event {
+  margin-left: auto;
+}
+
+/* An event that is not live. Only ever rendered for somebody who may manage
+   events — everyone else is served published events only — so this says "yours
+   to finish", not "hidden from you". */
+.calendar-event-box.is-draft {
+  border: 1px dashed rgba(128, 128, 128, 0.7);
+  border-radius: 0.25rem;
+  opacity: 0.75;
+}
+
+/* ------------------------------------------------------------ Group members */
+
+/* A row per member, because each carries a role field of their own. Chips have
+   nowhere to put one, and a second list of roles to be matched up against the
+   names by eye is how the wrong person ends up chair. */
+.group-members {
+  list-style: none;
+  margin: 0 0 0.5rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.group-member {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.group-member-name {
+  flex: 1 1 9rem;
+  min-width: 0;
+  font-size: 0.875rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Given more room than the name: a name is read at a glance, a role is typed. */
+.group-member-title {
+  flex: 2 1 11rem;
+  min-width: 0;
+}
+
+/* --------------------------------------------------------- The calendar page */
+
+/* The calendar as a place of its own. Wider than reading measure, because a
+   month grid needs the room; the heading above it is not a page-builder block,
+   so it carries its own spacing rather than inheriting a block's. */
+.calendar-page {
+  max-width: var(--content-wide, 76rem);
+}
+
+.calendar-page-head {
+  margin-bottom: 1.5rem;
+}
+
+.calendar-page-title {
+  font-family: var(--heading-font);
+  font-size: clamp(1.75rem, 4vw, 2.5rem);
+  margin: 0 0 0.5rem;
+}
+
+.calendar-page-intro {
+  margin: 0;
+  opacity: 0.75;
+  font-size: 1.0625rem;
+}
+
+/* -------------------------------------------------- The site flow diagram */
+
+/* Two hues carry the whole diagram, and they are declared once. Both are
+   picked to hold their contrast on the site's own background whether that is
+   light or dark, because this canvas wears the site's palette and not the
+   admin's. */
+.canvas-shell {
+  --canvas-live: #2e9e5b;
+  --canvas-restricted: #c07c1e;
+  --canvas-line: rgba(128, 128, 128, 0.45);
+  --canvas-plate: rgba(128, 128, 128, 0.08);
+  /* Named once: the diagram and the inspector beside it stand the same height,
+     so the pair reads as one panel rather than two of different sizes. */
+  --canvas-height: min(76vh, 800px);
+  margin-bottom: 1.25rem;
+}
+
+/* The diagram, and what is selected in it. A column rather than a band
+   underneath, so choosing a node never pushes the diagram off the screen. */
+.canvas-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 23rem;
+  gap: 1rem;
+  align-items: start;
+}
+
+.canvas-side {
+  position: sticky;
+  top: 1rem;
+  max-height: var(--canvas-height);
+  overflow-y: auto;
+}
+
+.canvas-side .canvas-panel {
+  margin-bottom: 0;
+}
+
+/* Too narrow to stand two abreast: the inspector goes back under the diagram,
+   and stops being sticky so it does not sit over it. */
+@media (max-width: 64rem) {
+  .canvas-split {
+    grid-template-columns: 1fr;
+  }
+
+  .canvas-side {
+    position: static;
+    max-height: none;
+    overflow-y: visible;
+  }
+
+  .canvas-side .canvas-panel {
+    margin-bottom: 1.25rem;
+  }
+}
+
+.canvas-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.canvas-bar-group {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.canvas-zoom {
+  min-width: 3.25rem;
+  text-align: center;
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.7;
+}
+
+.canvas-hint {
+  flex: 1 1 16rem;
+  margin: 0;
+}
+
+.canvas-saving {
+  margin-left: auto;
+}
+
+.canvas-message {
+  margin: 0 0 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius);
+  border: 1px solid rgba(128, 128, 128, 0.3);
+  font-size: 0.875rem;
+}
+
+.canvas-message.is-ok {
+  border-color: var(--canvas-live);
+}
+
+.canvas-message.is-error {
+  border-color: var(--canvas-restricted);
+}
+
+/* The window onto the diagram. `touch-action: none` because every gesture here
+   is the canvas's own — without it a drag on a touchscreen scrolls the page
+   instead of moving a node. */
+.canvas-frame {
+  position: relative;
+  height: var(--canvas-height);
+  min-height: 24rem;
+  overflow: hidden;
+  border: 1px solid rgba(128, 128, 128, 0.3);
+  border-radius: 0.75rem;
+  background: var(--canvas-plate);
+  background-image: radial-gradient(rgba(128, 128, 128, 0.28) 1px, transparent 1px);
+  background-size: 22px 22px;
+  cursor: grab;
+  touch-action: none;
+  overscroll-behavior: contain;
+}
+
+.canvas-frame.is-panning {
+  cursor: grabbing;
+}
+
+.canvas-stage {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+}
+
+.canvas-edges {
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.canvas-edge {
+  fill: none;
+  stroke: var(--canvas-line);
+  stroke-width: 1.5;
+}
+
+/* ------------------------------------------------------------- The nodes */
+
+.canvas-node {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.5rem 0.625rem;
+  border: 1px solid rgba(128, 128, 128, 0.4);
+  border-radius: 0.5rem;
+  background: var(--background, #fff);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+  cursor: pointer;
+  user-select: none;
+  overflow: hidden;
+}
+
+/* The site's own background is not always set as a variable, so the plate is
+   painted over whatever is behind it rather than relying on one. */
+.canvas-node::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--canvas-plate);
+  z-index: -1;
+}
+
+.canvas-node.is-draggable {
+  cursor: grab;
+}
+
+.canvas-node.is-home {
+  border-width: 2px;
+  border-color: rgba(128, 128, 128, 0.6);
+}
+
+.canvas-node.is-group {
+  border-style: dashed;
+}
+
+/* Not live: the node is on the diagram but not on the site, so it is drawn as
+   an outline rather than as a solid thing. */
+.canvas-node.is-draft {
+  opacity: 0.82;
+}
+
+.canvas-node.is-dangling {
+  border-left: 3px solid var(--canvas-restricted);
+}
+
+.canvas-node.is-selected {
+  border-color: currentColor;
+  box-shadow: 0 0 0 2px rgba(128, 128, 128, 0.35);
+}
+
+/* Lifted out of the flow while it is being carried, so it passes over the
+   nodes it is being dragged across rather than under them. */
+.canvas-node.is-dragging {
+  z-index: 20;
+  cursor: grabbing;
+  opacity: 0.92;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+}
+
+.canvas-node.is-drop-ok {
+  border-color: var(--canvas-live);
+  box-shadow: 0 0 0 2px var(--canvas-live);
+}
+
+.canvas-node.is-drop-no {
+  border-color: var(--canvas-restricted);
+  box-shadow: 0 0 0 2px var(--canvas-restricted);
+}
+
+.canvas-node-head {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.canvas-node-kind {
+  flex: 1;
+  font-size: 0.625rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.55;
+}
+
+.canvas-node-title {
+  font-size: 0.875rem;
+  line-height: 1.25;
+  /* Two lines at most: a long headline should not push the address out of the
+     box it is meant to identify. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.canvas-node-meta {
+  font-size: 0.6875rem;
+  opacity: 0.6;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.canvas-node-hidden {
+  font-size: 0.625rem;
+  opacity: 0.6;
+  font-style: italic;
+}
+
+/* The two axes, as two dots. Filled means the more restrictive answer on the
+   audience axis and the more finished one on the state axis; the legend under
+   the canvas says which is which. */
+.canvas-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  flex: none;
+  border-radius: 50%;
+  border: 1px solid currentColor;
+  opacity: 0.55;
+}
+
+.canvas-dot.is-public {
+  opacity: 0.4;
+}
+
+.canvas-dot.is-protected {
+  border-color: var(--canvas-restricted);
+  background: var(--canvas-restricted);
+  opacity: 1;
+}
+
+.canvas-dot.is-published {
+  border-color: var(--canvas-live);
+  background: var(--canvas-live);
+  opacity: 1;
+}
+
+.canvas-dot.is-draft {
+  border-style: dashed;
+  opacity: 0.6;
+}
+
+.canvas-swatch {
+  display: inline-block;
+  width: 0.75rem;
+  height: 0.75rem;
+  flex: none;
+  border-radius: 0.15rem;
+  border: 1px solid rgba(128, 128, 128, 0.4);
+}
+
+.canvas-swatch.is-dangling {
+  border-left: 3px solid var(--canvas-restricted);
+}
+
+/* ------------------------------------------------ Panel, tray and legend */
+
+.canvas-panel .member-facts {
+  margin-bottom: 1rem;
+}
+
+.canvas-warning {
+  margin: 0 0 1rem;
+  padding: 0.5rem 0.75rem;
+  border-left: 3px solid #c07c1e;
+  background: rgba(192, 124, 30, 0.1);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  font-size: 0.875rem;
+}
+
+.canvas-field {
+  margin-top: 1rem;
+}
+
+.canvas-field > label {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-size: 0.8125rem;
+  opacity: 0.75;
+}
+
+.canvas-field-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.canvas-field-row input,
+.canvas-field-row select {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+/* The two kinds of role are asked as two questions, so each gets its own
+   heading above its chips rather than one long undifferentiated row. */
+.canvas-role-heading {
+  display: block;
+  margin: 0.6rem 0 0.35rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.03em;
+  opacity: 0.7;
+}
+
+.canvas-adds {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid rgba(128, 128, 128, 0.2);
+}
+
+.canvas-parent-pick {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8125rem;
+  opacity: 0.8;
+}
+
+.canvas-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.4rem;
+  font-size: 0.875rem;
+}
+
+.canvas-legend li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* ------------------------------------------------- The unlinked-content tray */
+
+/* Room to breathe between the diagram and what follows it. Without it the tray
+   reads as part of the canvas rather than as the separate thing it is. */
+.canvas-split {
+  margin-bottom: 2rem;
+}
+
+.tray-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.875rem;
+  border-bottom: 1px solid rgba(128, 128, 128, 0.25);
+  padding-bottom: 0.5rem;
+}
+
+.tray-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid rgba(128, 128, 128, 0.3);
+  border-radius: 999px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.tray-tab:hover {
+  border-color: rgba(128, 128, 128, 0.6);
+}
+
+.tray-tab.is-active {
+  border-color: currentColor;
+  background: rgba(128, 128, 128, 0.14);
+  font-weight: 600;
+}
+
+.tray-tab-count {
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.6;
+}
+
+.tray-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.tray-filter {
+  flex: 1 1 16rem;
+  min-width: 0;
+}
+
+.tray-new {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  padding: 0.625rem 0.75rem;
+  border: 1px dashed rgba(128, 128, 128, 0.4);
+  border-radius: var(--radius);
+}
+
+.tray-new input[type="text"] {
+  flex: 1 1 14rem;
+  min-width: 0;
+}
+
+.tray-new .help-text {
+  flex: 1 1 100%;
+  margin: 0;
+}
+
+/* Cards rather than rows, wrapping to however many fit. A row per item wastes
+   most of a wide screen on empty space, and these are browsed — you are looking
+   for one among many — rather than scanned down a column. */
+.tray-cards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: 0.75rem;
+}
+
+.tray-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.75rem;
+  border: 1px solid rgba(128, 128, 128, 0.3);
+  border-radius: 0.5rem;
+  background: rgba(128, 128, 128, 0.05);
+}
+
+.tray-card-head {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.tray-card-title {
+  font-weight: 600;
+  font-size: 0.9375rem;
+  line-height: 1.3;
+  color: inherit;
+  text-decoration: none;
+  /* Two lines at most, so a long headline cannot make one card twice the
+     height of its neighbours and tear a hole in the grid. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.tray-card-title:hover {
+  text-decoration: underline;
+}
+
+.tray-card-meta {
+  font-size: 0.75rem;
+  opacity: 0.6;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tray-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  /* Pinned to the bottom, so the buttons line up across a row of cards whose
+     titles run to different lengths. */
+  margin-top: auto;
+  padding-top: 0.4rem;
 }
 
 /* Who has brought in what, across the campaigns being run. Ranked on what has
@@ -7239,6 +8005,18 @@ html:has(.admin-shell) body::-webkit-scrollbar {
   align-items: center;
   gap: 0.75rem;
   margin-top: 1rem;
+}
+
+/* The chip pickers are the admin's, and these two variables are only ever set
+   by the calendar that first needed them. Left undefined they are invalid at
+   computed-value time: the border falls back to currentColor, which is far too
+   heavy, and `color: var(--cal-accent)` stops doing anything at all — so a
+   ticked chip would look exactly like an unticked one. Named here in the site's
+   own palette, since this page sits on the site's background and not the
+   admin's. */
+.member-page {
+  --cal-border: rgba(128, 128, 128, 0.4);
+  --cal-accent: var(--content-accent);
 }
 
 /* A ghost button has no plate behind it, so the admin's near-white text lands

@@ -154,6 +154,7 @@ export function StoryEditor({
   fonts,
   mediaMeta: initialMediaMeta,
   canEditMedia,
+  exitToken = "",
 }: {
   story: StoryRecord;
   templates: Option[];
@@ -162,6 +163,12 @@ export function StoryEditor({
   /** Keyed by media id and, for older rows, by url. */
   mediaMeta: Record<string, MediaMeta>;
   canEditMedia: boolean;
+  /**
+   * The way-back token, handed back through the save so the header's back link
+   * survives it. This editor draws no back link itself, so the token is all it
+   * needs of the exit.
+   */
+  exitToken?: string;
 }) {
   const [content, setContent] = useState(story.content);
   const [featureUrl, setFeatureUrl] = useState(story.featureMediaUrl);
@@ -202,6 +209,10 @@ export function StoryEditor({
   return (
     <form action={saveStoryAction}>
       {story._id ? <input type="hidden" name="id" value={story._id} /> : null}
+      {/* Carried through the save's own redirect — without it, pressing Save
+          silently sends you back to the admin list instead of wherever you
+          came from. */}
+      <input type="hidden" name="from" value={exitToken} />
       <input type="hidden" name="content" value={content} />
       <input type="hidden" name="featureMediaUrl" value={featureUrl} />
       <input type="hidden" name="featureMediaId" value={featureId} />

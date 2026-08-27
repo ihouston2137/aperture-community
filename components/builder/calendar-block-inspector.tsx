@@ -15,15 +15,15 @@ import { CheckField, SelectField } from "./settings-fields";
  * Almost nothing, on purpose: how a calendar *looks* is a Calendar Style, saved
  * by name and edited in one place, so a block only says which style to wear, how
  * it behaves, and which events qualify.
+ *
+ * A thin adapter over `CalendarDisplayFields`, which is the same set of controls
+ * the site's calendar page is configured with. Two mounts, one control set —
+ * so the page and a block can never come to offer different things.
  */
 export function CalendarBlockInspector({
   block,
   update,
-  styles,
-  defaultStyleId,
-  categories,
-  who,
-  tags,
+  ...rest
 }: {
   block: PageBlock;
   update: (patch: Partial<PageBlock>) => void;
@@ -37,8 +37,43 @@ export function CalendarBlockInspector({
 }) {
   const display = normalizeCalendarDisplay(block.calendar);
 
-  const set = (patch: Partial<CalendarDisplay>) =>
-    update({ calendar: { ...display, ...patch } });
+  return (
+    <CalendarDisplayFields
+      {...rest}
+      display={display}
+      onChange={(next) => update({ calendar: next })}
+    />
+  );
+}
+
+/**
+ * How a calendar behaves and which events it shows, wherever it is being set
+ * up: a block on somebody's page, or the site's own calendar page.
+ *
+ * Takes the display and hands back a whole new one, rather than taking the
+ * thing that owns it — a block, a settings record — so it does not have to know
+ * which of those it is editing.
+ */
+export function CalendarDisplayFields({
+  display,
+  onChange,
+  styles,
+  defaultStyleId,
+  categories,
+  who,
+  tags,
+}: {
+  display: CalendarDisplay;
+  onChange: (display: CalendarDisplay) => void;
+  /** Saved Calendar Styles. */
+  styles: { _id: string; name: string }[];
+  /** What "site default" resolves to, so the option can name it. */
+  defaultStyleId: string;
+  categories: string[];
+  who: string[];
+  tags: string[];
+}) {
+  const set = (patch: Partial<CalendarDisplay>) => onChange({ ...display, ...patch });
 
   const fallback = styles.find((style) => style._id === defaultStyleId);
 
@@ -95,7 +130,7 @@ export function CalendarBlockInspector({
           value={display.lightbox}
           onChange={(value) => set({ lightbox: value })}
         />
-        <span className="help-text">Only published events appear on a page.</span>
+        <span className="help-text">Only published events are ever shown.</span>
       </div>
 
       <div className="inspector-section">

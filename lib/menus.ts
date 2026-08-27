@@ -1,3 +1,5 @@
+import type { Model } from "mongoose";
+
 import { getUserAccess } from "./access";
 import { connectDB } from "./db";
 import {
@@ -5,6 +7,7 @@ import {
   anonymousViewer,
   narrowVisibility,
   normalizeMenuItems,
+  normalizeVisibility,
   publicVisibility,
   visibleMenuItems,
   widestVisibility,
@@ -14,7 +17,16 @@ import {
   type MenuViewer,
   type MenuVisibility,
 } from "./menu-types";
-import { Collection, Documentation, Menu, SitePage, Story, User, Zine } from "./models";
+import {
+  Collection,
+  Documentation,
+  FormDefinition,
+  Menu,
+  SitePage,
+  Story,
+  User,
+  Zine,
+} from "./models";
 import { publicationHref } from "./publication-layout";
 import { getSession } from "./session";
 import { getSiteContent } from "./site-settings";
@@ -44,13 +56,17 @@ export async function loadMenuTargets(): Promise<
 > {
   await connectDB();
 
-  const [pages, stories, collections, publications, docSets] = await Promise.all([
+  const [pages, stories, collections, publications, docSets, forms] = await Promise.all([
     SitePage.find({ status: "published" }).select("title slug").sort({ title: 1 }).lean<any[]>(),
     Story.find({ status: "published" }).select("headline slug").sort({ headline: 1 }).lean<any[]>(),
     // A collection is published by being public rather than by a status field.
     Collection.find({ isPublic: true }).select("name slug").sort({ name: 1 }).lean<any[]>(),
     Zine.find({ status: "published" }).select("title slug kind").sort({ title: 1 }).lean<any[]>(),
     Documentation.find({ status: "published" })
+      .select("title slug")
+      .sort({ title: 1 })
+      .lean<any[]>(),
+    FormDefinition.find({ status: "published" })
       .select("title slug")
       .sort({ title: 1 })
       .lean<any[]>(),
@@ -81,6 +97,11 @@ export async function loadMenuTargets(): Promise<
       _id: String(doc._id),
       label: doc.title || doc.slug,
       href: `/docs/${doc.slug}`,
+    })),
+    form: forms.map((doc) => ({
+      _id: String(doc._id),
+      label: doc.title || doc.slug,
+      href: `/forms/${doc.slug}`,
     })),
   };
 }
@@ -274,7 +295,58 @@ export async function loadContentAccess(): Promise<ContentAccess> {
 
   const access: ContentAccess = new Map();
   for (const [key, rules] of collected) access.set(key, widestVisibility(rules));
+
+  // Then the records' own rules, which apply whether or not a menu mentions
+  // them. Only the restricted ones are fetched: on a site where nothing carries
+  // its own rule — every site, before this existed — these five queries match
+  // nothing and this loop does not run.
+  for (const [type, own] of await loadOwnVisibility()) {
+    const key = contentKey(type, own.id);
+    const viaMenu = access.get(key);
+    // As restricted as its own rule *and* the way in put together. So adding a
+    // public link to a members-only page does not quietly publish it, and
+    // restricting the link does not need the record changed as well.
+    access.set(key, viaMenu ? narrowVisibility(own.visibility, viaMenu) : own.visibility);
+  }
+
   return access;
+}
+
+/** The models that carry a rule of their own, and what to read a title from. */
+const OWNED: { type: MenuContentType; model: Model<any> }[] = [
+  { type: "page", model: SitePage },
+  { type: "story", model: Story },
+  { type: "collection", model: Collection },
+  { type: "publication", model: Zine },
+  { type: "documentation", model: Documentation },
+  { type: "form", model: FormDefinition },
+];
+
+type OwnRule = { id: string; visibility: MenuVisibility };
+
+/**
+ * Every record that restricts itself.
+ *
+ * Filtered in the query rather than in memory: a public rule is the default and
+ * means nothing needs saying, so there is no reason to carry every record on
+ * the site back across the wire to discover that.
+ */
+async function loadOwnVisibility(): Promise<[MenuContentType, OwnRule][]> {
+  const restricted = { "visibility.mode": { $in: ["signedIn", "roles"] } };
+
+  const results = await Promise.all(
+    OWNED.map(async ({ type, model }) => {
+      const rows = await model.find(restricted).select("_id visibility").lean<any[]>();
+      return rows.map(
+        (row): [MenuContentType, OwnRule] => [
+          type,
+          { id: String(row._id), visibility: normalizeVisibility(row.visibility) },
+        ]
+      );
+    })
+  );
+
+  return results.flat();
 }
 
 export type ContentVerdict = "allowed" | "signInRequired" | "denied";

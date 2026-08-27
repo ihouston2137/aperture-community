@@ -2,6 +2,8 @@ import type { AccountUser } from "@/components/account-menu";
 import type { RegistrationOptions } from "@/components/auth-dialog";
 
 import { getUserAccess } from "./access";
+import { getCalendarPageSettings } from "./calendar-page";
+import { contentPermissions } from "./content-access";
 import { sponsorshipAccess } from "./sponsorship-access";
 import { getAuthSettings } from "./auth-settings";
 import { connectDB } from "./db";
@@ -82,8 +84,13 @@ async function readUser(userId: string): Promise<AccountUser | null> {
   // menu belonging to nobody.
   if (!record) return null;
 
-  const { permissions, isAdministrator } = await getUserAccess(userId);
-  const roles = await getRoleSummaries();
+  const [{ permissions, isAdministrator }, roles, calendarPage] = await Promise.all([
+    getUserAccess(userId),
+    getRoleSummaries(),
+    // The calendar page is a place rather than a permission, so whether it
+    // exists has to be asked as well as whether this member may open it.
+    getCalendarPageSettings(),
+  ]);
   const { community } = splitRoles((record.roleIds ?? []).map(String), roles);
 
   // An account with no name at all falls back to the part of its address before
@@ -98,6 +105,14 @@ async function readUser(userId: string): Promise<AccountUser | null> {
   const sections: { label: string; href: string }[] = [];
   if (permissions.includes("community.directory")) {
     sections.push({ label: "Member directory", href: "/directory" });
+  }
+  // Named by its own title rather than by a fixed word, so a site that calls it
+  // "What's on" says that here too.
+  if (calendarPage.enabled && permissions.includes("community.calendar")) {
+    sections.push({ label: calendarPage.title, href: "/calendar" });
+  }
+  if (contentPermissions(permissions).canView) {
+    sections.push({ label: "Content", href: "/manage/content" });
   }
   if (sponsorshipAccess(permissions).canView) {
     sections.push({ label: "Sponsorships", href: "/manage/sponsorships" });

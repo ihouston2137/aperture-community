@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { withExit } from "@/lib/admin-exit";
 import { requirePermission } from "@/lib/access";
 import { connectDB } from "@/lib/db";
 import { normalizeFormLayout, normalizeFormSettings } from "@/lib/form-layout";
@@ -59,7 +60,8 @@ export async function saveFormAction(formData: FormData) {
   revalidatePath("/admin/forms");
   revalidatePath(`/forms/${slug}`);
 
-  redirect(`/admin/forms/${formId}/edit?saved=1`);
+  // Back where it came from, not where the admin's list is.
+  redirect(withExit(`/admin/forms/${formId}/edit?saved=1`, formData.get("from")));
 }
 
 export async function deleteFormAction(formData: FormData) {

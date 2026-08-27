@@ -22,6 +22,7 @@ import { RichTextEditor } from "@/components/rich-text-editor";
 import { InlineStyleEditor } from "@/components/style-editor";
 import { IconView } from "@/components/icons";
 import { IconSearchField } from "@/components/icon-search";
+import type { AdminExit } from "@/lib/admin-exit";
 import type { BuilderSources } from "@/lib/builder-sources";
 import { protectedMediaUrl } from "@/lib/protected-media-url";
 import {
@@ -234,7 +235,13 @@ export function PublicationEditor({
   sources,
   publicationSources,
   initialView,
+  exit = { href: "/admin/publications", label: "Publications", token: "" },
 }: {
+  /**
+   * Where the way-back link goes. Defaulted to this editor's own list, so only
+   * a caller arriving from somewhere else has to say anything.
+   */
+  exit?: AdminExit;
   publication: PublicationRecord;
   sources: BuilderSources;
   publicationSources: PublicationSources;
@@ -581,6 +588,10 @@ export function PublicationEditor({
   return (
     <div className="builder">
       <form action={savePublicationAction} id="publication-form">
+        {/* The way-back token, carried through the save's own redirect —
+            without it, pressing Save silently sends you back to the admin
+            list instead of wherever you came from. */}
+        <input type="hidden" name="from" value={exit.token} />
         <input type="hidden" name="id" value={publication._id} />
         <input type="hidden" name="title" value={title} />
         <input type="hidden" name="slug" value={slug} />
@@ -608,8 +619,8 @@ export function PublicationEditor({
 
       <div className="builder-topbar">
         {/* The admin sidebar is hidden on this route, so the way out lives here. */}
-        <Link href="/admin/publications" className="btn btn-sm" title="Back to publications">
-          ← Publications
+        <Link href={exit.href} className="btn btn-sm" title={`Back to ${exit.label}`}>
+          ← {exit.label}
         </Link>
         <input
           className="input"

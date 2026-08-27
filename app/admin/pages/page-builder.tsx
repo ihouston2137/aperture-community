@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createNamedStyleAction } from "@/app/admin/design-library/actions";
 import { CollectionBlockView } from "@/components/collection-blocks";
 import { BlockView } from "@/components/page-blocks";
+import type { AdminExit } from "@/lib/admin-exit";
 import type { ResolvedCollection } from "@/lib/collection-types";
 import {
   COLLECTION_SLOT_BLOCK_TYPES,
@@ -105,6 +106,7 @@ export function PageBuilder({
   sources,
   previewSources,
   chrome,
+  exit = { href: "/admin/pages", label: "Pages", token: "" },
 }: {
   page: PageRecord;
   sources: BuilderSources;
@@ -112,6 +114,14 @@ export function PageBuilder({
   previewSources: PageSources;
   /** Live header/footer settings, shown around the canvas for context. */
   chrome: { appearance: AppearanceValues; content: SiteContentValues };
+  /**
+   * Where the way-back link goes.
+   *
+   * A page is edited from more than one place now — the admin's own list, and
+   * the content dashboard's diagram — and leaving is going back to wherever you
+   * set off from. Defaulted, so the admin's list needs to say nothing.
+   */
+  exit?: AdminExit;
 }) {
   const [layout, setLayout] = useState<PageLayout>(page.layout);
   const [title, setTitle] = useState(page.title);
@@ -226,6 +236,10 @@ export function PageBuilder({
   return (
     <>
       <form action={savePageAction} id="page-form">
+        {/* The way-back token, carried through the save's own redirect —
+            without it, pressing Save silently sends you back to the admin
+            list instead of wherever you came from. */}
+        <input type="hidden" name="from" value={exit.token} />
         {page._id ? <input type="hidden" name="id" value={page._id} /> : null}
         <input type="hidden" name="layout" value={JSON.stringify(layout)} />
         <input type="hidden" name="title" value={title} />
@@ -397,8 +411,8 @@ export function PageBuilder({
           await deleteSavedBlockAction(id);
           setSavedBlocks((current) => current.filter((saved) => saved._id !== id));
         }}
-        exitHref="/admin/pages"
-        exitLabel="Pages"
+        exitHref={exit.href}
+        exitLabel={exit.label}
         topbar={
           <>
             <input

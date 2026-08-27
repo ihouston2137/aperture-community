@@ -170,6 +170,53 @@ export function normalizeCalendarDisplay(raw: unknown): CalendarDisplay {
   };
 }
 
+/* --------------------------------------------------------- The calendar page */
+
+/**
+ * The site's own calendar page, at `/calendar`.
+ *
+ * A page block puts a calendar inside a page somebody built; this is the
+ * calendar as a place — one address, always there, that a menu item or an email
+ * can point at without anybody having to build a page around it first.
+ *
+ * It wears the same `CalendarDisplay` a block does, so the two are configured
+ * with one set of controls and cannot drift apart in what they can express.
+ * Everything else here is what a page needs and a block does not: whether it
+ * exists at all, and what it says at the top.
+ */
+export type CalendarPageSettings = {
+  /**
+   * Off until somebody turns it on. A site that never wanted a calendar page
+   * should not quietly acquire an address it did not ask for.
+   */
+  enabled: boolean;
+  title: string;
+  /** A line under the title. Plain text; empty shows nothing. */
+  intro: string;
+  display: CalendarDisplay;
+};
+
+export const defaultCalendarPageSettings: CalendarPageSettings = {
+  enabled: false,
+  title: "Calendar",
+  intro: "",
+  display: defaultCalendarDisplay,
+};
+
+export function normalizeCalendarPageSettings(raw: unknown): CalendarPageSettings {
+  const source = (raw ?? {}) as Record<string, unknown>;
+  const base = defaultCalendarPageSettings;
+
+  return {
+    enabled: bool(source.enabled, base.enabled),
+    // A blank title would leave the page with no heading at all, so the
+    // default stands in rather than the page rendering headless.
+    title: str(source.title).slice(0, 120) || base.title,
+    intro: str(source.intro).slice(0, 500),
+    display: normalizeCalendarDisplay(source.display),
+  };
+}
+
 type FilterableEvent = { category: string; who: string[]; tags: string[] };
 
 /**

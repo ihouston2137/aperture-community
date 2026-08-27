@@ -36,6 +36,25 @@ export const permissionGroups: PermissionGroup[] = [
     ],
   },
   {
+    key: "contentDashboard",
+    label: "Content dashboard",
+    permissions: [
+      { key: "content.dashboard", label: "Open the content dashboard" },
+      { key: "content.public.view", label: "See public content" },
+      { key: "content.public.edit", label: "Change public content" },
+      { key: "content.protected.view", label: "See restricted content" },
+      { key: "content.protected.edit", label: "Change restricted content" },
+      { key: "content.published.view", label: "See live content" },
+      { key: "content.published.edit", label: "Change live content" },
+      { key: "content.draft.view", label: "See drafts" },
+      { key: "content.draft.edit", label: "Change drafts" },
+      {
+        key: "content.navigation",
+        label: "Change the site navigation from the dashboard",
+      },
+    ],
+  },
+  {
     key: "media",
     label: "Media",
     permissions: [

@@ -5,16 +5,23 @@ import {
   normalizeStatus,
   type CalendarEventRecord,
 } from "@/lib/calendar";
+import { checkPermission } from "@/lib/access";
 import { connectDB } from "@/lib/db";
 import { CalendarEvent } from "@/lib/models";
+import { getSession } from "@/lib/session";
 
 /**
- * Published calendar events in a date range, for the calendar page block as a
- * visitor moves between months.
+ * Calendar events in a date range, for a calendar as a visitor moves between
+ * months.
  *
- * Public and unauthenticated, so it returns published events only — the same
- * cut the public grid renders. The result count is capped, which bounds the
- * work whatever range is asked for, and `offset` lets a list page through.
+ * Public and unauthenticated by default, and then it returns **published events
+ * only** — the same cut the public grid renders. Somebody holding
+ * `calendar.manage` gets the unpublished ones as well, because the calendar
+ * page lets them edit from the grid and you cannot edit an event you cannot
+ * see; that is the same cut the admin calendar has always shown them.
+ *
+ * The result count is capped, which bounds the work whatever range is asked
+ * for, and `offset` lets a list page through.
  */
 
 const MAX_EVENTS = 500;
@@ -42,7 +49,12 @@ export async function GET(request: Request) {
 
   await connectDB();
 
-  const filter = { status: "published", date: { $gte: start, $lte: end } };
+  // Asked once per request. A signed-out visitor costs one cookie read that
+  // finds nothing, and no database work at all.
+  const canManage = await checkPermission(await getSession(), "calendar.manage");
+
+  const filter: Record<string, unknown> = { date: { $gte: start, $lte: end } };
+  if (!canManage) filter.status = "published";
 
   const [docs, total] = await Promise.all([
     CalendarEvent.find(filter)
