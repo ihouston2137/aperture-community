@@ -7482,6 +7482,12 @@ html:has(.admin-shell) body::-webkit-scrollbar {
   display: flex;
 }
 
+/* The hero bar carries the headline figure and is read first, so it is given
+   the height to match. */
+.manager-meter.is-tall {
+  height: 0.75rem;
+}
+
 .manager-meter.is-segmented > span {
   background: var(--tone, var(--content-accent));
   border-radius: 0;
@@ -7535,8 +7541,17 @@ html:has(.admin-shell) body::-webkit-scrollbar {
    money. Each is its own block, because reading them as one bar was what made
    the goal hard to find. */
 
+/* The campaign's own goal, framed so it reads as the headline rather than as
+   the first of several equal things. */
+.progress-hero {
+  padding: 1rem 1.1rem 1.1rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(128, 128, 128, 0.28);
+  background: rgba(128, 128, 128, 0.07);
+}
+
 /* The figure first, at a size that can be read across a room. */
-.progress-headline {
+.progress-hero-figures {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
@@ -7657,6 +7672,70 @@ html:has(.admin-shell) body::-webkit-scrollbar {
   opacity: 1;
 }
 
+/* An effort raised alongside gets a card of its own: its own target, its own
+   bar, its own figure. Set beside each other rather than stacked, because they
+   are peers — none of them is a step towards another. */
+.goal-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(16rem, 100%), 1fr));
+  gap: 0.75rem;
+  margin: 0.75rem 0;
+}
+
+.goal-card {
+  padding: 0.75rem 0.85rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(128, 128, 128, 0.28);
+  background: rgba(128, 128, 128, 0.05);
+}
+
+/* A goal that has been met borrows the colour of a gift in hand, on its edge
+   so the card is recognisable before it is read. */
+.goal-card.is-met {
+  border-color: var(--tone);
+}
+
+.goal-card-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.goal-card-title {
+  min-width: 0;
+}
+
+.goal-card-percent {
+  margin-left: auto;
+  flex: none;
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.75;
+}
+
+.goal-card.is-met .goal-card-percent {
+  color: var(--tone);
+  opacity: 1;
+}
+
+.goal-card-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.55;
+}
+
+.goal-card.is-met .goal-card-fill {
+  background: var(--tone);
+  opacity: 1;
+}
+
+.goal-card .manager-figures {
+  font-size: 0.875rem;
+}
+
 /* Goods and services, called out rather than tucked into a sentence: a
    campaign lent a hall has been given something real, and the money figures
    above cannot say so. */
@@ -7764,6 +7843,10 @@ html:has(.admin-shell) body::-webkit-scrollbar {
   min-width: 0;
 }
 
+.stretch-row .field.stretch-kind {
+  flex: 0 1 14rem;
+}
+
 .stretch-row .field.stretch-amount {
   flex: 0 1 10rem;
 }
@@ -7803,66 +7886,112 @@ html:has(.admin-shell) body::-webkit-scrollbar {
 
 /* ------------------------------------------------- Sponsors on a campaign */
 
-.sponsor-rows {
+/* The sponsors on a campaign, as cards rather than as rows.
+   Ordered by what each has given, so the grid reads down the page from the
+   largest — which is the question being asked of this list most of the time. */
+.sponsor-cards {
   list-style: none;
-  margin: 0;
+  margin: 1rem 0 0;
   padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(18rem, 100%), 1fr));
+  gap: 0.85rem;
+}
+
+.sponsor-card {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
-}
-
-/* One sponsor, one line: who they are, their level, who has them, and what they
-   have given. Wraps rather than scrolls when the window is too narrow for all
-   four. */
-.sponsor-line {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.5rem 1rem;
-  padding: 0.6rem 0;
-  border-bottom: 1px solid rgba(128, 128, 128, 0.18);
-  font-size: 0.9375rem;
-}
-
-.sponsor-line:last-child {
-  border-bottom: 0;
-}
-
-/* The name and the logo together are the way into that sponsor. */
-.sponsor-line-name {
-  display: flex;
-  align-items: center;
   gap: 0.6rem;
-  flex: 1 1 12rem;
+  padding: 0.9rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(128, 128, 128, 0.28);
+  background: rgba(128, 128, 128, 0.05);
+}
+
+.sponsor-card-head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
   min-width: 0;
   color: inherit;
   text-decoration: none;
 }
 
-.sponsor-line-name:hover strong {
+.sponsor-card-head:hover strong {
   text-decoration: underline;
 }
 
-.sponsor-line-cell {
+/* Larger than the row logo it replaces: artwork is the fastest way to
+   recognise a sponsor, and at row size it was decoration. */
+.sponsor-card-logo {
+  width: 4rem;
+  height: 4rem;
+  flex: none;
+  border-radius: var(--radius);
+  object-fit: contain;
+  box-sizing: border-box;
+  padding: 0.3rem;
+  border: 1px solid var(--admin-border);
+  background: var(--sponsor-logo-backdrop);
+}
+
+.sponsor-card-logo.is-empty {
+  background: rgba(128, 128, 128, 0.12);
+}
+
+.sponsor-card-name {
   display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  flex: 0 1 auto;
+  flex-direction: column;
+  gap: 0.1rem;
   min-width: 0;
 }
 
-/* The level is a standing fact about the sponsor; who has them is a working
-   arrangement. Weight and slope say which is which without a label on either. */
-.sponsor-line-cell.is-level {
-  font-weight: 600;
+.sponsor-card-name strong {
+  overflow-wrap: anywhere;
 }
 
-.sponsor-line-cell.is-assigned {
+/* What they have given, at the size of a figure worth reading. */
+.sponsor-card-given {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-size: 1.125rem;
+  font-variant-numeric: tabular-nums;
+  margin-top: auto;
+}
+
+.sponsor-card-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.sponsor-card-foot {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid rgba(128, 128, 128, 0.18);
+}
+
+.sponsor-card-assigned {
+  min-width: 0;
+  font-size: 0.8125rem;
   font-style: italic;
-  opacity: 0.85;
+  opacity: 0.8;
+  overflow-wrap: anywhere;
 }
 
+.sponsor-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-left: auto;
+}
+
+/* One sponsor, one line: who they are, their level, who has them, and what they
+   have given. Wraps rather than scrolls when the window is too narrow for all
+   four. */
 .sponsor-line-chips {
   display: flex;
   flex-wrap: wrap;
@@ -8031,13 +8160,6 @@ html:has(.admin-shell) body::-webkit-scrollbar {
    sit behind a logo. */
 .sponsor-row-logo.is-empty {
   background: rgba(128, 128, 128, 0.12);
-}
-
-/* Smaller on a one-line row, where the height of the line is the constraint. */
-.sponsor-line .sponsor-row-logo {
-  width: 2.25rem;
-  height: 2.25rem;
-  padding: 0.2rem;
 }
 
 .assignment-row {

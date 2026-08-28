@@ -265,6 +265,16 @@ export default async function SponsorshipsDashboard() {
                       </div>
                     )}
 
+                    {progress.secondary.length > 0 ? (
+                      <p className="help-text">
+                        Alongside:{" "}
+                        {formatDollars(progress.secondaryCents)} towards{" "}
+                        {progress.secondary.length} separate goal
+                        {progress.secondary.length === 1 ? "" : "s"}, kept out
+                        of the figure above
+                      </p>
+                    ) : null}
+
                     {progress.next ? (
                       <p className="help-text">
                         Next: {progress.next.description} at{" "}

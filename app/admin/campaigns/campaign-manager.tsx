@@ -32,7 +32,12 @@ export type SponsorOption = PickerOption & { isUnassignable?: boolean };
  * half-typed "12.5" survives the keystroke that follows it. It becomes cents
  * once, on save.
  */
-type StretchRow = { id: string; description: string; amount: string };
+type StretchRow = {
+  id: string;
+  description: string;
+  amount: string;
+  isSeparate: boolean;
+};
 
 /**
  * An id for a tier being added.
@@ -257,6 +262,7 @@ export function CampaignDialog({
       id: goal.id,
       description: goal.description,
       amount: centsToDollarInput(goal.amountCents),
+      isSeparate: goal.isSeparate,
     }))
   );
   const [goal, setGoal] = useState(
@@ -287,11 +293,25 @@ export function CampaignDialog({
    * to see is where it lands — so each row says both.
    */
   const goalCents = dollarsToCents(goal);
-  const stretchTotals = stretchRows.reduce<number[]>((running, row) => {
-    const previous = running[running.length - 1] ?? goalCents;
-    running.push(previous + dollarsToCents(row.amount));
-    return running;
-  }, []);
+
+  /*
+   * Where each stacked row lands, so a manager entering steps can see totals.
+   *
+   * A separate goal is not a point along the campaign's own run: it neither
+   * reads a running total nor moves the one after it, so it holds a nought
+   * that nothing displays.
+   */
+  const stretchTotals: number[] = [];
+  let runningCents = goalCents;
+  for (const row of stretchRows) {
+    if (row.isSeparate) {
+      stretchTotals.push(0);
+      continue;
+    }
+    runningCents += dollarsToCents(row.amount);
+    stretchTotals.push(runningCents);
+  }
+  const hasStacked = stretchRows.some((row) => !row.isSeparate);
 
   // A sponsor appears once per campaign; two rows for the same one would only
   // disagree about who is looking after them.
@@ -318,6 +338,7 @@ export function CampaignDialog({
           id: row.id,
           description: row.description,
           amountCents: dollarsToCents(row.amount),
+          isSeparate: row.isSeparate,
         }))
       )
     );
@@ -453,27 +474,60 @@ export function CampaignDialog({
               </div>
 
               <h4 className="inspector-title" style={{ marginTop: "1.25rem" }}>
-                Stretch goals
+                Further goals
               </h4>
               <p className="help-text">
-                What the campaign would go on to do if it passes its goal. Each
-                amount is on top of the one above it, and the description is the
-                point of it — an amount with nothing to spend it on is not a
-                stretch goal, it is a bigger number.
+                Two kinds, and the difference matters. A{" "}
+                <strong>stretch goal</strong> sits above the campaign&rsquo;s
+                own goal: its amount is on top of the one before it, and the
+                campaign&rsquo;s total carries it there. A{" "}
+                <strong>separate goal</strong> is an effort of its own, with its
+                own target, filled only by the gifts applied to it — and its
+                money is kept out of the campaign&rsquo;s total, so the appeal
+                is never shown doing better on money that is spoken for
+                elsewhere.
               </p>
 
-              {goalCents <= 0 && stretchRows.length > 0 ? (
+              {goalCents <= 0 && hasStacked ? (
                 <p className="admin-notice is-error">
-                  Stretch goals sit above a goal. Set one above, or remove
-                  these.
+                  A stretch goal sits above the campaign&rsquo;s goal. Set one
+                  above, or make these separate goals.
                 </p>
               ) : null}
 
               {stretchRows.map((row, index) => (
                 <div key={row.id} className="stretch-row">
+                  <div className="field stretch-kind">
+                    <label htmlFor={`stretch-kind-${index}`}>Kind</label>
+                    <select
+                      id={`stretch-kind-${index}`}
+                      value={row.isSeparate ? "separate" : "stacked"}
+                      disabled={pending}
+                      onChange={(event) =>
+                        setStretchRows((current) =>
+                          current.map((entry, position) =>
+                            position === index
+                              ? {
+                                  ...entry,
+                                  isSeparate: event.target.value === "separate",
+                                }
+                              : entry
+                          )
+                        )
+                      }
+                    >
+                      <option value="stacked">Stretch — above the goal</option>
+                      <option value="separate">Separate — its own goal</option>
+                    </select>
+                  </div>
+
                   <div className="field stretch-amount">
                     <label htmlFor={`stretch-amount-${index}`}>
-                      {index === 0 ? "Above the goal, a further" : "Then a further"}
+                      {row.isSeparate
+                        ? "Target"
+                        : index === 0
+                          ? "A further"
+                          : "Then a further"}
                     </label>
                     <input
                       id={`stretch-amount-${index}`}
@@ -493,9 +547,11 @@ export function CampaignDialog({
                       }
                     />
                     <span className="help-text">
-                      {goalCents > 0 && (stretchTotals[index] ?? 0) > goalCents
-                        ? `reaches ${formatDollars(stretchTotals[index])}`
-                        : "in dollars"}
+                      {row.isSeparate
+                        ? "in dollars, on its own"
+                        : goalCents > 0 && (stretchTotals[index] ?? 0) > goalCents
+                          ? `reaches ${formatDollars(stretchTotals[index])}`
+                          : "in dollars"}
                     </span>
                   </div>
 
@@ -542,11 +598,16 @@ export function CampaignDialog({
                 onClick={() =>
                   setStretchRows((current) => [
                     ...current,
-                    { id: newTierId(), description: "", amount: "" },
+                    {
+                      id: newTierId(),
+                      description: "",
+                      amount: "",
+                      isSeparate: false,
+                    },
                   ])
                 }
               >
-                Add a stretch goal
+                Add a goal
               </button>
 
               <h4 className="inspector-title" style={{ marginTop: "1.25rem" }}>

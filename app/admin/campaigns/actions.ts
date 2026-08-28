@@ -62,15 +62,17 @@ export async function saveCampaignAction(
 
   // A tier above nothing is not a stretch: without a goal there is no target
   // for it to be above, and the bar would have nothing to measure it against.
+  // A separate effort is under no such obligation — it is its own target.
   const goalCents = dollarsToCents(formData.get("goal"));
-  if (stretchGoals.length > 0 && goalCents <= 0) {
+  if (stretchGoals.some((goal) => !goal.isSeparate) && goalCents <= 0) {
     return {
       ok: false,
-      error: "Stretch goals sit above a goal — set the campaign's goal first.",
+      error:
+        "A stretch goal sits above the campaign's goal — set that first, or make it a separate goal.",
     };
   }
   if (stretchGoals.some((goal) => !goal.description)) {
-    return { ok: false, error: "Say what each stretch goal is for." };
+    return { ok: false, error: "Say what each goal is for." };
   }
 
   // A tier keeps its id for life, because donations are applied to it by id.

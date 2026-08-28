@@ -845,6 +845,16 @@ const SponsorshipCampaignSchema = new Schema<any>(
         id: { type: String, default: "" },
         description: { type: String, default: "" },
         amountCents: { type: Number, default: 0 },
+        /*
+         * A goal of its own rather than one more step above the campaign's.
+         *
+         * Some things a campaign wants are a separate effort — a bursary
+         * fund raised alongside the appeal, not out of it. Money given to one
+         * of these is kept out of the campaign's own total, or the appeal
+         * would appear to be doing better than it is on money that is spoken
+         * for elsewhere.
+         */
+        isSeparate: { type: Boolean, default: false },
       },
     ],
     /*

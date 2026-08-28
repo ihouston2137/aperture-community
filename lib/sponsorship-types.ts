@@ -301,8 +301,19 @@ export type StretchGoal = {
   id: string;
   /** What the extra money is for. Without one there is nothing to aim at. */
   description: string;
-  /** Additional whole cents, above the tier before it. */
+  /**
+   * Whole cents. What it means depends on which kind of goal this is: a step
+   * above the tier before it, or the whole target of a separate effort.
+   */
   amountCents: number;
+  /**
+   * A goal of its own, raised alongside the campaign rather than out of it.
+   *
+   * Money given to one of these is kept out of the campaign's total — that is
+   * the whole difference between the two kinds. A stacked tier says "if we
+   * pass the goal by this much"; a separate one says "and also, this".
+   */
+  isSeparate: boolean;
 };
 
 /** Drops tiers somebody started and left empty, and keeps the order given. */
@@ -322,6 +333,7 @@ export function normalizeStretchGoals(value: unknown): StretchGoal[] {
         0,
         Math.round(Number((entry as any)?.amountCents ?? 0) || 0)
       ),
+      isSeparate: Boolean((entry as any)?.isSeparate),
     }))
     .filter((goal) => goal.amountCents > 0)
     .slice(0, 12);
@@ -621,6 +633,28 @@ export type StretchTier = {
   earmarkedCount: number;
 };
 
+/**
+ * A goal raised alongside the campaign rather than out of it.
+ *
+ * It has no threshold, because it is not a point along the campaign's own
+ * run: it fills only from the gifts given to it by name, and the campaign's
+ * total never includes them.
+ */
+export type SecondaryGoal = {
+  id: string;
+  description: string;
+  /** What this effort is asking for, on its own. */
+  targetCents: number;
+  /** Given to it by name: counted, monetary, not cancelled. */
+  raisedCents: number;
+  giftCount: number;
+  /** Of its target, capped — for the width of its bar. */
+  fillPercent: number;
+  /** Of its target, uncapped — for the figure beside it. */
+  percent: number;
+  isMet: boolean;
+};
+
 export type MonetaryProgress = {
   segments: ProgressSegment[];
   /** Counted, monetary, not cancelled. */
@@ -632,7 +666,12 @@ export type MonetaryProgress = {
   scaleCents: number;
   /** Where the goal itself falls along the bar, once tiers widen it. */
   goalPercent: number;
+  /** The tiers stacked above the goal. Separate goals are not among them. */
   tiers: StretchTier[];
+  /** The efforts raised alongside, whose gifts stay out of every figure above. */
+  secondary: SecondaryGoal[];
+  /** Given to those efforts, and so deliberately absent from `totalCents`. */
+  secondaryCents: number;
   /** Every tier added up: what the stretch goals ask for beyond the goal. */
   stretchCents: number;
   /** How much has been raised beyond the goal, for the stretch track. */
@@ -666,9 +705,16 @@ export function monetaryProgress(
   goalCents: number,
   stretchGoals: StretchGoal[] = []
 ): MonetaryProgress {
+  // Which ids belong to an effort of its own, so a gift to one can be kept
+  // out of the campaign's total rather than counted twice over.
+  const separateIds = new Set(
+    stretchGoals.filter((goal) => goal.isSeparate).map((goal) => goal.id)
+  );
+
   const byStatus = new Map<DonationStatus, number>();
   const earmarked = new Map<string, { cents: number; count: number }>();
   let uncountedCents = 0;
+  let secondaryCents = 0;
 
   for (const donation of donations) {
     if (donation.kind !== "monetary") continue;
@@ -679,10 +725,6 @@ export function monetaryProgress(
       uncountedCents += donation.valueCents;
       continue;
     }
-    byStatus.set(
-      donation.status,
-      (byStatus.get(donation.status) ?? 0) + donation.valueCents
-    );
 
     if (donation.stretchGoalId) {
       const held = earmarked.get(donation.stretchGoalId) ?? { cents: 0, count: 0 };
@@ -690,6 +732,19 @@ export function monetaryProgress(
       held.count += 1;
       earmarked.set(donation.stretchGoalId, held);
     }
+
+    // Given to a separate effort: it fills that goal and nothing else. The
+    // campaign has not raised it, and a bar that said otherwise would be
+    // counting money that is already spoken for.
+    if (donation.stretchGoalId && separateIds.has(donation.stretchGoalId)) {
+      secondaryCents += donation.valueCents;
+      continue;
+    }
+
+    byStatus.set(
+      donation.status,
+      (byStatus.get(donation.status) ?? 0) + donation.valueCents
+    );
   }
 
   // Complete first, so the bar fills from what is certain towards what is not.
@@ -705,10 +760,10 @@ export function monetaryProgress(
     banded.push({ status, cents });
   }
 
-  const stretchCents = stretchGoals.reduce(
-    (sum, goal) => sum + goal.amountCents,
-    0
-  );
+  // Only the stacked tiers widen the campaign's own run. A separate effort is
+  // not further along it.
+  const stacked = stretchGoals.filter((goal) => !goal.isSeparate);
+  const stretchCents = stacked.reduce((sum, goal) => sum + goal.amountCents, 0);
   // The bar has to hold whatever is actually there: a campaign that has passed
   // its last tier still needs a width its own segments fit inside.
   const scaleCents = Math.max(goalCents + stretchCents, totalCents, 0);
@@ -723,7 +778,7 @@ export function monetaryProgress(
   const tiers: StretchTier[] = [];
   let thresholdCents = goalCents;
 
-  for (const [index, goal] of stretchGoals.entries()) {
+  for (const [index, goal] of stacked.entries()) {
     const opensAtCents = thresholdCents;
     thresholdCents += goal.amountCents;
     const given = earmarked.get(goal.id);
@@ -750,6 +805,27 @@ export function monetaryProgress(
     });
   }
 
+  const secondary: SecondaryGoal[] = stretchGoals
+    .filter((goal) => goal.isSeparate)
+    .map((goal) => {
+      const given = earmarked.get(goal.id);
+      const raisedCents = given?.cents ?? 0;
+      return {
+        id: goal.id,
+        description: goal.description,
+        targetCents: goal.amountCents,
+        raisedCents,
+        giftCount: given?.count ?? 0,
+        fillPercent: goal.amountCents
+          ? Math.min(100, (raisedCents / goal.amountCents) * 100)
+          : 0,
+        percent: goal.amountCents
+          ? Math.round((raisedCents / goal.amountCents) * 100)
+          : 0,
+        isMet: goal.amountCents > 0 && raisedCents >= goal.amountCents,
+      };
+    });
+
   const met = tiers.filter((tier) => tier.isMet);
 
   return {
@@ -759,6 +835,8 @@ export function monetaryProgress(
     scaleCents,
     goalPercent: scaleCents ? (goalCents / scaleCents) * 100 : 0,
     tiers,
+    secondary,
+    secondaryCents,
     stretchCents,
     intoStretchCents: Math.max(0, totalCents - goalCents),
     goalFillPercent: goalCents

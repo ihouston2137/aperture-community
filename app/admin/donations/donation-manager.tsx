@@ -320,9 +320,8 @@ export function DonationDialog({
    */
   const stretchGoals =
     campaigns.find((entry) => entry._id === campaignId)?.stretchGoals ?? [];
-  const appliesTo = stretchGoals.some((goal) => goal.id === stretchGoalId)
-    ? stretchGoalId
-    : "";
+  const appliedGoal = stretchGoals.find((goal) => goal.id === stretchGoalId);
+  const appliesTo = appliedGoal ? stretchGoalId : "";
   const [error, setError] = useState("");
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -426,15 +425,29 @@ export function DonationDialog({
                       onChange={(event) => setStretchGoalId(event.target.value)}
                     >
                       <option value="">The campaign itself</option>
-                      {stretchGoals.map((goal) => (
-                        <option key={goal.id} value={goal.id}>
-                          {goal.description}
-                        </option>
-                      ))}
+                      {stretchGoals
+                        .filter((goal) => !goal.isSeparate)
+                        .map((goal) => (
+                          <option key={goal.id} value={goal.id}>
+                            {goal.description}
+                          </option>
+                        ))}
+                      {stretchGoals.some((goal) => goal.isSeparate) ? (
+                        <optgroup label="Separate goals">
+                          {stretchGoals
+                            .filter((goal) => goal.isSeparate)
+                            .map((goal) => (
+                              <option key={goal.id} value={goal.id}>
+                                {goal.description}
+                              </option>
+                            ))}
+                        </optgroup>
+                      ) : null}
                     </select>
                     <span className="help-text">
-                      An earmark, not a separate pot — it fills the campaign
-                      either way. This records what the gift was given for.
+                      {appliedGoal?.isSeparate
+                        ? "A separate goal is raised alongside the campaign, so this gift fills that goal and is kept out of the campaign's own total."
+                        : "For a stretch goal this is an earmark, not a separate pot — the gift fills the campaign either way, and records what it was given for."}
                     </span>
                   </div>
                 ) : null}

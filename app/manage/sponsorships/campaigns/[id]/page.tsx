@@ -11,6 +11,7 @@ import { sponsorshipAccess } from "@/lib/sponsorship-access";
 import {
   DONATION_STATUS_LABELS,
   dateRangeLabel,
+  countsTowardTotals,
   formatDollars,
   inKindTotals,
   monetaryProgress,
@@ -111,21 +112,37 @@ export default async function CampaignDashboard({
   );
   const inKind = inKindTotals(mine);
 
+  /*
+   * The sponsors on this campaign, biggest giver first.
+   *
+   * Money and in-kind are added together for the ordering only — the card
+   * still shows them apart, because they are not the same thing. Ranking on
+   * money alone would put a sponsor who lent a hall worth thousands below one
+   * who sent a small cheque. Cancelled gifts never happened, so they order
+   * nobody; sponsors who have given nothing yet fall to the back, by name.
+   */
   const onCampaign = campaign.assignments
     .map((assignment) => {
       const sponsor = sponsors.find((entry) => entry._id === assignment.sponsorId);
       const given = mine.filter(
         (donation) => donation.sponsorId === assignment.sponsorId
       );
+      const givenCents = given
+        .filter((donation) => countsTowardTotals(donation.status))
+        .reduce((sum, donation) => sum + donation.valueCents, 0);
+
       return {
         assignment,
         sponsor,
         chips: sponsorChips(given),
         giftCount: given.length,
+        givenCents,
       };
     })
-    .sort((a, b) =>
-      (a.sponsor?.name ?? "").localeCompare(b.sponsor?.name ?? "")
+    .sort(
+      (a, b) =>
+        b.givenCents - a.givenCents ||
+        (a.sponsor?.name ?? "").localeCompare(b.sponsor?.name ?? "")
     );
 
   // The same question the dashboard asks of every running campaign, asked of
@@ -181,77 +198,80 @@ export default async function CampaignDashboard({
           ) : null}
         </div>
 
-        <div className="progress-headline">
-          <span className="progress-figure">
-            {formatDollars(progress.totalCents)}
-          </span>
-          <span className="progress-of">
-            {campaign.goalCents
-              ? `raised of a ${formatDollars(campaign.goalCents)} goal`
-              : "raised in monetary donations"}
-          </span>
-          {campaign.goalCents ? (
-            <span
-              className={`progress-percent${
-                progress.percent >= 100 ? " is-met tone-complete" : ""
-              }`}
-            >
-              {progress.percent}%
+        <div className="progress-hero">
+          <div className="progress-hero-figures">
+            <span className="progress-figure">
+              {formatDollars(progress.totalCents)}
             </span>
+            <span className="progress-of">
+              {campaign.goalCents
+                ? `raised of a ${formatDollars(campaign.goalCents)} goal`
+                : "raised in monetary donations"}
+            </span>
+            {campaign.goalCents ? (
+              <span
+                className={`progress-percent${
+                  progress.percent >= 100 ? " is-met tone-complete" : ""
+                }`}
+              >
+                {progress.percent}%
+              </span>
+            ) : (
+              <span className="progress-percent is-quiet">no goal set</span>
+            )}
+          </div>
+
+          {campaign.goalCents ? (
+            <>
+              {/* The goal on a bar of its own. With stretch tiers above it, one
+                  bar for both leaves the goal as a tick somewhere in the middle
+                  — and the goal is the promise the campaign made. */}
+              <div
+                className="manager-meter is-segmented is-tall"
+                role="img"
+                aria-label={`${progress.percent}% of the goal in monetary donations`}
+              >
+                {progress.segments.map((segment) => (
+                  <span
+                    key={segment.status}
+                    className={statusTone(segment.status)}
+                    style={{ width: `${segment.goalSharePercent}%` }}
+                    title={`${DONATION_STATUS_LABELS[segment.status]}: ${formatDollars(
+                      segment.cents
+                    )}`}
+                  />
+                ))}
+              </div>
+
+              <div className="manager-figures">
+                <span>
+                  {progress.goalFillPercent >= 100
+                    ? "Goal reached"
+                    : `${formatDollars(
+                        campaign.goalCents - progress.totalCents
+                      )} to the goal`}
+                </span>
+                <span className="manager-figure-end">
+                  {formatDollars(campaign.goalCents)}
+                </span>
+              </div>
+            </>
+          ) : null}
+
+          {progress.segments.length > 0 ? (
+            <ul className="tone-key">
+              {progress.segments.map((segment) => (
+                <li key={segment.status} className={statusTone(segment.status)}>
+                  <span className="tone-dot" aria-hidden="true" />
+                  {DONATION_STATUS_LABELS[segment.status]}{" "}
+                  {formatDollars(segment.cents)}
+                </li>
+              ))}
+            </ul>
           ) : (
-            <span className="progress-percent is-quiet">no goal set</span>
+            <p className="help-text">No monetary donations recorded yet.</p>
           )}
         </div>
-
-        {campaign.goalCents ? (
-          <>
-            {/* The goal on a bar of its own. With stretch goals above it, one
-                bar for both leaves the goal as a tick somewhere in the middle
-                — and the goal is the promise the campaign made. */}
-            <div
-              className="manager-meter is-segmented"
-              role="img"
-              aria-label={`${progress.percent}% of the goal in monetary donations`}
-            >
-              {progress.segments.map((segment) => (
-                <span
-                  key={segment.status}
-                  className={statusTone(segment.status)}
-                  style={{ width: `${segment.goalSharePercent}%` }}
-                  title={`${DONATION_STATUS_LABELS[segment.status]}: ${formatDollars(
-                    segment.cents
-                  )}`}
-                />
-              ))}
-            </div>
-
-            <div className="manager-figures">
-              <span>
-                {progress.goalFillPercent >= 100
-                  ? "Goal reached"
-                  : `${formatDollars(
-                      campaign.goalCents - progress.totalCents
-                    )} to the goal`}
-              </span>
-              <span className="manager-figure-end">
-                {formatDollars(campaign.goalCents)}
-              </span>
-            </div>
-          </>
-        ) : null}
-
-        {progress.segments.length > 0 ? (
-          <ul className="tone-key">
-            {progress.segments.map((segment) => (
-              <li key={segment.status} className={statusTone(segment.status)}>
-                <span className="tone-dot" aria-hidden="true" />
-                {DONATION_STATUS_LABELS[segment.status]} {formatDollars(segment.cents)}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="help-text">No monetary donations recorded yet.</p>
-        )}
 
         {progress.tiers.length > 0 ? (
           <div className="stretch-block">
@@ -326,13 +346,77 @@ export default async function CampaignDashboard({
                 </li>
               ))}
             </ol>
+          </div>
+        ) : null}
+
+        {progress.secondary.length > 0 ? (
+          <div className="stretch-block">
+            <div className="stretch-block-head">
+              <h3 className="member-card-subtitle">Raised alongside</h3>
+              <span className="stretch-block-figure">
+                {formatDollars(progress.secondaryCents)} given
+              </span>
+            </div>
+
+            {/* Each its own effort, so each gets its own card and its own bar
+                rather than a place along the campaign's. */}
+            <div className="goal-cards">
+              {progress.secondary.map((goal) => (
+                <article
+                  key={goal.id}
+                  className={`goal-card${goal.isMet ? " is-met tone-complete" : ""}`}
+                >
+                  <div className="goal-card-head">
+                    <strong className="goal-card-title">
+                      {goal.description}
+                    </strong>
+                    <span className="goal-card-percent">
+                      {goal.isMet ? "✓ met" : `${goal.percent}%`}
+                    </span>
+                  </div>
+
+                  <div
+                    className="manager-meter"
+                    role="img"
+                    aria-label={`${goal.percent}% of ${formatDollars(
+                      goal.targetCents
+                    )}`}
+                  >
+                    <span
+                      className="goal-card-fill"
+                      style={{ width: `${goal.fillPercent}%` }}
+                    />
+                  </div>
+
+                  <div className="manager-figures">
+                    <span>
+                      <strong>{formatDollars(goal.raisedCents)}</strong> of{" "}
+                      {formatDollars(goal.targetCents)}
+                    </span>
+                    <span className="manager-figure-end">
+                      {goal.giftCount} gift{goal.giftCount === 1 ? "" : "s"}
+                    </span>
+                  </div>
+                </article>
+              ))}
+            </div>
 
             <p className="help-text">
-              A gift can be applied to a stretch goal when it is recorded. That
-              is an earmark rather than a separate pot — it fills the campaign
-              either way, and a tier is reached by the campaign&rsquo;s total.
+              Separate efforts, raised alongside the campaign. What is given to
+              one of these fills that goal only and is kept out of every figure
+              above, so the appeal is never shown doing better on money that is
+              already spoken for.
             </p>
           </div>
+        ) : null}
+
+        {progress.tiers.length > 0 ? (
+          <p className="help-text" style={{ marginTop: "0.75rem" }}>
+            A gift can be applied to a stretch goal when it is recorded. On a
+            tier above the goal that is an earmark rather than a separate pot —
+            it fills the campaign either way, and the tier is reached by the
+            campaign&rsquo;s total.
+          </p>
         ) : null}
 
         {inKind.count > 0 ? (
@@ -390,97 +474,118 @@ export default async function CampaignDashboard({
               : ""}
           </p>
         ) : (
-          <ul className="sponsor-rows">
-            {onCampaign.map(({ assignment, sponsor, chips, giftCount }) => {
-              const level = levels.find(
-                (entry) => entry._id === sponsor?.recognitionLevelId
-              );
-              const logoSrc = sponsor
-                ? sponsorLogoSrc(primaryLogo(sponsor.logos))
-                : "";
+          <ul className="sponsor-cards">
+            {onCampaign.map(
+              ({ assignment, sponsor, chips, giftCount, givenCents }) => {
+                const level = levels.find(
+                  (entry) => entry._id === sponsor?.recognitionLevelId
+                );
+                const logoSrc = sponsor
+                  ? sponsorLogoSrc(primaryLogo(sponsor.logos))
+                  : "";
 
-              return (
-                <li key={assignment.sponsorId} className="sponsor-line">
-                  <Link
-                    href={`/manage/sponsorships/campaigns/${campaign._id}/sponsors/${assignment.sponsorId}`}
-                    className="sponsor-line-name"
-                  >
-                    {logoSrc ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={logoSrc} alt="" className="sponsor-row-logo" />
-                    ) : (
-                      <span className="sponsor-row-logo is-empty" aria-hidden="true" />
-                    )}
-                    <strong>{sponsor?.name ?? "a sponsor that has gone"}</strong>
-                  </Link>
-
-                  <span className="sponsor-line-cell is-level">
-                    {level?.name ?? "—"}
-                    {access.canEditSponsors && sponsor ? (
-                      <ChangeLevelButton
-                        sponsorId={sponsor._id}
-                        levels={levels}
-                        current={sponsor.recognitionLevelId}
-                        icon
-                      />
-                    ) : null}
-                  </span>
-
-                  <span className="sponsor-line-cell is-assigned">
-                    {sponsor?.isUnassignable ? (
-                      <span className="help-text">nobody, by arrangement</span>
-                    ) : assignment.memberIds.length === 0 ? (
-                      "—"
-                    ) : (
-                      assignment.memberIds.map(memberName).join(", ")
-                    )}
-                    {access.canEditCampaigns ? (
-                      <ChangeAssignedButton
-                        campaignId={campaign._id}
-                        sponsorId={assignment.sponsorId}
-                        sponsorName={sponsor?.name ?? "this sponsor"}
-                        members={members}
-                        assigned={assignment.memberIds}
-                        takesAssignment={!sponsor?.isUnassignable}
-                        icon
-                      />
-                    ) : null}
-                  </span>
-
-                  <span className="sponsor-line-chips">
-                    {chips.length === 0 ? (
-                      <span className="help-text">nothing yet</span>
-                    ) : (
-                      chips.map((chip) => (
+                return (
+                  <li key={assignment.sponsorId} className="sponsor-card">
+                    <Link
+                      href={`/manage/sponsorships/campaigns/${campaign._id}/sponsors/${assignment.sponsorId}`}
+                      className="sponsor-card-head"
+                    >
+                      {logoSrc ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={logoSrc} alt="" className="sponsor-card-logo" />
+                      ) : (
                         <span
-                          key={chip.key}
-                          className={`tone-chip ${chip.tone}`}
-                          title={chip.label}
-                        >
-                          <span className="tone-dot" aria-hidden="true" />
-                          {/* The colour says which this is — the legend above
-                              the sponsors reads for the whole page. The word is
-                              kept for anyone not reading the colour. */}
-                          <span className="visually-hidden">{chip.label}</span>
-                          {formatDollars(chip.cents)}
+                          className="sponsor-card-logo is-empty"
+                          aria-hidden="true"
+                        />
+                      )}
+                      <span className="sponsor-card-name">
+                        <strong>
+                          {sponsor?.name ?? "a sponsor that has gone"}
+                        </strong>
+                        <span className="help-text">
+                          {level?.name ?? "no level"}
                         </span>
-                      ))
-                    )}
-                  </span>
+                      </span>
+                    </Link>
 
-                  {access.canEditCampaigns ? (
-                    <span className="sponsor-line-cell">
-                      <RemoveSponsorButton
-                        campaignId={campaign._id}
-                        sponsorId={assignment.sponsorId}
-                        sponsorName={sponsor?.name ?? "this sponsor"}
-                        giftCount={giftCount}
-                      />
-                    </span>
-                  ) : null}
-                </li>
-              );
-            })}
+                    {/* The figure the cards are ordered by, said out loud —
+                        an order nobody can see is not an order. */}
+                    <div className="sponsor-card-given">
+                      <strong>
+                        {givenCents > 0
+                          ? formatDollars(givenCents)
+                          : "Nothing yet"}
+                      </strong>
+                      {giftCount > 0 ? (
+                        <span className="help-text">
+                          {giftCount} gift{giftCount === 1 ? "" : "s"}
+                        </span>
+                      ) : null}
+                    </div>
+
+                    {chips.length > 0 ? (
+                      <div className="sponsor-card-chips">
+                        {chips.map((chip) => (
+                          <span
+                            key={chip.key}
+                            className={`tone-chip ${chip.tone}`}
+                            title={chip.label}
+                          >
+                            <span className="tone-dot" aria-hidden="true" />
+                            {/* The colour says which this is — the legend at the
+                                foot of the page reads for the whole of it. The
+                                word is kept for anyone not reading the colour. */}
+                            <span className="visually-hidden">{chip.label}</span>
+                            {formatDollars(chip.cents)}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+
+                    <div className="sponsor-card-foot">
+                      <span className="sponsor-card-assigned">
+                        {sponsor?.isUnassignable
+                          ? "nobody, by arrangement"
+                          : assignment.memberIds.length === 0
+                            ? "nobody assigned"
+                            : assignment.memberIds.map(memberName).join(", ")}
+                      </span>
+
+                      <span className="sponsor-card-actions">
+                        {access.canEditSponsors && sponsor ? (
+                          <ChangeLevelButton
+                            sponsorId={sponsor._id}
+                            levels={levels}
+                            current={sponsor.recognitionLevelId}
+                            icon
+                          />
+                        ) : null}
+                        {access.canEditCampaigns ? (
+                          <>
+                            <ChangeAssignedButton
+                              campaignId={campaign._id}
+                              sponsorId={assignment.sponsorId}
+                              sponsorName={sponsor?.name ?? "this sponsor"}
+                              members={members}
+                              assigned={assignment.memberIds}
+                              takesAssignment={!sponsor?.isUnassignable}
+                              icon
+                            />
+                            <RemoveSponsorButton
+                              campaignId={campaign._id}
+                              sponsorId={assignment.sponsorId}
+                              sponsorName={sponsor?.name ?? "this sponsor"}
+                              giftCount={giftCount}
+                            />
+                          </>
+                        ) : null}
+                      </span>
+                    </div>
+                  </li>
+                );
+              }
+            )}
           </ul>
         )}
       </section>
