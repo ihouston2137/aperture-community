@@ -151,7 +151,19 @@ export async function setCampaignAssignedAction(
   const campaign = await SponsorshipCampaign.findById(campaignId);
   if (!campaign) return { ok: false, error: "That campaign no longer exists." };
 
+  // Some sponsors take no assignment at all. Checked here rather than only in
+  // the dialog, because the dialog can be open from before the flag was set.
   if (memberIds.length > 0) {
+    const sponsor = await Sponsor.findById(sponsorId)
+      .select("isUnassignable")
+      .lean<any>();
+    if (sponsor?.isUnassignable) {
+      return {
+        ok: false,
+        error: "That sponsor is set to take no assignment.",
+      };
+    }
+
     const found = await User.find({ _id: { $in: memberIds } })
       .select("_id")
       .lean<any[]>();

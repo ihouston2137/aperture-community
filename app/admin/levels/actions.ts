@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/access";
 import { connectDB } from "@/lib/db";
 import { RecognitionLevel, Sponsor, SponsorBenefit } from "@/lib/models";
-import { uniqueIds } from "@/lib/sponsorship-types";
+import { dollarsToCents, uniqueIds } from "@/lib/sponsorship-types";
 
 /** The dialog stays open on failure to show the message, so these report back. */
 export type LevelActionResult = { ok: boolean; error?: string };
@@ -69,6 +69,7 @@ export async function saveRecognitionLevelAction(
     name,
     description: String(formData.get("description") ?? "").trim().slice(0, 500),
     rank: Number(formData.get("rank") ?? 0) || 0,
+    thresholdCents: dollarsToCents(formData.get("threshold")),
     benefitIds,
     isAnonymous: formData.get("isAnonymous") === "on",
   };

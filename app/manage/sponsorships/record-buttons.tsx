@@ -6,6 +6,7 @@ import { useState } from "react";
 import {
   CampaignDialog,
   type PickerOption,
+  type SponsorOption,
 } from "@/app/admin/campaigns/campaign-manager";
 import {
   DonationDialog,
@@ -33,7 +34,7 @@ export function CampaignButton({
 }: {
   /** Absent when adding. */
   campaign?: CampaignSummary;
-  sponsors: PickerOption[];
+  sponsors: SponsorOption[];
   members: PickerOption[];
   label: string;
   primary?: boolean;

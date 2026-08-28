@@ -211,6 +211,7 @@ export function SponsorManager({
                           sponsor.contacts.length === 1 ? "" : "s"
                         }`
                       : ""}
+                    {sponsor.isUnassignable ? " · nobody assigned" : ""}
                     {sponsor.logos.length > 0
                       ? ` · ${sponsor.logos.length} logo${
                           sponsor.logos.length === 1 ? "" : "s"
@@ -428,6 +429,9 @@ function SponsorDialog({
                     {levels.map((level) => (
                       <option key={level._id} value={level._id}>
                         {level.name}
+                        {level.thresholdCents > 0
+                          ? ` — from ${formatDollars(level.thresholdCents)}`
+                          : ""}
                       </option>
                     ))}
                   </select>
@@ -664,6 +668,21 @@ function SponsorDialog({
               >
                 Add a logo
               </button>
+
+              <label className="checkbox-row" style={{ marginTop: "1.25rem" }}>
+                <input
+                  type="checkbox"
+                  name="isUnassignable"
+                  defaultChecked={sponsor?.isUnassignable ?? false}
+                />
+                Nobody looks after this sponsor
+              </label>
+              <span className="help-text">
+                No member can be assigned to them on any campaign. For sponsors
+                handled by the committee as a whole, or under an arrangement
+                that predates everyone on it — where naming somebody would be
+                wrong rather than merely missing.
+              </span>
 
               <div className="field" style={{ marginTop: "1.25rem" }}>
                 <label htmlFor="sponsor-notes">Notes</label>

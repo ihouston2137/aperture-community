@@ -11,6 +11,7 @@ import {
   CAMPAIGN_STATUS_LABELS,
   centsToDollarInput,
   dateRangeLabel,
+  dollarsToCents,
   formatDollars,
   type CampaignAssignment,
   type CampaignSummary,
@@ -19,6 +20,19 @@ import {
 import { deleteCampaignAction, saveCampaignAction } from "./actions";
 
 export type PickerOption = { _id: string; name: string; title?: string };
+
+/** A sponsor as the assignment editor needs them: a name, and whether they
+    take an assignment at all. */
+export type SponsorOption = PickerOption & { isUnassignable?: boolean };
+
+/**
+ * A stretch goal while it is being typed.
+ *
+ * The amount is held as the text in the box rather than as cents, so that a
+ * half-typed "12.5" survives the keystroke that follows it. It becomes cents
+ * once, on save.
+ */
+type StretchRow = { description: string; amount: string };
 
 export type CampaignTotalsMap = Record<
   string,
@@ -53,7 +67,7 @@ export function CampaignManager({
   canManage,
 }: {
   campaigns: CampaignSummary[];
-  sponsors: PickerOption[];
+  sponsors: SponsorOption[];
   members: PickerOption[];
   totals: CampaignTotalsMap;
   canManage: boolean;
@@ -217,13 +231,22 @@ export function CampaignDialog({
   onSaved,
 }: {
   campaign?: CampaignSummary;
-  sponsors: PickerOption[];
+  sponsors: SponsorOption[];
   members: PickerOption[];
   onClose: () => void;
   onSaved: () => void;
 }) {
   const [assignments, setAssignments] = useState<CampaignAssignment[]>(
     campaign?.assignments ?? []
+  );
+  const [stretchRows, setStretchRows] = useState<StretchRow[]>(
+    (campaign?.stretchGoals ?? []).map((goal) => ({
+      description: goal.description,
+      amount: centsToDollarInput(goal.amountCents),
+    }))
+  );
+  const [goal, setGoal] = useState(
+    centsToDollarInput(campaign?.goalCents ?? 0)
   );
   const [error, setError] = useState("");
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -240,6 +263,22 @@ export function CampaignDialog({
   const nameOf = (list: PickerOption[], id: string) =>
     list.find((entry) => entry._id === id)?.name ?? "one that has gone";
 
+  const takesAssignment = (sponsorId: string) =>
+    !sponsors.find((entry) => entry._id === sponsorId)?.isUnassignable;
+
+  /*
+   * The running totals behind the steps.
+   *
+   * A tier is entered as what the next push is worth, but what a manager needs
+   * to see is where it lands — so each row says both.
+   */
+  const goalCents = dollarsToCents(goal);
+  const stretchTotals = stretchRows.reduce<number[]>((running, row) => {
+    const previous = running[running.length - 1] ?? goalCents;
+    running.push(previous + dollarsToCents(row.amount));
+    return running;
+  }, []);
+
   // A sponsor appears once per campaign; two rows for the same one would only
   // disagree about who is looking after them.
   const unassigned = sponsors.filter(
@@ -248,7 +287,25 @@ export function CampaignDialog({
 
   function save(formData: FormData) {
     setError("");
-    formData.set("assignments", JSON.stringify(assignments));
+    // A sponsor who takes no assignment keeps none, however the rows got there
+    // — the server checks this too, and this keeps the two agreeing.
+    formData.set(
+      "assignments",
+      JSON.stringify(
+        assignments.map((entry) =>
+          takesAssignment(entry.sponsorId) ? entry : { ...entry, memberIds: [] }
+        )
+      )
+    );
+    formData.set(
+      "stretchGoals",
+      JSON.stringify(
+        stretchRows.map((row) => ({
+          description: row.description,
+          amountCents: dollarsToCents(row.amount),
+        }))
+      )
+    );
 
     startTransition(async () => {
       const result = await saveCampaignAction(formData);
@@ -372,12 +429,110 @@ export function CampaignDialog({
                     name="goal"
                     type="text"
                     inputMode="decimal"
-                    defaultValue={centsToDollarInput(campaign?.goalCents ?? 0)}
+                    value={goal}
+                    onChange={(event) => setGoal(event.target.value)}
                     placeholder="0.00"
                   />
                   <span className="help-text">In dollars. Leave blank for none.</span>
                 </div>
               </div>
+
+              <h4 className="inspector-title" style={{ marginTop: "1.25rem" }}>
+                Stretch goals
+              </h4>
+              <p className="help-text">
+                What the campaign would go on to do if it passes its goal. Each
+                amount is on top of the one above it, and the description is the
+                point of it — an amount with nothing to spend it on is not a
+                stretch goal, it is a bigger number.
+              </p>
+
+              {goalCents <= 0 && stretchRows.length > 0 ? (
+                <p className="admin-notice is-error">
+                  Stretch goals sit above a goal. Set one above, or remove
+                  these.
+                </p>
+              ) : null}
+
+              {stretchRows.map((row, index) => (
+                <div key={index} className="stretch-row">
+                  <div className="field stretch-amount">
+                    <label htmlFor={`stretch-amount-${index}`}>
+                      {index === 0 ? "Above the goal, a further" : "Then a further"}
+                    </label>
+                    <input
+                      id={`stretch-amount-${index}`}
+                      type="text"
+                      inputMode="decimal"
+                      value={row.amount}
+                      placeholder="0.00"
+                      disabled={pending}
+                      onChange={(event) =>
+                        setStretchRows((current) =>
+                          current.map((entry, position) =>
+                            position === index
+                              ? { ...entry, amount: event.target.value }
+                              : entry
+                          )
+                        )
+                      }
+                    />
+                    <span className="help-text">
+                      {goalCents > 0 && (stretchTotals[index] ?? 0) > goalCents
+                        ? `reaches ${formatDollars(stretchTotals[index])}`
+                        : "in dollars"}
+                    </span>
+                  </div>
+
+                  <div className="field">
+                    <label htmlFor={`stretch-for-${index}`}>What for</label>
+                    <input
+                      id={`stretch-for-${index}`}
+                      type="text"
+                      value={row.description}
+                      placeholder="Re-glaze the darkroom…"
+                      disabled={pending}
+                      onChange={(event) =>
+                        setStretchRows((current) =>
+                          current.map((entry, position) =>
+                            position === index
+                              ? { ...entry, description: event.target.value }
+                              : entry
+                          )
+                        )
+                      }
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    className="btn btn-danger btn-sm"
+                    disabled={pending}
+                    onClick={() =>
+                      setStretchRows((current) =>
+                        current.filter((_, position) => position !== index)
+                      )
+                    }
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+
+              <button
+                type="button"
+                className="btn btn-sm"
+                style={{ marginTop: "0.6rem" }}
+                disabled={pending}
+                onClick={() =>
+                  setStretchRows((current) => [
+                    ...current,
+                    { description: "", amount: "" },
+                  ])
+                }
+              >
+                Add a stretch goal
+              </button>
 
               <h4 className="inspector-title" style={{ marginTop: "1.25rem" }}>
                 Sponsors and who looks after them
@@ -409,57 +564,67 @@ export function CampaignDialog({
                     </button>
                   </div>
 
-                  {assignment.memberIds.length > 0 ? (
-                    <div className="chip-picker" style={{ marginBottom: "0.5rem" }}>
-                      {assignment.memberIds.map((memberId) => (
-                        <span key={memberId} className="chip-option">
-                          {nameOf(members, memberId)}
-                          <button
-                            type="button"
-                            className="chip-remove"
-                            aria-label={`Remove ${nameOf(members, memberId)}`}
-                            disabled={pending}
-                            onClick={() =>
-                              setAssignments((current) =>
-                                current.map((entry) =>
-                                  entry.sponsorId === assignment.sponsorId
-                                    ? {
-                                        ...entry,
-                                        memberIds: entry.memberIds.filter(
-                                          (held) => held !== memberId
-                                        ),
-                                      }
-                                    : entry
-                                )
-                              )
-                            }
-                          >
-                            <span aria-hidden="true">×</span>
-                          </button>
-                        </span>
-                      ))}
-                    </div>
-                  ) : null}
+                  {!takesAssignment(assignment.sponsorId) ? (
+                    <p className="help-text">
+                      Nobody looks after this sponsor — they are set to take no
+                      assignment. They still belong to the campaign, and their
+                      gifts are still recorded against them.
+                    </p>
+                  ) : (
+                    <>
+                      {assignment.memberIds.length > 0 ? (
+                        <div className="chip-picker" style={{ marginBottom: "0.5rem" }}>
+                          {assignment.memberIds.map((memberId) => (
+                            <span key={memberId} className="chip-option">
+                              {nameOf(members, memberId)}
+                              <button
+                                type="button"
+                                className="chip-remove"
+                                aria-label={`Remove ${nameOf(members, memberId)}`}
+                                disabled={pending}
+                                onClick={() =>
+                                  setAssignments((current) =>
+                                    current.map((entry) =>
+                                      entry.sponsorId === assignment.sponsorId
+                                        ? {
+                                            ...entry,
+                                            memberIds: entry.memberIds.filter(
+                                              (held) => held !== memberId
+                                            ),
+                                          }
+                                        : entry
+                                    )
+                                  )
+                                }
+                              >
+                                <span aria-hidden="true">×</span>
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
 
-                  <BioPicker
-                    options={members.filter(
-                      (member) => !assignment.memberIds.includes(member._id)
-                    )}
-                    value=""
-                    onChange={(memberId) => {
-                      if (!memberId) return;
-                      setAssignments((current) =>
-                        current.map((entry) =>
-                          entry.sponsorId === assignment.sponsorId
-                            ? { ...entry, memberIds: [...entry.memberIds, memberId] }
-                            : entry
-                        )
-                      );
-                    }}
-                    emptyLabel="—"
-                    placeholder="Type a name to assign somebody"
-                    disabled={pending}
-                  />
+                      <BioPicker
+                        options={members.filter(
+                          (member) => !assignment.memberIds.includes(member._id)
+                        )}
+                        value=""
+                        onChange={(memberId) => {
+                          if (!memberId) return;
+                          setAssignments((current) =>
+                            current.map((entry) =>
+                              entry.sponsorId === assignment.sponsorId
+                                ? { ...entry, memberIds: [...entry.memberIds, memberId] }
+                                : entry
+                            )
+                          );
+                        }}
+                        emptyLabel="—"
+                        placeholder="Type a name to assign somebody"
+                        disabled={pending}
+                      />
+                    </>
+                  )}
                 </div>
               ))}
 

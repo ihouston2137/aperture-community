@@ -29,7 +29,12 @@ import {
 import { Leaderboard } from "../../leaderboard";
 import { CampaignButton } from "../../record-buttons";
 import { ToneLegend } from "../../tone-legend";
-import { AddSponsorButton, ChangeAssignedButton, ChangeLevelButton } from "../../sponsor-controls";
+import {
+  AddSponsorButton,
+  ChangeAssignedButton,
+  ChangeLevelButton,
+  RemoveSponsorButton,
+} from "../../sponsor-controls";
 
 /**
  * One campaign, in full: where it has got to, and who is on it.
@@ -98,7 +103,11 @@ export default async function CampaignDashboard({
 
   // Only monetary donations fill the bar: a goal is money to be raised, and an
   // in-kind donation — worth recording, worth having — is not money.
-  const progress = monetaryProgress(mine, campaign.goalCents);
+  const progress = monetaryProgress(
+    mine,
+    campaign.goalCents,
+    campaign.stretchGoals
+  );
 
   const onCampaign = campaign.assignments
     .map((assignment) => {
@@ -106,7 +115,12 @@ export default async function CampaignDashboard({
       const given = mine.filter(
         (donation) => donation.sponsorId === assignment.sponsorId
       );
-      return { assignment, sponsor, chips: sponsorChips(given) };
+      return {
+        assignment,
+        sponsor,
+        chips: sponsorChips(given),
+        giftCount: given.length,
+      };
     })
     .sort((a, b) =>
       (a.sponsor?.name ?? "").localeCompare(b.sponsor?.name ?? "")
@@ -157,6 +171,7 @@ export default async function CampaignDashboard({
               sponsors={sponsors.map((sponsor) => ({
                 _id: sponsor._id,
                 name: sponsor.name,
+                isUnassignable: sponsor.isUnassignable,
               }))}
               members={members}
               label="Edit campaign"
@@ -167,7 +182,9 @@ export default async function CampaignDashboard({
         {campaign.goalCents ? (
           <>
             <div
-              className="manager-meter is-segmented"
+              className={`manager-meter is-segmented${
+                progress.tiers.length > 0 ? " has-marks" : ""
+              }`}
               role="img"
               aria-label={`${progress.percent}% of the goal in monetary donations`}
             >
@@ -181,12 +198,36 @@ export default async function CampaignDashboard({
                   )}`}
                 />
               ))}
+
+              {/* With tiers the bar stands for the goal and everything above
+                  it, so the goal itself needs marking or it disappears. */}
+              {progress.tiers.length > 0 ? (
+                <span
+                  className="meter-mark is-goal"
+                  style={{ left: `${progress.goalPercent}%` }}
+                  title={`Goal: ${formatDollars(campaign.goalCents)}`}
+                />
+              ) : null}
+
+              {progress.tiers.map((tier) => (
+                <span
+                  key={tier.step}
+                  className={`meter-mark${tier.isMet ? " is-met" : ""}`}
+                  style={{ left: `${tier.markerPercent}%` }}
+                  title={`${formatDollars(tier.thresholdCents)}: ${
+                    tier.description
+                  }`}
+                />
+              ))}
             </div>
 
             <div className="manager-figures">
               <span>
                 <strong>{formatDollars(progress.totalCents)}</strong> of{" "}
                 {formatDollars(campaign.goalCents)}
+                {progress.tiers.length > 0
+                  ? `, and ${formatDollars(progress.scaleCents)} with every stretch goal`
+                  : ""}
               </span>
               <span className="manager-figure-end">{progress.percent}%</span>
             </div>
@@ -214,9 +255,40 @@ export default async function CampaignDashboard({
           <p className="help-text">No monetary donations recorded yet.</p>
         )}
 
+        {progress.tiers.length > 0 ? (
+          <>
+            <h3 className="member-card-subtitle">Stretch goals</h3>
+            <ol className="stretch-list">
+              {progress.tiers.map((tier) => (
+                <li
+                  key={tier.step}
+                  className={`stretch-tier${tier.isMet ? " is-met" : ""}`}
+                >
+                  <span className="stretch-tier-figure">
+                    {formatDollars(tier.thresholdCents)}
+                  </span>
+                  <span className="stretch-tier-what">{tier.description}</span>
+                  <span className="stretch-tier-state">
+                    {tier.isMet
+                      ? "reached"
+                      : `${formatDollars(
+                          tier.thresholdCents - progress.totalCents
+                        )} to go`}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          </>
+        ) : null}
+
         <p className="help-text" style={{ marginTop: "0.5rem" }}>
           Monetary donations only — an in-kind donation is recorded against the
           sponsor who gave it, but does not fill a money goal.
+          {progress.uncountedCents > 0
+            ? ` A further ${formatDollars(
+                progress.uncountedCents
+              )} is recorded but marked as not counting towards the goal.`
+            : ""}
         </p>
       </section>
 
@@ -243,7 +315,7 @@ export default async function CampaignDashboard({
           </p>
         ) : (
           <ul className="sponsor-rows">
-            {onCampaign.map(({ assignment, sponsor, chips }) => {
+            {onCampaign.map(({ assignment, sponsor, chips, giftCount }) => {
               const level = levels.find(
                 (entry) => entry._id === sponsor?.recognitionLevelId
               );
@@ -279,9 +351,13 @@ export default async function CampaignDashboard({
                   </span>
 
                   <span className="sponsor-line-cell is-assigned">
-                    {assignment.memberIds.length === 0
-                      ? "—"
-                      : assignment.memberIds.map(memberName).join(", ")}
+                    {sponsor?.isUnassignable ? (
+                      <span className="help-text">nobody, by arrangement</span>
+                    ) : assignment.memberIds.length === 0 ? (
+                      "—"
+                    ) : (
+                      assignment.memberIds.map(memberName).join(", ")
+                    )}
                     {access.canEditCampaigns ? (
                       <ChangeAssignedButton
                         campaignId={campaign._id}
@@ -289,6 +365,7 @@ export default async function CampaignDashboard({
                         sponsorName={sponsor?.name ?? "this sponsor"}
                         members={members}
                         assigned={assignment.memberIds}
+                        takesAssignment={!sponsor?.isUnassignable}
                         icon
                       />
                     ) : null}
@@ -314,6 +391,17 @@ export default async function CampaignDashboard({
                       ))
                     )}
                   </span>
+
+                  {access.canEditCampaigns ? (
+                    <span className="sponsor-line-cell">
+                      <RemoveSponsorButton
+                        campaignId={campaign._id}
+                        sponsorId={assignment.sponsorId}
+                        sponsorName={sponsor?.name ?? "this sponsor"}
+                        giftCount={giftCount}
+                      />
+                    </span>
+                  ) : null}
                 </li>
               );
             })}

@@ -18,6 +18,7 @@ import {
   normalizeContacts,
   normalizeLinks,
   normalizeLogos,
+  normalizeStretchGoals,
   sponsorSize,
   sponsorType,
   uniqueIds,
@@ -49,6 +50,7 @@ export function toSponsorSummary(record: any): SponsorSummary {
     logos: normalizeLogos(record.logos),
     contacts: normalizeContacts(record.contacts),
     notes: String(record.notes ?? ""),
+    isUnassignable: Boolean(record.isUnassignable),
     recognitionLevelId: record.recognitionLevelId
       ? String(record.recognitionLevelId)
       : "",
@@ -76,6 +78,7 @@ export function toRecognitionLevelSummary(record: any): RecognitionLevelSummary 
     name: String(record.name ?? ""),
     description: String(record.description ?? ""),
     rank: Number(record.rank ?? 0) || 0,
+    thresholdCents: Math.max(0, Number(record.thresholdCents ?? 0) || 0),
     benefitIds: uniqueIds((record.benefitIds ?? []).map(String)),
     isAnonymous: Boolean(record.isAnonymous),
   };
@@ -110,6 +113,7 @@ export function toCampaignSummary(record: any): CampaignSummary {
     startDate: isoDate(record.startDate),
     endDate: isoDate(record.endDate),
     goalCents: Number(record.goalCents ?? 0) || 0,
+    stretchGoals: normalizeStretchGoals(record.stretchGoals),
     assignments: normalizeAssignments(record.assignments),
   };
 }
@@ -123,6 +127,9 @@ export function toDonationSummary(record: any): DonationSummary {
     status: donationStatus(record.status),
     date: isoDate(record.date),
     valueCents: Number(record.valueCents ?? 0) || 0,
+    // Absent on everything recorded before the flag existed, and those were
+    // all counted at the time, so the absence has to read as true.
+    isCounted: record.isCounted !== false,
     description: String(record.description ?? ""),
     memberIds: uniqueIds((record.memberIds ?? []).map(String)),
   };
@@ -255,8 +262,10 @@ export function splitCreditByMember(
   const credit = new Map<string, MemberCredit>();
 
   for (const donation of donations) {
-    // A cancelled gift is nobody's credit.
+    // A cancelled gift is nobody's credit, and neither is one recorded as not
+    // counting — the board and the goal answer to the same flag.
     if (!countsTowardTotals(donation.status)) continue;
+    if (!donation.isCounted) continue;
     if (donation.memberIds.length === 0 || donation.valueCents <= 0) continue;
 
     const share = Math.floor(donation.valueCents / donation.memberIds.length);
@@ -316,8 +325,10 @@ export function creditByMember(
   const credit = new Map<string, { totalCents: number; count: number }>();
 
   for (const donation of donations) {
-    // A gift that was cancelled is nobody's credit.
+    // A gift that was cancelled is nobody's credit, nor is one recorded as not
+    // counting towards the goal and the board.
     if (!countsTowardTotals(donation.status)) continue;
+    if (!donation.isCounted) continue;
 
     for (const memberId of donation.memberIds) {
       const entry = credit.get(memberId) ?? { totalCents: 0, count: 0 };

@@ -76,6 +76,7 @@ export default async function SponsorshipsDashboard() {
   const sponsorOptions = sponsors.map((sponsor) => ({
     _id: sponsor._id,
     name: sponsor.name,
+    isUnassignable: sponsor.isUnassignable,
   }));
 
   const totals = totalsByCampaign(donations);
@@ -184,7 +185,8 @@ export default async function SponsorshipsDashboard() {
                 donations.filter(
                   (donation) => donation.campaignId === campaign._id
                 ),
-                campaign.goalCents
+                campaign.goalCents,
+                campaign.stretchGoals
               );
 
               return (
@@ -203,7 +205,9 @@ export default async function SponsorshipsDashboard() {
                     {campaign.goalCents ? (
                       <>
                         <div
-                          className="manager-meter is-segmented"
+                          className={`manager-meter is-segmented${
+                            progress.tiers.length > 0 ? " has-marks" : ""
+                          }`}
                           role="img"
                           aria-label={`${progress.percent}% of the goal in monetary gifts`}
                         >
@@ -217,6 +221,27 @@ export default async function SponsorshipsDashboard() {
                               title={`${
                                 DONATION_STATUS_LABELS[segment.status]
                               }: ${formatDollars(segment.cents)}`}
+                            />
+                          ))}
+
+                          {progress.tiers.length > 0 ? (
+                            <span
+                              className="meter-mark is-goal"
+                              style={{ left: `${progress.goalPercent}%` }}
+                              title={`Goal: ${formatDollars(campaign.goalCents)}`}
+                            />
+                          ) : null}
+
+                          {progress.tiers.map((tier) => (
+                            <span
+                              key={tier.step}
+                              className={`meter-mark${
+                                tier.isMet ? " is-met" : ""
+                              }`}
+                              style={{ left: `${tier.markerPercent}%` }}
+                              title={`${formatDollars(tier.thresholdCents)}: ${
+                                tier.description
+                              }`}
                             />
                           ))}
                         </div>
@@ -239,6 +264,21 @@ export default async function SponsorshipsDashboard() {
                         <span className="manager-figure-end">no goal set</span>
                       </div>
                     )}
+
+                    {progress.next ? (
+                      <p className="help-text">
+                        Next: {progress.next.description} at{" "}
+                        {formatDollars(progress.next.thresholdCents)}
+                        {progress.reached
+                          ? ` · ${progress.reached.description} reached`
+                          : ""}
+                      </p>
+                    ) : progress.reached ? (
+                      <p className="help-text">
+                        Every stretch goal reached, to{" "}
+                        {progress.reached.description}.
+                      </p>
+                    ) : null}
 
                     <p className="help-text">
                       {pending > 0

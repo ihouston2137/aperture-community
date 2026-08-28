@@ -739,6 +739,15 @@ const SponsorSchema = new Schema<any>(
       },
     ],
     notes: { type: String, default: "" },
+    /*
+     * Nobody is put down as looking after them.
+     *
+     * Some sponsors are handled by the committee as a whole, or under an
+     * arrangement that predates everyone currently on it. Naming a member for
+     * those would be wrong rather than merely missing, so the campaigns stop
+     * asking.
+     */
+    isUnassignable: { type: Boolean, default: false },
     /** The tier this sponsor is currently recognised at, if any. */
     recognitionLevelId: { type: String, default: "" },
     /** How this community groups its sponsors. A sponsor can carry several. */
@@ -761,6 +770,15 @@ const RecognitionLevelSchema = new Schema<any>(
     description: { type: String, default: "" },
     /** Orders the tiers, highest first. */
     rank: { type: Number, default: 0 },
+    /*
+     * What a sponsor has to have given to qualify, in whole cents. Zero for a
+     * level with no figure attached.
+     *
+     * A threshold says what the level is worth, not who is at it: a sponsor is
+     * still put at a level by hand, because recognition is a decision somebody
+     * makes and a sponsor is often held at a level through a quiet year.
+     */
+    thresholdCents: { type: Number, default: 0 },
     /** What a sponsor at this level receives. */
     benefitIds: [{ type: String }],
     /*
@@ -809,6 +827,21 @@ const SponsorshipCampaignSchema = new Schema<any>(
     /** What the campaign is aiming at, in whole cents. Zero for no target. */
     goalCents: { type: Number, default: 0 },
     /*
+     * What the campaign would do with more than it asked for, in order.
+     *
+     * Each amount is additional — above the goal, and above the tier before it
+     * — so a run of them reads as steps rather than as competing totals. The
+     * description is the point of the tier: an amount with nothing to spend it
+     * on is not a stretch goal, it is a bigger number.
+     */
+    stretchGoals: [
+      {
+        _id: false,
+        description: { type: String, default: "" },
+        amountCents: { type: Number, default: 0 },
+      },
+    ],
+    /*
      * Who looks after which sponsor, for this campaign only. Held here rather
      * than on the sponsor because the same sponsor can be looked after by
      * different people from one year's campaign to the next.
@@ -846,6 +879,15 @@ const DonationSchema = new Schema<any>(
     date: { type: String, default: "" },
     valueCents: { type: Number, default: 0 },
     description: { type: String, default: "" },
+    /*
+     * Whether it fills the campaign's goal and earns leaderboard credit.
+     *
+     * A transfer from another fund, a gift the committee arranged with itself,
+     * or money already counted somewhere else is worth recording and would
+     * flatter both if it were counted. Everything else is counted, so an
+     * existing record and a new one both start true.
+     */
+    isCounted: { type: Boolean, default: true },
     /** The members credited with bringing it in. */
     memberIds: [{ type: String }],
   },

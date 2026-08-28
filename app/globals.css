@@ -7495,6 +7495,108 @@ html:has(.admin-shell) body::-webkit-scrollbar {
   border-radius: 0 999px 999px 0;
 }
 
+/* A bar with stretch goals along it stands for the goal plus every tier, so
+   the tiers — and the goal itself, no longer the far end — are marked on it.
+   The marks are out of the flex flow, so they sit over the bands rather than
+   taking width from them. */
+.manager-meter.has-marks {
+  position: relative;
+  overflow: visible;
+}
+
+.meter-mark {
+  position: absolute;
+  top: -0.15rem;
+  bottom: -0.15rem;
+  width: 0.125rem;
+  margin-left: -0.0625rem;
+  border-radius: 999px;
+  /* currentColor rather than a palette value: these bars appear on the admin
+     shell and on the member-facing manage pages, which are not the same
+     ground. */
+  background: currentColor;
+  opacity: 0.35;
+}
+
+/* The goal reads as the firmer line: it is the promise, and the tiers above it
+   are what would follow. */
+.meter-mark.is-goal {
+  opacity: 0.75;
+}
+
+.meter-mark.is-met {
+  opacity: 0.6;
+}
+
+/* Each tier: where it lands, what it is for, and how far off it is. */
+.member-card-subtitle {
+  font-family: var(--heading-font);
+  font-size: 0.8125rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.7;
+  margin: 1.25rem 0 0.5rem;
+}
+
+.stretch-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.9375rem;
+}
+
+.stretch-tier {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem 0.75rem;
+  opacity: 0.75;
+}
+
+/* A tier already reached is the one worth reading first. */
+.stretch-tier.is-met {
+  opacity: 1;
+}
+
+.stretch-tier-figure {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  flex: 0 0 auto;
+}
+
+.stretch-tier-what {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+.stretch-tier-state {
+  margin-left: auto;
+  font-size: 0.875rem;
+  opacity: 0.7;
+}
+
+/* One stretch goal as it is being entered: what it adds, and what it is for. */
+.stretch-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.5rem 0.75rem;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--admin-border);
+}
+
+.stretch-row .field {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+.stretch-row .field.stretch-amount {
+  flex: 0 1 10rem;
+}
+
 /* The key to the colours, at the foot of every screen that uses them. Quiet
    enough to be ignored by anybody who already knows. */
 .tone-legend {

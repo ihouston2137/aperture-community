@@ -68,6 +68,7 @@ export default async function CampaignsPage() {
         sponsors={sponsors.map((sponsor) => ({
           _id: sponsor._id,
           name: sponsor.name,
+          isUnassignable: sponsor.isUnassignable,
         }))}
         members={members}
         totals={totals}

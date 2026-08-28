@@ -5,9 +5,11 @@ import { useEffect, useState, useTransition } from "react";
 
 import { Panel } from "@/components/admin-ui";
 import { ModalPortal } from "@/components/modal-portal";
-import type {
-  RecognitionLevelSummary,
-  SponsorBenefitSummary,
+import {
+  centsToDollarInput,
+  formatDollars,
+  type RecognitionLevelSummary,
+  type SponsorBenefitSummary,
 } from "@/lib/sponsorship-types";
 
 import {
@@ -81,6 +83,9 @@ export function RecognitionManager({
                 <div className="admin-list-meta">
                   {level.description || "no description"}
                   {` · rank ${level.rank}`}
+                  {level.thresholdCents > 0
+                    ? ` · from ${formatDollars(level.thresholdCents)}`
+                    : ""}
                 </div>
                 <div className="admin-list-meta">
                   {level.benefitIds.length === 0
@@ -226,6 +231,23 @@ function LevelDialog({
                   <span className="help-text">
                     Orders the levels, highest first. Gold above Silver above
                     Bronze.
+                  </span>
+                </div>
+                <div className="field">
+                  <label htmlFor="level-threshold">Qualifies from</label>
+                  <input
+                    id="level-threshold"
+                    name="threshold"
+                    type="text"
+                    inputMode="decimal"
+                    defaultValue={centsToDollarInput(level?.thresholdCents ?? 0)}
+                    placeholder="0.00"
+                  />
+                  <span className="help-text">
+                    The least a sponsor must have given to qualify, in dollars.
+                    Leave blank for a level with no figure attached. Sponsors
+                    are still put at a level by hand — reaching the figure does
+                    not move anybody on its own.
                   </span>
                 </div>
               </div>

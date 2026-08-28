@@ -5,7 +5,10 @@ import { useEffect, useState, useTransition } from "react";
 
 import { BioPicker } from "@/components/bio-picker";
 import { ModalPortal } from "@/components/modal-portal";
-import type { RecognitionLevelSummary } from "@/lib/sponsorship-types";
+import {
+  formatDollars,
+  type RecognitionLevelSummary,
+} from "@/lib/sponsorship-types";
 
 import {
   addCampaignSponsorAction,
@@ -397,6 +400,9 @@ export function ChangeLevelButton({
               {levels.map((level) => (
                 <option key={level._id} value={level._id}>
                   {level.name}
+                  {level.thresholdCents > 0
+                    ? ` — from ${formatDollars(level.thresholdCents)}`
+                    : ""}
                 </option>
               ))}
             </select>
@@ -412,6 +418,105 @@ export function ChangeLevelButton({
   );
 }
 
+/**
+ * Take one sponsor off this campaign, from the row itself.
+ *
+ * The same thing can be done from inside the assignment popup, but that one is
+ * opened to change who looks after somebody — a person who has decided a
+ * sponsor does not belong on the campaign at all should not have to guess that
+ * the answer is behind a pencil.
+ *
+ * Nothing is deleted: the sponsor stays on file and their gifts stay recorded
+ * against the campaign, which is what the confirmation says.
+ */
+export function RemoveSponsorButton({
+  campaignId,
+  sponsorId,
+  sponsorName,
+  giftCount,
+}: {
+  campaignId: string;
+  sponsorId: string;
+  sponsorName: string;
+  /** Gifts this sponsor has already given to this campaign. */
+  giftCount: number;
+}) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [error, setError] = useState("");
+  const [pending, startTransition] = useTransition();
+
+  function remove() {
+    setError("");
+    startTransition(async () => {
+      const formData = new FormData();
+      formData.set("campaignId", campaignId);
+      formData.set("sponsorId", sponsorId);
+
+      const result = await removeCampaignSponsorAction(formData);
+      if (result.ok) {
+        setOpen(false);
+        router.refresh();
+      } else {
+        setError(result.error ?? "Could not take them off.");
+      }
+    });
+  }
+
+  return (
+    <>
+      <IconButton
+        label={`Take ${sponsorName} off this campaign`}
+        danger
+        onClick={() => setOpen(true)}
+      >
+        <TrashIcon />
+      </IconButton>
+
+      {open ? (
+        <Popup
+          title="Take off campaign"
+          pending={pending}
+          error={error}
+          onClose={() => {
+            if (!pending) setOpen(false);
+          }}
+          footer={
+            <>
+              <button
+                type="button"
+                className="btn btn-danger btn-sm"
+                disabled={pending}
+                onClick={remove}
+              >
+                {pending ? "Removing…" : "Yes, take them off"}
+              </button>
+              <button
+                type="button"
+                className="btn btn-sm"
+                style={{ marginLeft: "auto" }}
+                disabled={pending}
+                onClick={() => setOpen(false)}
+              >
+                Keep
+              </button>
+            </>
+          }
+        >
+          <p className="help-text">
+            Take {sponsorName} off this campaign?{" "}
+            {giftCount > 0
+              ? `Their ${giftCount} gift${
+                  giftCount === 1 ? "" : "s"
+                } to it stay recorded, and still count towards what it raised.`
+              : "They stay on file, and can be put back on at any time."}
+          </p>
+        </Popup>
+      ) : null}
+    </>
+  );
+}
+
 /** Change who looks after one sponsor on this campaign, or take them off it. */
 export function ChangeAssignedButton({
   campaignId,
@@ -419,6 +524,7 @@ export function ChangeAssignedButton({
   sponsorName,
   members,
   assigned,
+  takesAssignment = true,
   icon = false,
 }: {
   campaignId: string;
@@ -426,6 +532,9 @@ export function ChangeAssignedButton({
   sponsorName: string;
   members: Option[];
   assigned: string[];
+  /** False for a sponsor nobody is put down as looking after. The dialog then
+      only offers to take them off the campaign. */
+  takesAssignment?: boolean;
   /** A square pencil rather than a worded button, for a one-line row. */
   icon?: boolean;
 }) {
@@ -486,7 +595,11 @@ export function ChangeAssignedButton({
     <>
       {icon ? (
         <IconButton
-          label={`Change who looks after ${sponsorName}`}
+          label={
+            takesAssignment
+              ? `Change who looks after ${sponsorName}`
+              : `${sponsorName} on this campaign`
+          }
           onClick={() => setOpen(true)}
         />
       ) : (
@@ -497,7 +610,11 @@ export function ChangeAssignedButton({
 
       {open ? (
         <Popup
-          title={`Who looks after ${sponsorName}`}
+          title={
+            takesAssignment
+              ? `Who looks after ${sponsorName}`
+              : `${sponsorName} on this campaign`
+          }
           pending={pending}
           error={error}
           onClose={close}
@@ -537,57 +654,68 @@ export function ChangeAssignedButton({
                 </button>
               )}
 
-              <button
-                type="button"
-                className="btn btn-primary btn-sm"
-                style={{ marginLeft: "auto" }}
-                disabled={pending}
-                onClick={save}
-              >
-                {pending ? "Saving…" : "Save"}
-              </button>
+              {takesAssignment ? (
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  style={{ marginLeft: "auto" }}
+                  disabled={pending}
+                  onClick={save}
+                >
+                  {pending ? "Saving…" : "Save"}
+                </button>
+              ) : null}
             </>
           }
         >
-          <div className="field">
-            <span className="field-label">Assigned ({memberIds.length})</span>
+          {!takesAssignment ? (
+            <p className="help-text">
+              Nobody looks after {sponsorName} — they are set to take no
+              assignment, which is changed on the sponsor itself. They still
+              belong to this campaign, and their gifts are still recorded
+              against them.
+            </p>
+          ) : (
+            <div className="field">
+              <span className="field-label">Assigned ({memberIds.length})</span>
 
-            {memberIds.length > 0 ? (
-              <div className="chip-picker" style={{ marginBottom: "0.5rem" }}>
-                {memberIds.map((id) => (
-                  <span key={id} className="chip-option">
-                    {nameOf(id)}
-                    <button
-                      type="button"
-                      className="chip-remove"
-                      aria-label={`Remove ${nameOf(id)}`}
-                      disabled={pending}
-                      onClick={() =>
-                        setMemberIds((current) => current.filter((held) => held !== id))
-                      }
-                    >
-                      <span aria-hidden="true">×</span>
-                    </button>
-                  </span>
-                ))}
-              </div>
-            ) : null}
+              {memberIds.length > 0 ? (
+                <div className="chip-picker" style={{ marginBottom: "0.5rem" }}>
+                  {memberIds.map((id) => (
+                    <span key={id} className="chip-option">
+                      {nameOf(id)}
+                      <button
+                        type="button"
+                        className="chip-remove"
+                        aria-label={`Remove ${nameOf(id)}`}
+                        disabled={pending}
+                        onClick={() =>
+                          setMemberIds((current) => current.filter((held) => held !== id))
+                        }
+                      >
+                        <span aria-hidden="true">×</span>
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              ) : null}
 
-            <BioPicker
-              options={members.filter((member) => !memberIds.includes(member._id))}
-              value=""
-              onChange={(id) => {
-                if (id) setMemberIds((current) => [...current, id]);
-              }}
-              emptyLabel="—"
-              placeholder="Type a name to assign somebody"
-              disabled={pending}
-            />
-            <span className="help-text">
-              Who owns this relationship for this campaign. Credit for a gift is
-              recorded on the gift itself, so the two can differ.
-            </span>
-          </div>
+              <BioPicker
+                options={members.filter((member) => !memberIds.includes(member._id))}
+                value=""
+                onChange={(id) => {
+                  if (id) setMemberIds((current) => [...current, id]);
+                }}
+                emptyLabel="—"
+                placeholder="Type a name to assign somebody"
+                disabled={pending}
+              />
+              <span className="help-text">
+                Who owns this relationship for this campaign. Credit for a gift is
+                recorded on the gift itself, so the two can differ.
+              </span>
+            </div>
+          )}
         </Popup>
       ) : null}
     </>

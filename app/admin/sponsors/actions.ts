@@ -69,6 +69,7 @@ export async function saveSponsorAction(
     logos,
     contacts,
     notes: String(formData.get("notes") ?? "").trim().slice(0, 2000),
+    isUnassignable: formData.get("isUnassignable") === "on",
     recognitionLevelId: String(formData.get("recognitionLevelId") ?? "").trim(),
     categoryIds: uniqueIds(formData.getAll("categoryIds").map(String)),
   };

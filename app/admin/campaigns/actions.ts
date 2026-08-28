@@ -10,6 +10,7 @@ import {
   dollarsToCents,
   isoDate,
   normalizeAssignments,
+  normalizeStretchGoals,
 } from "@/lib/sponsorship-types";
 
 /** The dialog stays open on failure to show the message, so these report back. */
@@ -45,12 +46,29 @@ export async function saveCampaignAction(
   }
 
   let assignments;
+  let stretchGoals;
   try {
     assignments = normalizeAssignments(
       JSON.parse(String(formData.get("assignments") ?? "[]"))
     );
+    stretchGoals = normalizeStretchGoals(
+      JSON.parse(String(formData.get("stretchGoals") ?? "[]"))
+    );
   } catch {
-    return { ok: false, error: "Could not read those sponsor assignments." };
+    return { ok: false, error: "Could not read that campaign's details." };
+  }
+
+  // A tier above nothing is not a stretch: without a goal there is no target
+  // for it to be above, and the bar would have nothing to measure it against.
+  const goalCents = dollarsToCents(formData.get("goal"));
+  if (stretchGoals.length > 0 && goalCents <= 0) {
+    return {
+      ok: false,
+      error: "Stretch goals sit above a goal — set the campaign's goal first.",
+    };
+  }
+  if (stretchGoals.some((goal) => !goal.description)) {
+    return { ok: false, error: "Say what each stretch goal is for." };
   }
 
   // Everything named has to still exist, or the campaign would list a sponsor
@@ -58,12 +76,18 @@ export async function saveCampaignAction(
   const sponsorIds = assignments.map((entry) => entry.sponsorId);
   const memberIds = [...new Set(assignments.flatMap((entry) => entry.memberIds))];
 
+  // Read alongside the existence check rather than in a query of its own: the
+  // same rows answer both questions.
+  const unassignable = new Set<string>();
   if (sponsorIds.length > 0) {
     const found = await Sponsor.find({ _id: { $in: sponsorIds } })
-      .select("_id")
+      .select("_id isUnassignable")
       .lean<any[]>();
     if (found.length !== sponsorIds.length) {
       return { ok: false, error: "One of those sponsors no longer exists." };
+    }
+    for (const sponsor of found) {
+      if (sponsor.isUnassignable) unassignable.add(String(sponsor._id));
     }
   }
   if (memberIds.length > 0) {
@@ -81,8 +105,14 @@ export async function saveCampaignAction(
     status: campaignStatus(formData.get("status")),
     startDate,
     endDate,
-    goalCents: dollarsToCents(formData.get("goal")),
-    assignments,
+    goalCents,
+    stretchGoals,
+    // A sponsor set to take no assignment keeps none, whatever the form sent:
+    // the flag is the sponsor's own, and a campaign does not get to overrule it
+    // by having had its dialog open since before the flag was set.
+    assignments: assignments.map((entry) =>
+      unassignable.has(entry.sponsorId) ? { ...entry, memberIds: [] } : entry
+    ),
   };
 
   if (id) await SponsorshipCampaign.findByIdAndUpdate(id, payload);

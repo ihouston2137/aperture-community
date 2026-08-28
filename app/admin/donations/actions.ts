@@ -70,6 +70,9 @@ export async function saveDonationAction(
     // arrives before anyone gets round to entering it.
     date: isoDate(formData.get("date")) || new Date().toISOString().slice(0, 10),
     valueCents,
+    // The dialog always carries the checkbox, so an absent value is somebody
+    // clearing it rather than a field that was never asked about.
+    isCounted: formData.get("isCounted") === "on",
     description: String(formData.get("description") ?? "").trim().slice(0, 2000),
     memberIds,
   };

@@ -196,6 +196,7 @@ export function DonationManager({
                   {donation.date ? ` · ${formatDateLabel(donation.date)}` : ""}
                   {` · ${DONATION_KIND_LABELS[donation.kind]}`}
                   {` · ${DONATION_STATUS_LABELS[donation.status]}`}
+                  {donation.isCounted ? "" : " · not counted"}
                 </div>
                 <div className="admin-list-meta">
                   {donation.memberIds.length > 0
@@ -439,6 +440,21 @@ export function DonationDialog({
                   </span>
                 </div>
               </div>
+
+              <label className="checkbox-row" style={{ marginTop: "0.875rem" }}>
+                <input
+                  type="checkbox"
+                  name="isCounted"
+                  defaultChecked={donation?.isCounted ?? true}
+                />
+                Counts towards the goal and the leaderboard
+              </label>
+              <span className="help-text">
+                Clear it for a gift that should be on the record without filling
+                the campaign&apos;s goal or earning anybody credit — money moved from
+                another fund, or a gift already counted elsewhere. It still
+                appears against the sponsor who gave it.
+              </span>
 
               <div className="field" style={{ marginTop: "0.875rem" }}>
                 <label htmlFor="donation-description">Description</label>

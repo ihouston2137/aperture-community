@@ -187,6 +187,8 @@ export type RecognitionLevelSummary = {
   description: string;
   /** Highest first when sorted; ties fall back to the name. */
   rank: number;
+  /** The least a sponsor must have given to qualify. Zero for no figure. */
+  thresholdCents: number;
   /** What a sponsor at this level receives. */
   benefitIds: string[];
   /**
@@ -246,6 +248,8 @@ export type SponsorSummary = {
   logos: SponsorLogo[];
   contacts: SponsorContact[];
   notes: string;
+  /** When true, no member is put down as looking after them. */
+  isUnassignable: boolean;
   /** Empty when the sponsor is not recognised at any level. */
   recognitionLevelId: string;
   categoryIds: string[];
@@ -284,6 +288,39 @@ export type CampaignAssignment = {
   memberIds: string[];
 };
 
+/**
+ * Something the campaign would go on to do, if it passes what it asked for.
+ *
+ * The amount is additional: above the goal, and above the tier before it. A
+ * manager thinks in what the next push is worth — "another two thousand and we
+ * can re-glaze the darkroom" — rather than in running totals, and the running
+ * totals are the one thing that can be worked out from the steps.
+ */
+export type StretchGoal = {
+  /** What the extra money is for. Without one there is nothing to aim at. */
+  description: string;
+  /** Additional whole cents, above the tier before it. */
+  amountCents: number;
+};
+
+/** Drops tiers somebody started and left empty, and keeps the order given. */
+export function normalizeStretchGoals(value: unknown): StretchGoal[] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((entry) => ({
+      description: String((entry as any)?.description ?? "")
+        .trim()
+        .slice(0, 300),
+      amountCents: Math.max(
+        0,
+        Math.round(Number((entry as any)?.amountCents ?? 0) || 0)
+      ),
+    }))
+    .filter((goal) => goal.amountCents > 0)
+    .slice(0, 12);
+}
+
 export type CampaignSummary = {
   _id: string;
   name: string;
@@ -293,6 +330,8 @@ export type CampaignSummary = {
   startDate: string;
   endDate: string;
   goalCents: number;
+  /** Above the goal, in order. Empty for a campaign with one target. */
+  stretchGoals: StretchGoal[];
   assignments: CampaignAssignment[];
 };
 
@@ -537,52 +576,140 @@ export function contributionsByCampaign(
  * An in-kind gift is worth having and worth recording, but a goal is money to
  * be raised — counting a lent projector towards it would say the money had come
  * in when it had not. Cancelled gifts are ignored for the same reason they are
- * ignored everywhere else.
+ * ignored everywhere else, and so is a gift recorded as not counting.
  */
 export type ProgressSegment = {
   status: DonationStatus;
   cents: number;
-  /** Percent of the goal, for the width of this segment. */
+  /** Percent of the bar's full width, which is `scaleCents`. */
   percent: number;
 };
 
+/** One stretch goal, placed against what the campaign has actually raised. */
+export type StretchTier = {
+  /** 1 for the first tier above the goal. */
+  step: number;
+  description: string;
+  /** The step itself: what this tier asks for beyond the one before. */
+  amountCents: number;
+  /** The campaign total at which this tier is reached. */
+  thresholdCents: number;
+  /** Where the tier sits along the bar, as a percent of its full width. */
+  markerPercent: number;
+  isMet: boolean;
+};
+
+export type MonetaryProgress = {
+  segments: ProgressSegment[];
+  /** Counted, monetary, not cancelled. */
+  totalCents: number;
+  /** Of the goal itself, and deliberately not capped: passing it is the point
+      of having stretch tiers, and a bar reading 100% would hide that. */
+  percent: number;
+  /** What the full width of the bar stands for. */
+  scaleCents: number;
+  /** Where the goal itself falls along the bar, once tiers widen it. */
+  goalPercent: number;
+  tiers: StretchTier[];
+  /** The furthest tier reached, or null while the goal itself is unmet. */
+  reached: StretchTier | null;
+  /** The next one to aim at, or null once every tier is met. */
+  next: StretchTier | null;
+  /** Monetary and not cancelled, but recorded as not counting. */
+  uncountedCents: number;
+};
+
+/**
+ * The bar, its bands, and the stretch tiers marked along it.
+ *
+ * With stretch goals the bar stops standing for the goal alone: its full width
+ * is the goal plus every tier, so a campaign at its target reads as part-way
+ * along rather than as finished. The headline percentage still answers "how
+ * much of the goal", which is the figure people quote.
+ */
 export function monetaryProgress(
-  donations: { status: DonationStatus; kind: DonationKind; valueCents: number }[],
-  goalCents: number
-): { segments: ProgressSegment[]; totalCents: number; percent: number } {
+  donations: {
+    status: DonationStatus;
+    kind: DonationKind;
+    valueCents: number;
+    isCounted?: boolean;
+  }[],
+  goalCents: number,
+  stretchGoals: StretchGoal[] = []
+): MonetaryProgress {
   const byStatus = new Map<DonationStatus, number>();
+  let uncountedCents = 0;
 
   for (const donation of donations) {
     if (donation.kind !== "monetary") continue;
     if (donation.status === "cancelled") continue;
+    // Recorded, and deliberately left out of the goal: see `isCounted`. Older
+    // records predate the flag and are counted, as they always were.
+    if (donation.isCounted === false) {
+      uncountedCents += donation.valueCents;
+      continue;
+    }
     byStatus.set(
       donation.status,
       (byStatus.get(donation.status) ?? 0) + donation.valueCents
     );
   }
 
-  const segments: ProgressSegment[] = [];
+  // Complete first, so the bar fills from what is certain towards what is not.
+  const banded: { status: DonationStatus; cents: number }[] = [];
   let totalCents = 0;
 
-  // Complete first, so the bar fills from what is certain towards what is not.
   for (const status of DONATION_STATUS_ORDER) {
     if (status === "cancelled") continue;
     const cents = byStatus.get(status) ?? 0;
     if (cents <= 0) continue;
 
     totalCents += cents;
-    segments.push({
-      status,
-      cents,
-      percent: goalCents ? (cents / goalCents) * 100 : 0,
+    banded.push({ status, cents });
+  }
+
+  const stretchCents = stretchGoals.reduce(
+    (sum, goal) => sum + goal.amountCents,
+    0
+  );
+  // The bar has to hold whatever is actually there: a campaign that has passed
+  // its last tier still needs a width its own segments fit inside.
+  const scaleCents = Math.max(goalCents + stretchCents, totalCents, 0);
+
+  const segments: ProgressSegment[] = banded.map(({ status, cents }) => ({
+    status,
+    cents,
+    percent: scaleCents ? (cents / scaleCents) * 100 : 0,
+  }));
+
+  const tiers: StretchTier[] = [];
+  let thresholdCents = goalCents;
+
+  for (const [index, goal] of stretchGoals.entries()) {
+    thresholdCents += goal.amountCents;
+    tiers.push({
+      step: index + 1,
+      description: goal.description,
+      amountCents: goal.amountCents,
+      thresholdCents,
+      markerPercent: scaleCents ? (thresholdCents / scaleCents) * 100 : 0,
+      isMet: thresholdCents > 0 && totalCents >= thresholdCents,
     });
   }
 
-  const percent = goalCents
-    ? Math.min(100, Math.round((totalCents / goalCents) * 100))
-    : 0;
+  const met = tiers.filter((tier) => tier.isMet);
 
-  return { segments, totalCents, percent };
+  return {
+    segments,
+    totalCents,
+    percent: goalCents ? Math.round((totalCents / goalCents) * 100) : 0,
+    scaleCents,
+    goalPercent: scaleCents ? (goalCents / scaleCents) * 100 : 0,
+    tiers,
+    reached: met.length > 0 ? met[met.length - 1] : null,
+    next: tiers.find((tier) => !tier.isMet) ?? null,
+    uncountedCents,
+  };
 }
 
 export type DonationSummary = {
@@ -595,6 +722,8 @@ export type DonationSummary = {
   date: string;
   /** Whole cents. In-kind donations carry the value they stand in for. */
   valueCents: number;
+  /** Whether it fills the goal and earns leaderboard credit. */
+  isCounted: boolean;
   description: string;
   /** The members credited with bringing it in. */
   memberIds: string[];
