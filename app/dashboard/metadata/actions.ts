@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { getUserAccess } from "@/lib/access";
 import { connectDB } from "@/lib/db";
 import { getMetadataGroup } from "@/lib/metadata";
-import { normalizeValues } from "@/lib/metadata-types";
+import { normalizeEntries } from "@/lib/metadata-types";
 import { MetadataAnswer } from "@/lib/models";
 import { requireSession } from "@/lib/session";
 
@@ -42,11 +42,11 @@ export async function saveOwnMetadataAction(
     return { ok: false, error: "That group is not asked of you." };
   }
 
-  let values;
+  let entries;
   try {
-    values = normalizeValues(
-      JSON.parse(String(formData.get("values") ?? "[]")),
-      group.questions
+    entries = normalizeEntries(
+      JSON.parse(String(formData.get("entries") ?? "[]")),
+      group
     );
   } catch {
     return { ok: false, error: "Could not read those answers." };
@@ -54,7 +54,15 @@ export async function saveOwnMetadataAction(
 
   await MetadataAnswer.findOneAndUpdate(
     { userId: session.userId, groupId },
-    { userId: session.userId, groupId, values, updatedById: session.userId },
+    {
+      userId: session.userId,
+      groupId,
+      entries,
+      updatedById: session.userId,
+      // The pre-repetition field, cleared so nothing reads it back as an entry
+      // once real entries exist.
+      $unset: { values: "" },
+    },
     { upsert: true }
   );
 

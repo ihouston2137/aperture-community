@@ -7726,6 +7726,23 @@ html:has(.admin-shell) body::-webkit-scrollbar {
   margin-top: 0.6rem;
 }
 
+/* One pass through a repeatable group's questions. Boxed and numbered, so a
+   page of three emergency contacts reads as three of something rather than as
+   one long form with the same questions three times. */
+.metadata-entry {
+  padding: 0.25rem 0.9rem 0.9rem;
+  margin-top: 0.75rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(128, 128, 128, 0.28);
+}
+
+.metadata-entry-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 0 0.1rem;
+}
+
 /* The answers offered by a choice question, as they are picked. */
 .metadata-choices {
   display: flex;

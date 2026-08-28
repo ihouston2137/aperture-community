@@ -10,12 +10,12 @@ import { connectDB } from "./db";
 import { MetadataAnswer, MetadataGroup, User } from "./models";
 import {
   managedBy,
+  normalizeEntries,
   normalizeQuestions,
-  normalizeValues,
   unanswered,
   type MetadataAnswerSummary,
+  type MetadataEntry,
   type MetadataGroupSummary,
-  type MetadataValue,
 } from "./metadata-types";
 
 export * from "./metadata-types";
@@ -34,6 +34,9 @@ export function toMetadataGroup(record: any): MetadataGroupSummary {
     managedBy: managedBy(record.managedBy),
     roleIds: ids(record.roleIds),
     questions: normalizeQuestions(record.questions),
+    isRepeatable: Boolean(record.isRepeatable),
+    entryLabel: String(record.entryLabel ?? "").trim(),
+    maxEntries: Math.max(0, Number(record.maxEntries ?? 0) || 0),
     viewRoleIds: ids(record.viewRoleIds),
     viewUserIds: ids(record.viewUserIds),
     editRoleIds: ids(record.editRoleIds),
@@ -67,8 +70,9 @@ export function toMetadataAnswer(
     userId: String(record.userId ?? ""),
     groupId: String(record.groupId ?? ""),
     // Read against the questions as they stand now, so an answer to a question
-    // since deleted, or an option since removed, quietly falls away.
-    values: normalizeValues(record.values, group.questions),
+    // since deleted, or an option since removed, quietly falls away. `values`
+    // is the shape answers had before groups could repeat.
+    entries: normalizeEntries(record.entries ?? record.values, group),
     updatedAt: record.updatedAt ? new Date(record.updatedAt).toISOString() : "",
   };
 }
@@ -88,17 +92,17 @@ export async function getGroupAnswers(
   return byUser;
 }
 
-/** One member's answers to one group, or an empty set when they have none. */
+/** One member's answers to one group, or nothing when they have none. */
 export async function getAnswer(
   userId: string,
   group: MetadataGroupSummary
-): Promise<MetadataValue[]> {
+): Promise<MetadataEntry[]> {
   await connectDB();
   const record = await MetadataAnswer.findOne({
     userId,
     groupId: group._id,
   }).lean<any>();
-  return record ? toMetadataAnswer(record, group).values : [];
+  return record ? toMetadataAnswer(record, group).entries : [];
 }
 
 /**
@@ -137,8 +141,8 @@ export async function membersForGroup(
  */
 export type MemberMetadataTask = {
   group: MetadataGroupSummary;
-  values: MetadataValue[];
-  /** Required questions still blank. Empty means there is nothing owed. */
+  entries: MetadataEntry[];
+  /** Required questions still blank, across every entry. */
   outstanding: number;
 };
 
@@ -161,8 +165,8 @@ export async function memberMetadataTasks(
     const record = records.find(
       (entry) => String(entry.groupId) === group._id
     );
-    const values = record ? toMetadataAnswer(record, group).values : [];
-    return { group, values, outstanding: unanswered(group, values).length };
+    const entries = record ? toMetadataAnswer(record, group).entries : [];
+    return { group, entries, outstanding: unanswered(group, entries).length };
   });
 }
 

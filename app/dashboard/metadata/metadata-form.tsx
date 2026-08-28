@@ -3,11 +3,11 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
-import { MetadataFields } from "@/components/metadata-fields";
+import { MetadataEntries } from "@/components/metadata-fields";
 import {
   unanswered,
+  type MetadataEntry,
   type MetadataGroupSummary,
-  type MetadataValue,
 } from "@/lib/metadata-types";
 
 import { saveOwnMetadataAction } from "./actions";
@@ -21,13 +21,13 @@ import { saveOwnMetadataAction } from "./actions";
  */
 export function MetadataForm({
   group,
-  values,
+  entries,
 }: {
   group: MetadataGroupSummary;
-  values: MetadataValue[];
+  entries: MetadataEntry[];
 }) {
   const router = useRouter();
-  const [draft, setDraft] = useState<MetadataValue[]>(values);
+  const [draft, setDraft] = useState<MetadataEntry[]>(entries);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -41,7 +41,7 @@ export function MetadataForm({
     startTransition(async () => {
       const formData = new FormData();
       formData.set("groupId", group._id);
-      formData.set("values", JSON.stringify(draft));
+      formData.set("entries", JSON.stringify(draft));
 
       const result = await saveOwnMetadataAction(formData);
       if (result.ok) {
@@ -70,9 +70,9 @@ export function MetadataForm({
 
       {error ? <div className="admin-notice is-error">{error}</div> : null}
 
-      <MetadataFields
-        questions={group.questions}
-        values={draft}
+      <MetadataEntries
+        group={group}
+        entries={draft}
         onChange={(next) => {
           setDraft(next);
           setSaved(false);

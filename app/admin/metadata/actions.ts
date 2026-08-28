@@ -11,8 +11,8 @@ import {
   canEditGroup,
   managedBy,
   METADATA_PERMISSIONS,
+  normalizeEntries,
   normalizeQuestions,
-  normalizeValues,
   type MetadataViewer,
 } from "@/lib/metadata-types";
 import { MetadataAnswer, MetadataGroup } from "@/lib/models";
@@ -75,6 +75,12 @@ export async function saveMetadataGroupAction(
     managedBy: managedBy(formData.get("managedBy")),
     roleIds: list("roleIds"),
     questions,
+    isRepeatable: formData.get("isRepeatable") === "on",
+    entryLabel: String(formData.get("entryLabel") ?? "").trim().slice(0, 60),
+    maxEntries: Math.max(
+      0,
+      Math.min(50, Number(formData.get("maxEntries") ?? 0) || 0)
+    ),
     viewRoleIds: list("viewRoleIds"),
     viewUserIds: list("viewUserIds"),
     editRoleIds: list("editRoleIds"),
@@ -140,11 +146,11 @@ export async function saveManagedAnswerAction(
     return { ok: false, error: "You cannot change this group's answers." };
   }
 
-  let values;
+  let entries;
   try {
-    values = normalizeValues(
-      JSON.parse(String(formData.get("values") ?? "[]")),
-      group.questions
+    entries = normalizeEntries(
+      JSON.parse(String(formData.get("entries") ?? "[]")),
+      group
     );
   } catch {
     return { ok: false, error: "Could not read those answers." };
@@ -152,7 +158,14 @@ export async function saveManagedAnswerAction(
 
   await MetadataAnswer.findOneAndUpdate(
     { userId, groupId },
-    { userId, groupId, values, updatedById: session.userId },
+    {
+      userId,
+      groupId,
+      entries,
+      updatedById: session.userId,
+      // The pre-repetition field, cleared so nothing reads it back as an entry.
+      $unset: { values: "" },
+    },
     { upsert: true }
   );
 

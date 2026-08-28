@@ -731,6 +731,15 @@ const MetadataGroupSchema = new Schema<any>(
     roleIds: [{ type: String }],
     questions: { type: [MetadataQuestionSchema], default: [] },
     /*
+     * Answered more than once: two emergency contacts, three allergies.
+     *
+     * The questions are the same each time; only how many times they are asked
+     * changes. `maxEntries` is zero for no limit.
+     */
+    isRepeatable: { type: Boolean, default: false },
+    entryLabel: { type: String, default: "" },
+    maxEntries: { type: Number, default: 0 },
+    /*
      * Who may read, who may change, and who may see everybody at once.
      *
      * Each is a pair: the management roles that carry it, and the individual
@@ -760,12 +769,25 @@ const MetadataAnswerSchema = new Schema<any>(
   {
     userId: { type: String, required: true, index: true },
     groupId: { type: String, required: true, index: true },
-    values: [
+    /*
+     * One pass through the questions each.
+     *
+     * A group that does not repeat holds one entry. Answers written before
+     * groups could repeat are a bare `values` list, read back as the single
+     * entry they always were — see `normalizeEntries`.
+     */
+    entries: [
       {
         _id: false,
-        questionId: { type: String, required: true },
-        text: { type: String, default: "" },
-        choices: [{ type: String }],
+        id: { type: String, default: "" },
+        values: [
+          {
+            _id: false,
+            questionId: { type: String, required: true },
+            text: { type: String, default: "" },
+            choices: [{ type: String }],
+          },
+        ],
       },
     ],
     /** Who last wrote it: the member themselves, or the manager who did. */

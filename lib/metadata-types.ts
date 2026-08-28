@@ -81,6 +81,19 @@ export type MetadataGroupSummary = {
   /** The membership roles it is asked of. Empty means nobody. */
   roleIds: string[];
   questions: MetadataQuestion[];
+  /**
+   * Answered more than once.
+   *
+   * Some things a community asks for are a list rather than a fact: two
+   * emergency contacts, three allergies, the cars somebody might arrive in.
+   * The questions are the same each time; what changes is how many times they
+   * are asked.
+   */
+  isRepeatable: boolean;
+  /** What one of them is called — "Emergency contact", "Vehicle". */
+  entryLabel: string;
+  /** The most that may be given. Zero for no limit. */
+  maxEntries: number;
   /* --- who may do what, on a manager-managed group ---------------------- */
   /** Management roles whose holders may read the answers. */
   viewRoleIds: string[];
@@ -104,11 +117,26 @@ export type MetadataValue = {
   choices: string[];
 };
 
+/**
+ * One pass through a group's questions.
+ *
+ * Every group is answered in entries, and a group that is not repeatable is
+ * simply one that holds at most one of them. That way the shape of an answer
+ * does not depend on a flag somebody may change later — turning repetition on
+ * for a group people have already answered keeps what they said as the first
+ * entry, and turning it off keeps the first and drops the rest.
+ */
+export type MetadataEntry = {
+  /** Distinguishes one entry from another while it is being edited. */
+  id: string;
+  values: MetadataValue[];
+};
+
 export type MetadataAnswerSummary = {
   _id: string;
   userId: string;
   groupId: string;
-  values: MetadataValue[];
+  entries: MetadataEntry[];
   /** ISO, or empty when nothing has been answered yet. */
   updatedAt: string;
 };
@@ -221,7 +249,44 @@ export function normalizeValues(
   return values;
 }
 
-/** True when the question has been answered at all. */
+/**
+ * Reads whatever is stored into entries.
+ *
+ * Answers written before groups could repeat are a bare list of values; they
+ * come back as the one entry they always were. A group that is not repeatable
+ * keeps only the first, so turning repetition off does not leave answers
+ * nothing can show.
+ */
+export function normalizeEntries(
+  value: unknown,
+  group: MetadataGroupSummary
+): MetadataEntry[] {
+  const rows = Array.isArray(value) ? value : [];
+
+  // The old shape: a flat list of values rather than a list of entries.
+  const looksFlat = rows.some(
+    (row) => row && typeof row === "object" && "questionId" in (row as object)
+  );
+  const source = looksFlat ? [{ values: rows }] : rows;
+
+  const entries: MetadataEntry[] = [];
+  const seen = new Set<string>();
+
+  for (const [index, raw] of source.slice(0, 100).entries()) {
+    const row = (raw ?? {}) as Record<string, unknown>;
+    let id = String(row.id ?? "").trim() || `e${index + 1}`;
+    while (seen.has(id)) id = `${id}x`;
+    seen.add(id);
+
+    entries.push({ id, values: normalizeValues(row.values, group.questions) });
+  }
+
+  const kept = group.isRepeatable ? entries : entries.slice(0, 1);
+  const limit = group.isRepeatable && group.maxEntries > 0 ? group.maxEntries : kept.length;
+  return kept.slice(0, Math.max(limit, 0));
+}
+
+/** True when the question has been answered at all, in one entry. */
 export function isAnswered(
   question: MetadataQuestion,
   values: MetadataValue[]
@@ -233,17 +298,40 @@ export function isAnswered(
     : value.text.trim() !== "";
 }
 
-/** The required questions of a group that this member has not answered. */
-export function unanswered(
+/** Whether anything at all has been said in this entry. */
+export function isEntryEmpty(
   group: MetadataGroupSummary,
-  values: MetadataValue[]
-): MetadataQuestion[] {
-  return group.questions.filter(
-    (question) => question.isRequired && !isAnswered(question, values)
-  );
+  entry: MetadataEntry
+): boolean {
+  return !group.questions.some((question) => isAnswered(question, entry.values));
 }
 
-/** How an answer reads on a report or a record. */
+/**
+ * What is still owed, counted across every entry.
+ *
+ * A required question is owed once per entry: a second emergency contact with
+ * a name and no telephone number is as incomplete as a first one would be. A
+ * repeatable group with nothing in it at all owes its required questions once,
+ * because one entry is the least it can be answered with.
+ */
+export function unanswered(
+  group: MetadataGroupSummary,
+  entries: MetadataEntry[]
+): MetadataQuestion[] {
+  const required = group.questions.filter((question) => question.isRequired);
+  if (required.length === 0) return [];
+  if (entries.length === 0) return required;
+
+  const owed: MetadataQuestion[] = [];
+  for (const entry of entries) {
+    for (const question of required) {
+      if (!isAnswered(question, entry.values)) owed.push(question);
+    }
+  }
+  return owed;
+}
+
+/** How one entry's answer reads on a report or a record. */
 export function answerText(
   question: MetadataQuestion,
   values: MetadataValue[]
@@ -251,6 +339,24 @@ export function answerText(
   const value = values.find((entry) => entry.questionId === question.id);
   if (!value) return "";
   return isChoiceType(question.type) ? value.choices.join(", ") : value.text;
+}
+
+/**
+ * One question's answers across every entry, for a report's cell.
+ *
+ * Numbered when there is more than one, because "Dad, Mum" in one column and
+ * "07700 900461, 07700 900912" in the next only line up if the reader can see
+ * that they are both in the order the entries were given.
+ */
+export function answerAcross(
+  question: MetadataQuestion,
+  entries: MetadataEntry[]
+): string {
+  const answers = entries.map((entry) => answerText(question, entry.values));
+  if (answers.length <= 1) return answers[0] ?? "";
+  return answers
+    .map((answer, index) => `${index + 1}. ${answer || "—"}`)
+    .join("  ");
 }
 
 /* ---------------------------------------------------------------- Access */

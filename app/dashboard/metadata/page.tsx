@@ -57,7 +57,7 @@ export default async function OwnMetadataPage() {
               <MetadataForm
                 key={task.group._id}
                 group={task.group}
-                values={task.values}
+                entries={task.entries}
               />
             ))}
 

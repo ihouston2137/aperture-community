@@ -14,7 +14,7 @@ import {
   type MetadataViewer,
 } from "@/lib/metadata";
 import {
-  answerText,
+  answerAcross,
   isAnswered,
   METADATA_PERMISSIONS,
   unanswered,
@@ -73,15 +73,17 @@ export default async function MetadataReportPage({
   ]);
 
   const rows = members.map((member) => {
-    const values = answers.get(String(member._id))?.values ?? [];
+    const entries = answers.get(String(member._id))?.entries ?? [];
     return {
       _id: String(member._id),
       name: fullName(member),
       isInactive: member.isActive === false,
-      values,
-      outstanding: unanswered(group, values).length,
+      entries,
+      outstanding: unanswered(group, entries).length,
+      // Counted on the first entry: it is what "has this member started"
+      // means, and a second contact does not make the first one more answered.
       answered: group.questions.filter((question) =>
-        isAnswered(question, values)
+        isAnswered(question, entries[0]?.values ?? [])
       ).length,
     };
   });
@@ -135,6 +137,7 @@ export default async function MetadataReportPage({
             <thead>
               <tr>
                 <th>Member</th>
+                {group.isRepeatable ? <th>Entries</th> : null}
                 {group.questions.map((question) => (
                   <th key={question.id}>
                     {question.label}
@@ -161,11 +164,13 @@ export default async function MetadataReportPage({
                     ) : null}
                   </td>
 
+                  {group.isRepeatable ? <td>{row.entries.length}</td> : null}
+
                   {group.questions.map((question) => (
                     <td key={question.id}>
                       {showAnswers
-                        ? answerText(question, row.values) || "—"
-                        : isAnswered(question, row.values)
+                        ? answerAcross(question, row.entries) || "—"
+                        : isAnswered(question, row.entries[0]?.values ?? [])
                           ? "answered"
                           : "—"}
                     </td>
@@ -174,11 +179,10 @@ export default async function MetadataReportPage({
                   {canEdit ? (
                     <td>
                       <AnswerButton
-                        groupId={group._id}
-                        questions={group.questions}
+                        group={group}
                         userId={row._id}
                         userName={row.name}
-                        values={row.values}
+                        entries={row.entries}
                       />
                     </td>
                   ) : null}

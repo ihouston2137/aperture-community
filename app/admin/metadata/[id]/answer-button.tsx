@@ -3,9 +3,12 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 
-import { MetadataFields } from "@/components/metadata-fields";
+import { MetadataEntries } from "@/components/metadata-fields";
 import { ModalPortal } from "@/components/modal-portal";
-import type { MetadataQuestion, MetadataValue } from "@/lib/metadata-types";
+import type {
+  MetadataEntry,
+  MetadataGroupSummary,
+} from "@/lib/metadata-types";
 
 import { saveManagedAnswerAction } from "../actions";
 
@@ -17,21 +20,19 @@ import { saveManagedAnswerAction } from "../actions";
  * row rather than on a page of its own.
  */
 export function AnswerButton({
-  groupId,
-  questions,
+  group,
   userId,
   userName,
-  values,
+  entries,
 }: {
-  groupId: string;
-  questions: MetadataQuestion[];
+  group: MetadataGroupSummary;
   userId: string;
   userName: string;
-  values: MetadataValue[];
+  entries: MetadataEntry[];
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [draft, setDraft] = useState<MetadataValue[]>(values);
+  const [draft, setDraft] = useState<MetadataEntry[]>(entries);
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
 
@@ -49,16 +50,16 @@ export function AnswerButton({
     setError("");
     // Back to what is on file, so a half-typed answer is not still sitting
     // there the next time the row is opened.
-    setDraft(values);
+    setDraft(entries);
   }
 
   function save() {
     setError("");
     startTransition(async () => {
       const formData = new FormData();
-      formData.set("groupId", groupId);
+      formData.set("groupId", group._id);
       formData.set("userId", userId);
-      formData.set("values", JSON.stringify(draft));
+      formData.set("entries", JSON.stringify(draft));
 
       const result = await saveManagedAnswerAction(formData);
       if (result.ok) {
@@ -113,9 +114,9 @@ export function AnswerButton({
                     Kept about this member. They do not see it.
                   </p>
 
-                  <MetadataFields
-                    questions={questions}
-                    values={draft}
+                  <MetadataEntries
+                    group={group}
+                    entries={draft}
                     onChange={setDraft}
                     disabled={pending}
                     idPrefix={`answer-${userId}`}

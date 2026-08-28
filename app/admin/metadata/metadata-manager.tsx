@@ -120,6 +120,11 @@ export function MetadataManager({
                 <div className="admin-list-meta">
                   {group.questions.length} question
                   {group.questions.length === 1 ? "" : "s"}
+                  {group.isRepeatable
+                    ? `, repeated${
+                        group.maxEntries > 0 ? ` up to ${group.maxEntries}×` : ""
+                      }`
+                    : ""}
                   {group.questions.some((question) => question.isRequired)
                     ? `, ${
                         group.questions.filter((question) => question.isRequired)
@@ -186,6 +191,7 @@ function GroupDialog({
   onSaved: () => void;
 }) {
   const [kind, setKind] = useState<ManagedBy>(group?.managedBy ?? "member");
+  const [repeats, setRepeats] = useState(group?.isRepeatable ?? false);
   const [questions, setQuestions] = useState<MetadataQuestion[]>(
     group?.questions ?? [blankQuestion()]
   );
@@ -451,6 +457,61 @@ function GroupDialog({
               >
                 Add a question
               </button>
+
+              <label className="checkbox-row" style={{ marginTop: "1.25rem" }}>
+                <input
+                  type="checkbox"
+                  name="isRepeatable"
+                  checked={repeats}
+                  disabled={pending}
+                  onChange={(event) => setRepeats(event.target.checked)}
+                />
+                These questions are answered more than once
+              </label>
+              <span className="help-text">
+                For a list rather than a fact: two emergency contacts, three
+                allergies, the vehicles somebody might arrive in. The questions
+                above are asked again for each one, and each one has to answer
+                whatever is required.
+              </span>
+
+              {repeats ? (
+                <div className="field-grid" style={{ marginTop: "0.75rem" }}>
+                  <div className="field">
+                    <label htmlFor="metadata-entry-label">
+                      What one of them is called
+                    </label>
+                    <input
+                      id="metadata-entry-label"
+                      name="entryLabel"
+                      type="text"
+                      defaultValue={group?.entryLabel ?? ""}
+                      placeholder="Emergency contact"
+                      disabled={pending}
+                    />
+                    <span className="help-text">
+                      Used on the buttons the member presses — &ldquo;Add
+                      another emergency contact&rdquo;.
+                    </span>
+                  </div>
+
+                  <div className="field">
+                    <label htmlFor="metadata-max-entries">At most</label>
+                    <input
+                      id="metadata-max-entries"
+                      name="maxEntries"
+                      type="number"
+                      min={0}
+                      max={50}
+                      defaultValue={group?.maxEntries ?? 0}
+                      disabled={pending}
+                    />
+                    <span className="help-text">
+                      How many may be given. Leave it at nought for no limit.
+                    </span>
+                  </div>
+                </div>
+              ) : null}
 
               {kind === "manager" ? (
                 <>
