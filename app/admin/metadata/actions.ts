@@ -82,8 +82,14 @@ export async function saveMetadataGroupAction(
       0,
       Math.min(50, Number(formData.get("maxEntries") ?? 0) || 0)
     ),
-    reportRows: reportDimension(formData.get("reportRows")),
-    reportColumns: reportDimension(formData.get("reportColumns")),
+    reportGroupBy: reportDimension(formData.get("reportGroupBy")),
+    reportGroupQuestionId: String(
+      formData.get("reportGroupQuestionId") ?? ""
+    ).trim(),
+    reportCountBy: reportDimension(formData.get("reportCountBy")),
+    reportCountQuestionId: String(
+      formData.get("reportCountQuestionId") ?? ""
+    ).trim(),
     reportSumIds: list("reportSumIds"),
     viewRoleIds: list("viewRoleIds"),
     viewUserIds: list("viewUserIds"),

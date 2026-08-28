@@ -747,9 +747,12 @@ const MetadataGroupSchema = new Schema<any>(
      * shirt sizes are always a count by size — and it is settled once by the
      * person writing the questions.
      */
-    reportRows: { type: String, default: "user" },
-    reportColumns: { type: String, default: "question" },
-    /** Which number questions are totalled. Empty means all of them. */
+    reportGroupBy: { type: String, default: "user" },
+    /** Grouping by a question means grouping by its answers, so it names one. */
+    reportGroupQuestionId: { type: String, default: "" },
+    reportCountBy: { type: String, default: "record" },
+    reportCountQuestionId: { type: String, default: "" },
+    /** Which number questions are totalled. Empty totals nothing. */
     reportSumIds: [{ type: String }],
     /*
      * Who may read, who may change, and who may see everybody at once.

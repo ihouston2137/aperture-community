@@ -5,10 +5,13 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 
 import { Panel } from "@/components/admin-ui";
+import { BioPicker } from "@/components/bio-picker";
 import { ModalPortal } from "@/components/modal-portal";
 import {
-  DIMENSION_HELP,
-  DIMENSION_LABELS,
+  COUNT_BY_HELP,
+  COUNT_BY_LABELS,
+  GROUP_BY_HELP,
+  GROUP_BY_LABELS,
   REPORT_DIMENSIONS,
 } from "@/lib/metadata-report";
 import {
@@ -197,10 +200,8 @@ function GroupDialog({
 }) {
   const [kind, setKind] = useState<ManagedBy>(group?.managedBy ?? "member");
   const [repeats, setRepeats] = useState(group?.isRepeatable ?? false);
-  const [reportRows, setReportRows] = useState(group?.reportRows ?? "user");
-  const [reportColumns, setReportColumns] = useState(
-    group?.reportColumns ?? "question"
-  );
+  const [groupBy, setGroupBy] = useState(group?.reportGroupBy ?? "user");
+  const [countBy, setCountBy] = useState(group?.reportCountBy ?? "record");
 
   const [questions, setQuestions] = useState<MetadataQuestion[]>(
     group?.questions ?? [blankQuestion()]
@@ -216,6 +217,11 @@ function GroupDialog({
    */
   const summable = questions.filter(
     (question) => question.type === "number" && question.label.trim() !== ""
+  );
+  /* Anything with an answer can be grouped by, though a choice question is
+     what makes it worth doing: "how many of each size" needs sizes. */
+  const answerable = questions.filter(
+    (question) => question.label.trim() !== ""
   );
 
   useEffect(() => {
@@ -490,57 +496,79 @@ function GroupDialog({
 
               <div className="field-grid">
                 <div className="field">
-                  <label htmlFor="report-rows">Down the side</label>
+                  <label htmlFor="report-group">Group by</label>
                   <select
-                    id="report-rows"
-                    name="reportRows"
-                    value={reportRows}
+                    id="report-group"
+                    name="reportGroupBy"
+                    value={groupBy}
                     disabled={pending}
-                    onChange={(event) => setReportRows(event.target.value)}
+                    onChange={(event) => setGroupBy(event.target.value)}
                   >
                     {REPORT_DIMENSIONS.map((dimension) => (
                       <option key={dimension} value={dimension}>
-                        {DIMENSION_LABELS[dimension]}
+                        {GROUP_BY_LABELS[dimension]}
                       </option>
                     ))}
                   </select>
                   <span className="help-text">
-                    {DIMENSION_HELP[
-                      reportRows as (typeof REPORT_DIMENSIONS)[number]
+                    {GROUP_BY_HELP[
+                      groupBy as (typeof REPORT_DIMENSIONS)[number]
                     ] ?? ""}
                   </span>
+
+                  {/* Grouping by a question means grouping by its answers, so
+                      it has to say which question. */}
+                  {groupBy === "question" ? (
+                    <QuestionChoice
+                      id="report-group-question"
+                      name="reportGroupQuestionId"
+                      questions={answerable}
+                      chosen={group?.reportGroupQuestionId ?? ""}
+                      disabled={pending}
+                    />
+                  ) : null}
                 </div>
 
                 <div className="field">
-                  <label htmlFor="report-cols">Across the top</label>
+                  <label htmlFor="report-count">Count by</label>
                   <select
-                    id="report-cols"
-                    name="reportColumns"
-                    value={reportColumns}
+                    id="report-count"
+                    name="reportCountBy"
+                    value={countBy}
                     disabled={pending}
-                    onChange={(event) => setReportColumns(event.target.value)}
+                    onChange={(event) => setCountBy(event.target.value)}
                   >
                     {REPORT_DIMENSIONS.map((dimension) => (
                       <option key={dimension} value={dimension}>
-                        {DIMENSION_LABELS[dimension]}
+                        {COUNT_BY_LABELS[dimension]}
                       </option>
                     ))}
                   </select>
                   <span className="help-text">
-                    {DIMENSION_HELP[
-                      reportColumns as (typeof REPORT_DIMENSIONS)[number]
+                    {COUNT_BY_HELP[
+                      countBy as (typeof REPORT_DIMENSIONS)[number]
                     ] ?? ""}
                   </span>
+
+                  {countBy === "question" ? (
+                    <QuestionChoice
+                      id="report-count-question"
+                      name="reportCountQuestionId"
+                      questions={answerable}
+                      chosen={group?.reportCountQuestionId ?? ""}
+                      disabled={pending}
+                    />
+                  ) : null}
                 </div>
               </div>
 
               <div className="field" style={{ marginTop: "0.75rem" }}>
-                <span className="field-label">Added up</span>
+                <span className="field-label">Add up</span>
                 {summable.length === 0 ? (
                   <span className="help-text">
-                    This group asks no number questions, so its report counts
-                    records instead — how many entries each member has given.
-                    Add a question of the Number type above to total something.
+                    This group asks no number questions, so its report is a
+                    count. Add a question of the Number type above to total
+                    something as well.
                   </span>
                 ) : (
                   <>
@@ -553,9 +581,8 @@ function GroupDialog({
                       chosen={group?.reportSumIds ?? []}
                     />
                     <span className="help-text">
-                      Which of its numbers to total. None chosen takes them all,
-                      which is worth watching when they measure different
-                      things — tickets and pounds do not add.
+                      A column of totals for each one chosen, beside the count.
+                      Leave them all unticked for a count alone.
                     </span>
                   </>
                 )}
@@ -726,6 +753,52 @@ function questionKind(value: string): ManagedBy {
   return value === "manager" ? "manager" : "member";
 }
 
+/**
+ * Which question a dimension means.
+ *
+ * Only shown when the dimension is "question", because that is the only time
+ * the setting means anything — and it is asked right under the dimension it
+ * belongs to rather than in a list of its own further down.
+ */
+function QuestionChoice({
+  id,
+  name,
+  questions,
+  chosen,
+  disabled,
+}: {
+  id: string;
+  name: string;
+  questions: MetadataQuestion[];
+  chosen: string;
+  disabled: boolean;
+}) {
+  if (questions.length === 0) {
+    return (
+      <span className="help-text">
+        Write a question above first — there is nothing to group by yet.
+      </span>
+    );
+  }
+
+  return (
+    <select
+      id={id}
+      name={name}
+      defaultValue={chosen}
+      disabled={disabled}
+      style={{ marginTop: "0.35rem" }}
+    >
+      <option value="">Choose a question</option>
+      {questions.map((question) => (
+        <option key={question.id || question.label} value={question.id}>
+          {question.label}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 /** A row of checkboxes that post one field name. */
 function ChipPicker({
   name,
@@ -812,12 +885,80 @@ function AccessPicker({
 
       <div className="field" style={{ marginTop: "0.5rem" }}>
         <span className="field-label">Named accounts</span>
-        <ChipPicker name={userName} options={users} chosen={chosenUsers} />
+        <NamedAccounts name={userName} users={users} chosen={chosenUsers} />
         <span className="help-text">
           Named directly, which needs no permission of its own — this is one
           group shared with one person.
         </span>
       </div>
+    </>
+  );
+}
+
+/**
+ * People named on a group, chosen by typing rather than by hunting a checkbox.
+ *
+ * A site has hundreds of accounts and a group is usually shared with two or
+ * three of them, so the list is filtered to what is typed and what has been
+ * picked is shown as chips — the same way members are credited on a donation
+ * and assigned to a sponsor.
+ *
+ * The chosen ids are posted as hidden inputs under one name, so the action
+ * reads them with `getAll` exactly as it read the checkboxes this replaced.
+ */
+function NamedAccounts({
+  name,
+  users,
+  chosen,
+}: {
+  name: string;
+  users: UserChoice[];
+  chosen: string[];
+}) {
+  const [picked, setPicked] = useState<string[]>(chosen);
+
+  const nameOf = (id: string) =>
+    users.find((user) => user._id === id)?.name ?? "somebody who has gone";
+
+  if (users.length === 0) {
+    return <span className="help-text">No accounts to name.</span>;
+  }
+
+  return (
+    <>
+      {picked.map((id) => (
+        <input key={id} type="hidden" name={name} value={id} />
+      ))}
+
+      {picked.length > 0 ? (
+        <div className="chip-picker" style={{ marginBottom: "0.5rem" }}>
+          {picked.map((id) => (
+            <span key={id} className="chip-option">
+              {nameOf(id)}
+              <button
+                type="button"
+                className="chip-remove"
+                aria-label={`Remove ${nameOf(id)}`}
+                onClick={() =>
+                  setPicked((current) => current.filter((held) => held !== id))
+                }
+              >
+                <span aria-hidden="true">×</span>
+              </button>
+            </span>
+          ))}
+        </div>
+      ) : null}
+
+      <BioPicker
+        options={users.filter((user) => !picked.includes(user._id))}
+        value=""
+        onChange={(id) => {
+          if (id) setPicked((current) => [...current, id]);
+        }}
+        emptyLabel="—"
+        placeholder="Type a name to add somebody"
+      />
     </>
   );
 }

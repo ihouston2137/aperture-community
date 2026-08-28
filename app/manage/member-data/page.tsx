@@ -16,12 +16,12 @@ import {
 } from "@/lib/metadata";
 import {
   buildFacts,
-  cellKey,
-  DIMENSION_LABELS,
-  pivot,
+  COUNT_BY_LABELS,
+  GROUP_BY_LABELS,
   reportDimension,
-  summedQuestions,
+  summarise,
   type ReportMember,
+  type ReportTable,
 } from "@/lib/metadata-report";
 import { fullName } from "@/lib/member-types";
 import { getSession } from "@/lib/session";
@@ -31,11 +31,11 @@ export const metadata = { title: "Member data" };
 /**
  * What the membership has answered, group by group.
  *
- * Nothing to configure here. Each group carries its own reading — see
- * `reportRows`, `reportColumns` and `reportSumIds` on the group — so this page
- * shows every group the reader may see, each the way that group says it should
- * be shown. A reading that is wrong is corrected where the questions are
- * written, once, rather than by everybody who opens this.
+ * Nothing to configure here. Each group says what to group by, what to count,
+ * and which numbers to add up — so this page shows every group the reader may
+ * see, each read the way that group asks to be read. A reading that is wrong
+ * is corrected where the questions are written, once, rather than by everybody
+ * who opens this.
  */
 export default async function MemberDataPage() {
   const session = await getSession();
@@ -52,9 +52,9 @@ export default async function MemberDataPage() {
   };
 
   /*
-   * Only the groups whose answers this reader may already read one member's
-   * of. A total is still an answer: a figure nobody may read one line of is
-   * not one they may read the sum of.
+   * Only groups whose answers this reader may already read one member's of. A
+   * total is still an answer: a figure nobody may read one line of is not one
+   * they may read the sum of.
    */
   const visible = (await getMetadataGroups()).filter((group) =>
     canViewGroup(viewer, group)
@@ -78,12 +78,7 @@ export default async function MemberDataPage() {
     reports.push({
       group,
       memberCount: members.size,
-      sums: summedQuestions(group),
-      table: pivot(
-        facts,
-        reportDimension(group.reportRows),
-        reportDimension(group.reportColumns)
-      ),
+      table: summarise(group, facts),
     });
   }
 
@@ -98,12 +93,11 @@ export default async function MemberDataPage() {
           </p>
         </header>
 
-        {reports.map(({ group, memberCount, sums, table }) => (
+        {reports.map(({ group, memberCount, table }) => (
           <GroupReport
             key={group._id}
             group={group}
             memberCount={memberCount}
-            sums={sums.map((question) => question.label)}
             table={table}
             canOpen={canReportGroup(viewer, group)}
           />
@@ -113,29 +107,36 @@ export default async function MemberDataPage() {
   );
 }
 
-/** One group's figures, laid out the way that group asks for. */
+/** One group, grouped and counted the way it asks to be. */
 function GroupReport({
   group,
   memberCount,
-  sums,
   table,
   canOpen,
 }: {
   group: MetadataGroupSummary;
   memberCount: number;
-  /** The questions being added up. Empty means the figures are record counts. */
-  sums: string[];
-  table: ReturnType<typeof pivot>;
-  /** Whether this reader may open the group's own report. */
+  table: ReportTable;
   canOpen: boolean;
 }) {
-  const counting = sums.length === 0;
-  const figure = (cell: { sum: number; records: number } | undefined) => {
-    if (!cell) return "—";
-    return counting
-      ? String(cell.records)
-      : cell.sum.toLocaleString(undefined, { maximumFractionDigits: 2 });
-  };
+  const groupBy = reportDimension(group.reportGroupBy);
+  const countBy = reportDimension(group.reportCountBy);
+
+  const questionName = (id: string) =>
+    group.questions.find((question) => question.id === id)?.label ?? "a question";
+
+  const heading =
+    groupBy === "question"
+      ? questionName(group.reportGroupQuestionId)
+      : GROUP_BY_LABELS[groupBy];
+
+  const countHeading =
+    countBy === "question"
+      ? `${questionName(group.reportCountQuestionId)} answers`
+      : COUNT_BY_LABELS[countBy];
+
+  const figure = (value: number) =>
+    value.toLocaleString(undefined, { maximumFractionDigits: 2 });
 
   return (
     <section className="member-card manager-card">
@@ -149,70 +150,66 @@ function GroupReport({
       </div>
 
       <p className="help-text">
-        {counting
-          ? "Counting records"
-          : `Adding up ${sums.join(", ")}`}
-        {" · "}
-        {DIMENSION_LABELS[reportDimension(group.reportRows)].toLowerCase()} down
-        the side, {DIMENSION_LABELS[
-          reportDimension(group.reportColumns)
-        ].toLowerCase()} across the top · asked of {memberCount} member
-        {memberCount === 1 ? "" : "s"}
+        Grouped by {heading.toLowerCase()}, counting{" "}
+        {countHeading.toLowerCase()}
+        {table.sumQuestions.length > 0
+          ? `, adding up ${table.sumQuestions
+              .map((question) => question.label)
+              .join(", ")}`
+          : ""}
+        {" · "}asked of {memberCount} member{memberCount === 1 ? "" : "s"}
       </p>
 
       {table.rows.length === 0 ? (
         <p className="member-note">
-          Nothing answered yet{group.questions.length === 0 ? " — and nothing asked" : ""}.
+          Nothing answered yet
+          {group.questions.length === 0 ? " — and nothing asked" : ""}.
         </p>
       ) : (
         <div className="import-preview">
           <table className="admin-table">
             <thead>
               <tr>
-                <th />
-                {table.columns.map((column) => (
-                  <th key={column}>{column}</th>
+                <th>{heading}</th>
+                <th className="is-figure">{countHeading}</th>
+                {table.sumQuestions.map((question) => (
+                  <th key={question.id} className="is-figure">
+                    {question.label}
+                  </th>
                 ))}
-                {table.columns.length > 1 ? <th>Total</th> : null}
               </tr>
             </thead>
             <tbody>
               {table.rows.map((row) => (
-                <tr key={row}>
-                  <th scope="row">{row}</th>
-
-                  {table.columns.map((column) => (
-                    <td key={column} className="is-figure">
-                      {figure(table.cells.get(cellKey(row, column)))}
+                <tr key={row.label}>
+                  <th scope="row">{row.label}</th>
+                  <td className="is-figure">{figure(row.count)}</td>
+                  {table.sumQuestions.map((question) => (
+                    <td key={question.id} className="is-figure">
+                      {row.sums.has(question.id)
+                        ? figure(row.sums.get(question.id) ?? 0)
+                        : "—"}
                     </td>
                   ))}
-
-                  {table.columns.length > 1 ? (
-                    <td className="is-figure is-total">
-                      {figure(table.rowTotals.get(row))}
-                    </td>
-                  ) : null}
                 </tr>
               ))}
             </tbody>
             <tfoot>
               <tr>
                 <th scope="row">Total</th>
-                {table.columns.map((column) => (
-                  <td key={column} className="is-figure is-total">
-                    {figure(table.columnTotals.get(column))}
+                <td className="is-figure is-total">{figure(table.total.count)}</td>
+                {table.sumQuestions.map((question) => (
+                  <td key={question.id} className="is-figure is-total">
+                    {figure(table.total.sums.get(question.id) ?? 0)}
                   </td>
                 ))}
-                {table.columns.length > 1 ? (
-                  <td className="is-figure is-total">{figure(table.total)}</td>
-                ) : null}
               </tr>
             </tfoot>
           </table>
         </div>
       )}
 
-      {!counting ? (
+      {table.sumQuestions.length > 0 ? (
         <p className="help-text" style={{ marginTop: "0.5rem" }}>
           A question left blank is absent rather than nought, so nobody
           answering and everybody answering none are not the same figure.

@@ -121,11 +121,15 @@ export type MetadataGroupSummary = {
   /** The most that may be given. Zero for no limit. */
   maxEntries: number;
   /* --- how the dashboard reads this group ------------------------------- */
-  /** What the rows of its report are: none, user, question or record. */
-  reportRows: string;
-  /** And its columns. */
-  reportColumns: string;
-  /** Which of its number questions are added up. Empty means all of them. */
+  /** What its report groups by: user, record or question. */
+  reportGroupBy: string;
+  /** Which question's answers the lines are, when grouping by question. */
+  reportGroupQuestionId: string;
+  /** What is counted on each line: user, record or question. */
+  reportCountBy: string;
+  /** Which question's answers are counted, when counting by question. */
+  reportCountQuestionId: string;
+  /** Which of its number questions are added up. Empty totals nothing. */
   reportSumIds: string[];
   /* --- who may do what, on a manager-managed group ---------------------- */
   /** Management roles whose holders may read the answers. */
