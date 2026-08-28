@@ -907,6 +907,8 @@ export type DonationSummary = {
   isCounted: boolean;
   /** The stretch goal it was given for, or empty for the campaign at large. */
   stretchGoalId: string;
+  /** What kind of donation this was, from the sponsor category list. */
+  categoryIds: string[];
   description: string;
   /** The members credited with bringing it in. */
   memberIds: string[];

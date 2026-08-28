@@ -17,6 +17,7 @@ import {
   formatDollars,
   isRealised,
   type DonationSummary,
+  type SponsorCategorySummary,
   type StretchGoal,
 } from "@/lib/sponsorship-types";
 
@@ -52,12 +53,15 @@ export function DonationManager({
   campaigns,
   sponsors,
   members,
+  categories,
   canManage,
 }: {
   donations: DonationSummary[];
   campaigns: CampaignOption[];
   sponsors: PickerOption[];
   members: PickerOption[];
+  /** The sponsor categories, which qualify a donation as well as a sponsor. */
+  categories: SponsorCategorySummary[];
   canManage: boolean;
 }) {
   const router = useRouter();
@@ -66,6 +70,7 @@ export function DonationManager({
   const [campaignId, setCampaignId] = useState("");
   const [kind, setKind] = useState("");
   const [status, setStatus] = useState("");
+  const [categoryId, setCategoryId] = useState("");
 
   const nameOf = (list: PickerOption[], id: string) =>
     list.find((entry) => entry._id === id)?.name ?? "one that has gone";
@@ -77,12 +82,16 @@ export function DonationManager({
       ?.stretchGoals?.find((goal) => goal.id === donation.stretchGoalId)
       ?.description ?? "";
 
+  const categoryName = (id: string) =>
+    categories.find((category) => category._id === id)?.name ?? "";
+
   const shown = useMemo(() => {
     const needle = query.trim().toLowerCase();
     return donations.filter((donation) => {
       if (campaignId && donation.campaignId !== campaignId) return false;
       if (kind && donation.kind !== kind) return false;
       if (status && donation.status !== status) return false;
+      if (categoryId && !donation.categoryIds.includes(categoryId)) return false;
       if (!needle) return true;
       return [
         nameOf(sponsors, donation.sponsorId),
@@ -95,7 +104,17 @@ export function DonationManager({
         .includes(needle);
     });
     // The lookups read from the three lists, which is what actually changes.
-  }, [donations, query, campaignId, kind, status, sponsors, campaigns, members]);
+  }, [
+    donations,
+    query,
+    campaignId,
+    kind,
+    status,
+    categoryId,
+    sponsors,
+    campaigns,
+    members,
+  ]);
 
   // Cancelled donations never happened, so they are left out of the figure — and
   // what has arrived is reported apart from what is still being worked on.
@@ -183,6 +202,24 @@ export function DonationManager({
             ))}
           </select>
         </div>
+
+        {categories.length > 0 ? (
+          <div className="field">
+            <label htmlFor="donation-category">Category</label>
+            <select
+              id="donation-category"
+              value={categoryId}
+              onChange={(event) => setCategoryId(event.target.value)}
+            >
+              <option value="">Every category</option>
+              {categories.map((category) => (
+                <option key={category._id} value={category._id}>
+                  {category.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : null}
       </div>
 
       <p className="help-text" style={{ marginTop: "0.75rem" }}>
@@ -210,6 +247,12 @@ export function DonationManager({
                   {` · ${DONATION_STATUS_LABELS[donation.status]}`}
                   {donation.isCounted ? "" : " · not counted"}
                   {appliedTo(donation) ? ` · for ${appliedTo(donation)}` : ""}
+                  {donation.categoryIds.length > 0
+                    ? ` · ${donation.categoryIds
+                        .map(categoryName)
+                        .filter(Boolean)
+                        .join(", ")}`
+                    : ""}
                 </div>
                 <div className="admin-list-meta">
                   {donation.memberIds.length > 0
@@ -255,6 +298,7 @@ export function DonationManager({
           campaigns={campaigns}
           sponsors={sponsors}
           members={members}
+          categories={categories}
           onClose={() => setDialog(null)}
           onSaved={() => {
             setDialog(null);
@@ -277,6 +321,7 @@ export function DonationDialog({
   campaigns,
   sponsors,
   members,
+  categories,
   defaultSponsorId = "",
   defaultCampaignId = "",
   onClose,
@@ -286,6 +331,7 @@ export function DonationDialog({
   campaigns: CampaignOption[];
   sponsors: PickerOption[];
   members: PickerOption[];
+  categories: SponsorCategorySummary[];
   /*
    * Who and what a new donation is for, when the page opening this already knows.
    * Somebody recording a donation from a sponsor's page on a campaign has
@@ -550,6 +596,33 @@ export function DonationDialog({
                   placeholder="What was given, and anything worth remembering about it."
                 />
               </div>
+
+              {categories.length > 0 ? (
+                <div className="field" style={{ marginTop: "0.875rem" }}>
+                  <span className="field-label">Categories</span>
+                  <div className="chip-picker">
+                    {categories.map((category) => (
+                      <label key={category._id} className="chip-option">
+                        <input
+                          type="checkbox"
+                          name="categoryIds"
+                          value={category._id}
+                          defaultChecked={
+                            donation?.categoryIds.includes(category._id) ?? false
+                          }
+                        />
+                        {category.name}
+                      </label>
+                    ))}
+                  </div>
+                  <span className="help-text">
+                    What kind of donation this was. The sponsor&apos;s own
+                    categories say what kind of organisation they are, which is
+                    a different question — a printing firm can give money to one
+                    campaign and printing to another.
+                  </span>
+                </div>
+              ) : null}
 
               <div className="field" style={{ marginTop: "0.875rem" }}>
                 <span className="field-label">

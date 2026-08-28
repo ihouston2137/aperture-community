@@ -24,6 +24,7 @@ import {
   getCampaigns,
   getDonations,
   getRecognitionLevels,
+  getSponsorCategories,
   getSponsors,
 } from "@/lib/sponsorships";
 
@@ -56,17 +57,19 @@ export default async function CampaignSponsorDashboard({
   const access = sponsorshipAccess(permissions);
   await connectDB();
 
-  const [campaigns, donations, sponsors, levels, users, roles] = await Promise.all([
-    getCampaigns(),
-    getDonations(),
-    getSponsors(),
-    getRecognitionLevels(),
-    User.find({ isActive: { $ne: false } })
-      .select("_id firstName lastName name email roleIds")
-      .sort({ lastName: 1, firstName: 1, email: 1 })
-      .lean<any[]>(),
-    getRoleSummaries("community"),
-  ]);
+  const [campaigns, donations, sponsors, levels, categories, users, roles] =
+    await Promise.all([
+      getCampaigns(),
+      getDonations(),
+      getSponsors(),
+      getRecognitionLevels(),
+      getSponsorCategories(),
+      User.find({ isActive: { $ne: false } })
+        .select("_id firstName lastName name email roleIds")
+        .sort({ lastName: 1, firstName: 1, email: 1 })
+        .lean<any[]>(),
+      getRoleSummaries("community"),
+    ]);
 
   const campaign = campaigns.find((entry) => entry._id === id);
   const sponsor = sponsors.find((entry) => entry._id === sponsorId);
@@ -110,6 +113,9 @@ export default async function CampaignSponsorDashboard({
 
   const level = levels.find((entry) => entry._id === sponsor.recognitionLevelId);
   const logoSrc = sponsorLogoSrc(primaryLogo(sponsor.logos));
+
+  const categoryName = (id: string) =>
+    categories.find((category) => category._id === id)?.name ?? "";
 
   const campaignOptions = campaigns.map((entry) => ({
     _id: entry._id,
@@ -223,6 +229,7 @@ export default async function CampaignSponsorDashboard({
               campaigns={campaignOptions}
               sponsors={sponsorOptions}
               members={members}
+              categories={categories}
               defaultSponsorId={sponsor._id}
               defaultCampaignId={campaign._id}
               label="Record a donation"
@@ -249,6 +256,12 @@ export default async function CampaignSponsorDashboard({
                     {donation.memberIds.length > 0
                       ? ` · ${donation.memberIds.map(memberName).join(", ")}`
                       : ""}
+                    {donation.categoryIds.length > 0
+                      ? ` · ${donation.categoryIds
+                          .map(categoryName)
+                          .filter(Boolean)
+                          .join(", ")}`
+                      : ""}
                   </span>
                   {donation.description ? (
                     <span className="help-text">{donation.description}</span>
@@ -266,6 +279,7 @@ export default async function CampaignSponsorDashboard({
                     campaigns={campaignOptions}
                     sponsors={sponsorOptions}
                     members={members}
+                    categories={categories}
                     label={`Edit this ${DONATION_KIND_LABELS[
                       donation.kind
                     ].toLowerCase()} donation`}
@@ -297,6 +311,13 @@ export default async function CampaignSponsorDashboard({
 
             <dt>Phone</dt>
             <dd>{formatPhone(sponsor.phone) || "—"}</dd>
+
+            <dt>Categories</dt>
+            <dd>
+              {sponsor.categoryIds.length === 0
+                ? "—"
+                : sponsor.categoryIds.map(categoryName).filter(Boolean).join(", ")}
+            </dd>
 
             <dt>Website</dt>
             <dd>

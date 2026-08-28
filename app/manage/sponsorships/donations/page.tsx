@@ -17,6 +17,7 @@ import {
   creditByMember,
   getCampaigns,
   getDonations,
+  getSponsorCategories,
   getSponsors,
 } from "@/lib/sponsorships";
 
@@ -33,16 +34,18 @@ export default async function ManagerDonationsPage() {
 
   await connectDB();
 
-  const [donations, campaigns, sponsors, users, roles] = await Promise.all([
-    getDonations(),
-    getCampaigns(),
-    getSponsors(),
-    User.find({ isActive: { $ne: false } })
-      .select("_id firstName lastName name email roleIds")
-      .sort({ lastName: 1, firstName: 1, email: 1 })
-      .lean<any[]>(),
-    getRoleSummaries("community"),
-  ]);
+  const [donations, campaigns, sponsors, categories, users, roles] =
+    await Promise.all([
+      getDonations(),
+      getCampaigns(),
+      getSponsors(),
+      getSponsorCategories(),
+      User.find({ isActive: { $ne: false } })
+        .select("_id firstName lastName name email roleIds")
+        .sort({ lastName: 1, firstName: 1, email: 1 })
+        .lean<any[]>(),
+      getRoleSummaries("community"),
+    ]);
 
   const seedEmail = (process.env.SEED_ADMIN_EMAIL || "").trim().toLowerCase();
 
@@ -89,6 +92,7 @@ export default async function ManagerDonationsPage() {
           name: sponsor.name,
         }))}
         members={members}
+        categories={categories}
         canManage={access.canEditDonations}
       />
 

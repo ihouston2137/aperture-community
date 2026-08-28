@@ -327,11 +327,15 @@ export function ChangeLevelButton({
   sponsorId,
   levels,
   current,
+  label = "Change",
   icon = false,
 }: {
   sponsorId: string;
   levels: RecognitionLevelSummary[];
   current: string;
+  /** The word on the button. "Change" reads oddly beside a sponsor at no
+      level at all, where the question is whether to recognise them. */
+  label?: string;
   /** A square pencil rather than a worded button, for a one-line row. */
   icon?: boolean;
 }) {
@@ -371,7 +375,7 @@ export function ChangeLevelButton({
         <IconButton label="Change recognition level" onClick={() => setOpen(true)} />
       ) : (
         <button type="button" className="btn btn-sm" onClick={() => setOpen(true)}>
-          Change
+          {label}
         </button>
       )}
 

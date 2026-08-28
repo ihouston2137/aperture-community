@@ -19,6 +19,7 @@ import {
   getCampaigns,
   getDonations,
   getSponsors,
+  recognitionReport,
   splitCreditByMember,
   totalsByCampaign,
 } from "@/lib/sponsorships";
@@ -113,6 +114,13 @@ export default async function SponsorshipsDashboard() {
 
   // Closed campaigns are only part of the count for somebody who may see them.
   const visibleCampaignCount = active.length + closed.length;
+
+  // Who is on the site, and who has paid for a campaign without being put
+  // there. Worked out here as well as on its own page so the box and the page
+  // can never disagree about the figures.
+  const recognition = access.canSeeRecords
+    ? recognitionReport(sponsors, campaigns, donations)
+    : null;
 
   return (
     <>
@@ -307,6 +315,59 @@ export default async function SponsorshipsDashboard() {
           </ul>
         )}
       </section>
+
+      {recognition ? (
+        <Link
+          href="/manage/sponsorships/recognition"
+          className={`member-card manager-card report-box${
+            recognition.unrecognised.length > 0 ? " is-flagged" : ""
+          }`}
+        >
+          <div className="manager-card-head">
+            <h2 className="member-card-title">Recognition</h2>
+            <span className="report-box-more" aria-hidden="true">
+              ›
+            </span>
+          </div>
+
+          <div className="report-figures">
+            <span className="report-figure">
+              <strong>{recognition.recognisedCount}</strong>
+              <span className="help-text">
+                sponsor{recognition.recognisedCount === 1 ? "" : "s"} recognised
+              </span>
+            </span>
+
+            <span className="report-figure">
+              <strong>{formatDollars(recognition.latestCents)}</strong>
+              <span className="help-text">
+                {recognition.latest
+                  ? `from ${recognition.latest.name}, ${
+                      recognition.latestCount
+                    } donation${recognition.latestCount === 1 ? "" : "s"}`
+                  : "no campaign running"}
+              </span>
+            </span>
+
+            {/* The figure the box exists for: money taken from sponsors the
+                site does not name anywhere. */}
+            <span
+              className={`report-figure${
+                recognition.unrecognised.length > 0 ? " is-flagged" : ""
+              }`}
+            >
+              <strong>{recognition.unrecognised.length}</strong>
+              <span className="help-text">
+                {recognition.unrecognised.length === 0
+                  ? "all givers recognised"
+                  : `giving ${formatDollars(
+                      recognition.unrecognisedCents
+                    )} without being recognised`}
+              </span>
+            </span>
+          </div>
+        </Link>
+      ) : null}
 
       <Leaderboard
         entries={leaderboard}

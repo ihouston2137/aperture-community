@@ -912,6 +912,16 @@ const DonationSchema = new Schema<any>(
      * meant it to pay for. Empty for a donation to the campaign at large.
      */
     stretchGoalId: { type: String, default: "" },
+    /*
+     * The same categories a sponsor can be put into, applied to one donation.
+     *
+     * A sponsor's categories say what kind of organisation they are, which
+     * does not change from one donation to the next. These say what kind of
+     * donation this was — and the two are not the same question, so a printing
+     * firm can give money to one campaign and printing to another without the
+     * record having to pretend both were the same sort of thing.
+     */
+    categoryIds: [{ type: String }],
     /** The members credited with bringing it in. */
     memberIds: [{ type: String }],
   },

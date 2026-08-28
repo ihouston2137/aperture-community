@@ -12,7 +12,11 @@ import {
   DonationDialog,
   type CampaignOption,
 } from "@/app/admin/donations/donation-manager";
-import type { CampaignSummary, DonationSummary } from "@/lib/sponsorship-types";
+import type {
+  CampaignSummary,
+  DonationSummary,
+  SponsorCategorySummary,
+} from "@/lib/sponsorship-types";
 
 import { IconButton } from "./sponsor-controls";
 
@@ -73,6 +77,7 @@ export function DonationButton({
   campaigns,
   sponsors,
   members,
+  categories,
   defaultSponsorId,
   defaultCampaignId,
   label,
@@ -84,6 +89,7 @@ export function DonationButton({
   campaigns: CampaignOption[];
   sponsors: PickerOption[];
   members: PickerOption[];
+  categories: SponsorCategorySummary[];
   /** What the page opening this already knows about a new donation. */
   defaultSponsorId?: string;
   defaultCampaignId?: string;
@@ -115,6 +121,7 @@ export function DonationButton({
           campaigns={campaigns}
           sponsors={sponsors}
           members={members}
+          categories={categories}
           defaultSponsorId={defaultSponsorId}
           defaultCampaignId={defaultCampaignId}
           onClose={() => setOpen(false)}

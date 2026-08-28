@@ -185,6 +185,7 @@ export async function deleteCategoryAction(
   // Unlike a level or a benefit, a category carries nothing of its own — so it
   // is simply taken off the sponsors holding it rather than refused.
   await Sponsor.updateMany({ categoryIds: id }, { $pull: { categoryIds: id } });
+  await Donation.updateMany({ categoryIds: id }, { $pull: { categoryIds: id } });
   await SponsorCategory.findByIdAndDelete(id);
 
   revalidate();

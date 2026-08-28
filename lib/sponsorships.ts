@@ -28,6 +28,7 @@ import {
   type DonationSummary,
   type RecognitionLevelSummary,
   type SponsorBenefitSummary,
+  type SponsorLogo,
   type SponsorCategorySummary,
   type SponsorSummary,
 } from "./sponsorship-types";
@@ -131,6 +132,7 @@ export function toDonationSummary(record: any): DonationSummary {
     // all counted at the time, so the absence has to read as true.
     isCounted: record.isCounted !== false,
     stretchGoalId: String(record.stretchGoalId ?? ""),
+    categoryIds: uniqueIds((record.categoryIds ?? []).map(String)),
     description: String(record.description ?? ""),
     memberIds: uniqueIds((record.memberIds ?? []).map(String)),
   };
@@ -340,4 +342,161 @@ export function creditByMember(
   }
 
   return credit;
+}
+
+/* ------------------------------------------------------- Recognition report */
+
+/**
+ * One sponsor, against what they have given to the campaigns now running.
+ *
+ * Money and in-kind are held apart, as they are everywhere else — a donated
+ * venue is not a cheque — but they are ranked together, because a sponsor who
+ * lent a hall worth thousands has not given less than one who sent a small
+ * cheque, and an order that said so would put the wrong people at the top of a
+ * list whose whole purpose is deciding who to thank.
+ */
+export type RecognitionRow = {
+  _id: string;
+  name: string;
+  logos: SponsorLogo[];
+  /** Empty when nobody has put them at a level. */
+  recognitionLevelId: string;
+  monetaryCents: number;
+  inKindCents: number;
+  /** The two added, for ordering only. Never shown as one figure. */
+  rankCents: number;
+  count: number;
+  /** The running campaigns they have given to. */
+  campaignCount: number;
+};
+
+/**
+ * Who is being recognised, and who has given without being.
+ *
+ * The second list is the point of the report: a sponsor who has paid for a
+ * campaign and appears nowhere on the site is an oversight nobody notices,
+ * because nothing about the donation record says it is missing. Asked only of
+ * the campaigns now running — last year's sponsors were recognised, or were
+ * not, and it is too late to be told about it here.
+ */
+export type RecognitionReport = {
+  /** At a level, ordered by what they have given to running campaigns. */
+  recognised: RecognitionRow[];
+  /** Gave to a running campaign, at no level. Ordered the same way. */
+  unrecognised: RecognitionRow[];
+  /** Every sponsor at a level, whether or not they have given lately. */
+  recognisedCount: number;
+  /** Money given to running campaigns by sponsors at a level. */
+  recognisedCents: number;
+  /** And by sponsors at none — the figure that is going unthanked. */
+  unrecognisedCents: number;
+  /** The campaign that started most recently, of those running. */
+  latest: CampaignSummary | null;
+  latestCents: number;
+  latestCount: number;
+};
+
+export function recognitionReport(
+  sponsors: SponsorSummary[],
+  campaigns: CampaignSummary[],
+  donations: DonationSummary[]
+): RecognitionReport {
+  const active = campaigns.filter((campaign) => campaign.status === "active");
+  const activeIds = new Set(active.map((campaign) => campaign._id));
+
+  // The one started most recently. A campaign with no start date has no claim
+  // to being the latest, so it only wins when nothing else is running.
+  const latest =
+    [...active].sort((a, b) => b.startDate.localeCompare(a.startDate))[0] ?? null;
+
+  const rows = new Map<string, RecognitionRow>();
+  const campaignsSeen = new Map<string, Set<string>>();
+  let latestCents = 0;
+  let latestCount = 0;
+
+  for (const donation of donations) {
+    // Cancelled never happened, here as everywhere. A donation marked as not
+    // counting towards the goal is still something the sponsor gave, and is
+    // still a reason to thank them, so it is counted here.
+    if (!countsTowardTotals(donation.status)) continue;
+    if (!activeIds.has(donation.campaignId)) continue;
+
+    if (latest && donation.campaignId === latest._id) {
+      latestCents += donation.valueCents;
+      latestCount += 1;
+    }
+
+    const sponsor = sponsors.find((entry) => entry._id === donation.sponsorId);
+    if (!sponsor) continue;
+
+    const row = rows.get(sponsor._id) ?? {
+      _id: sponsor._id,
+      name: sponsor.name,
+      logos: sponsor.logos,
+      recognitionLevelId: sponsor.recognitionLevelId,
+      monetaryCents: 0,
+      inKindCents: 0,
+      rankCents: 0,
+      count: 0,
+      campaignCount: 0,
+    };
+
+    if (donation.kind === "in-kind") row.inKindCents += donation.valueCents;
+    else row.monetaryCents += donation.valueCents;
+    row.rankCents += donation.valueCents;
+    row.count += 1;
+    rows.set(sponsor._id, row);
+
+    const seen = campaignsSeen.get(sponsor._id) ?? new Set<string>();
+    seen.add(donation.campaignId);
+    campaignsSeen.set(sponsor._id, seen);
+  }
+
+  for (const [sponsorId, row] of rows) {
+    row.campaignCount = campaignsSeen.get(sponsorId)?.size ?? 0;
+  }
+
+  const byGiven = (a: RecognitionRow, b: RecognitionRow) =>
+    b.rankCents - a.rankCents || a.name.localeCompare(b.name);
+
+  /*
+   * A recognised sponsor belongs on the first list whether or not they have
+   * given this year: the list answers "who is on the site", and a sponsor
+   * recognised through a quiet year is still on it.
+   */
+  const recognised = sponsors
+    .filter((sponsor) => sponsor.recognitionLevelId)
+    .map(
+      (sponsor) =>
+        rows.get(sponsor._id) ?? {
+          _id: sponsor._id,
+          name: sponsor.name,
+          logos: sponsor.logos,
+          recognitionLevelId: sponsor.recognitionLevelId,
+          monetaryCents: 0,
+          inKindCents: 0,
+          rankCents: 0,
+          count: 0,
+          campaignCount: 0,
+        }
+    )
+    .sort(byGiven);
+
+  const unrecognised = [...rows.values()]
+    .filter((row) => !row.recognitionLevelId)
+    .sort(byGiven);
+
+  const sum = (list: RecognitionRow[]) =>
+    list.reduce((total, row) => total + row.rankCents, 0);
+
+  return {
+    recognised,
+    unrecognised,
+    recognisedCount: recognised.length,
+    recognisedCents: sum(recognised),
+    unrecognisedCents: sum(unrecognised),
+    latest,
+    latestCents,
+    latestCount,
+  };
 }

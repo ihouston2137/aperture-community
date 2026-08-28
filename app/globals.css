@@ -7672,6 +7672,130 @@ html:has(.admin-shell) body::-webkit-scrollbar {
   opacity: 1;
 }
 
+/* ------------------------------------------------------ Recognition report
+
+   A card that is entirely a link, and the list it leads to. */
+
+.report-box {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+
+.report-box:hover {
+  border-color: rgba(128, 128, 128, 0.5);
+}
+
+.report-box .manager-card-title {
+  margin-bottom: 0;
+}
+
+.report-box-more {
+  margin-left: auto;
+  font-size: 1.25rem;
+  opacity: 0.5;
+}
+
+/* A card carrying something somebody has to act on. Quiet — it is a prompt,
+   not an error — in the same amber pair `.badge-draft` uses for work that is
+   not finished, rather than a donation status colour, which would say this
+   was about a donation. */
+.manager-card.is-flagged,
+.report-box.is-flagged {
+  border-color: #6b5b32;
+}
+
+.report-figures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 2rem;
+  margin-top: 0.75rem;
+}
+
+.report-figure {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.report-figure strong {
+  font-family: var(--heading-font);
+  font-size: 1.75rem;
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+}
+
+.report-figure .help-text {
+  max-width: 16rem;
+}
+
+.report-figure.is-flagged strong {
+  color: #fdd663;
+}
+
+/* One sponsor on the recognition lists: who, at what level, for how much. */
+.recognition-rows {
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.recognition-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid rgba(128, 128, 128, 0.18);
+}
+
+.recognition-row:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.recognition-logo {
+  width: 3.5rem;
+  height: 3.5rem;
+  flex: none;
+  border-radius: var(--radius);
+  object-fit: contain;
+  box-sizing: border-box;
+  padding: 0.25rem;
+  border: 1px solid var(--admin-border);
+  background: var(--sponsor-logo-backdrop);
+}
+
+.recognition-logo.is-empty {
+  background: rgba(128, 128, 128, 0.12);
+}
+
+.recognition-who {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+.recognition-level {
+  font-size: 0.875rem;
+  opacity: 0.8;
+}
+
+.recognition-figures {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.1rem;
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+
 /* An effort raised alongside gets a card of its own: its own target, its own
    bar, its own figure. Set beside each other rather than stacked, because they
    are peers — none of them is a step towards another. */

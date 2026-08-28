@@ -4,7 +4,13 @@ import { revalidatePath } from "next/cache";
 
 import { requirePermission } from "@/lib/access";
 import { connectDB } from "@/lib/db";
-import { Donation, Sponsor, SponsorshipCampaign, User } from "@/lib/models";
+import {
+  Donation,
+  Sponsor,
+  SponsorCategory,
+  SponsorshipCampaign,
+  User,
+} from "@/lib/models";
 import {
   dollarsToCents,
   donationKind,
@@ -78,6 +84,16 @@ export async function saveDonationAction(
     }
   }
 
+  const categoryIds = uniqueIds(formData.getAll("categoryIds").map(String));
+  if (categoryIds.length > 0) {
+    const found = await SponsorCategory.find({ _id: { $in: categoryIds } })
+      .select("_id")
+      .lean<any[]>();
+    if (found.length !== categoryIds.length) {
+      return { ok: false, error: "One of those categories no longer exists." };
+    }
+  }
+
   const payload = {
     campaignId,
     sponsorId,
@@ -91,6 +107,7 @@ export async function saveDonationAction(
     // clearing it rather than a field that was never asked about.
     isCounted: formData.get("isCounted") === "on",
     stretchGoalId,
+    categoryIds,
     description: String(formData.get("description") ?? "").trim().slice(0, 2000),
     memberIds,
   };
