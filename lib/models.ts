@@ -837,6 +837,12 @@ const SponsorshipCampaignSchema = new Schema<any>(
     stretchGoals: [
       {
         _id: false,
+        /*
+         * Minted when the tier is first saved and kept for its lifetime, so a
+         * donation can be applied to one. A position would not do: deleting
+         * the first tier would silently move every gift below it up one.
+         */
+        id: { type: String, default: "" },
         description: { type: String, default: "" },
         amountCents: { type: Number, default: 0 },
       },
@@ -888,6 +894,14 @@ const DonationSchema = new Schema<any>(
      * existing record and a new one both start true.
      */
     isCounted: { type: Boolean, default: true },
+    /*
+     * The stretch goal this gift was given for, if it was given for one.
+     *
+     * An earmark rather than a redirection: the money fills the campaign the
+     * same way whatever it is marked for, and this records what the giver
+     * meant it to pay for. Empty for a gift to the campaign at large.
+     */
+    stretchGoalId: { type: String, default: "" },
     /** The members credited with bringing it in. */
     memberIds: [{ type: String }],
   },

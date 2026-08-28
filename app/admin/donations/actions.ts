@@ -10,6 +10,7 @@ import {
   donationKind,
   donationStatus,
   isoDate,
+  normalizeStretchGoals,
   uniqueIds,
 } from "@/lib/sponsorship-types";
 
@@ -46,11 +47,27 @@ export async function saveDonationAction(
   }
 
   const [campaign, sponsor] = await Promise.all([
-    SponsorshipCampaign.exists({ _id: campaignId }),
+    SponsorshipCampaign.findById(campaignId).select("stretchGoals").lean<any>(),
     Sponsor.exists({ _id: sponsorId }),
   ]);
   if (!campaign) return { ok: false, error: "That campaign no longer exists." };
   if (!sponsor) return { ok: false, error: "That sponsor no longer exists." };
+
+  // A gift can only be applied to a stretch goal of the campaign it is for.
+  // The dialog only offers those, so this catches a campaign changed under an
+  // open dialog rather than a mistake somebody could make on screen.
+  const stretchGoalId = String(formData.get("stretchGoalId") ?? "").trim();
+  if (
+    stretchGoalId &&
+    !normalizeStretchGoals(campaign.stretchGoals).some(
+      (goal) => goal.id === stretchGoalId
+    )
+  ) {
+    return {
+      ok: false,
+      error: "That stretch goal is not one of this campaign's.",
+    };
+  }
 
   if (memberIds.length > 0) {
     const found = await User.find({ _id: { $in: memberIds } })
@@ -73,6 +90,7 @@ export async function saveDonationAction(
     // The dialog always carries the checkbox, so an absent value is somebody
     // clearing it rather than a field that was never asked about.
     isCounted: formData.get("isCounted") === "on",
+    stretchGoalId,
     description: String(formData.get("description") ?? "").trim().slice(0, 2000),
     memberIds,
   };

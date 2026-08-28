@@ -12,6 +12,7 @@ import {
   DONATION_STATUS_LABELS,
   dateRangeLabel,
   formatDollars,
+  inKindTotals,
   monetaryProgress,
   primaryLogo,
   sponsorChips,
@@ -108,6 +109,7 @@ export default async function CampaignDashboard({
     campaign.goalCents,
     campaign.stretchGoals
   );
+  const inKind = inKindTotals(mine);
 
   const onCampaign = campaign.assignments
     .map((assignment) => {
@@ -179,12 +181,35 @@ export default async function CampaignDashboard({
           ) : null}
         </div>
 
+        <div className="progress-headline">
+          <span className="progress-figure">
+            {formatDollars(progress.totalCents)}
+          </span>
+          <span className="progress-of">
+            {campaign.goalCents
+              ? `raised of a ${formatDollars(campaign.goalCents)} goal`
+              : "raised in monetary donations"}
+          </span>
+          {campaign.goalCents ? (
+            <span
+              className={`progress-percent${
+                progress.percent >= 100 ? " is-met tone-complete" : ""
+              }`}
+            >
+              {progress.percent}%
+            </span>
+          ) : (
+            <span className="progress-percent is-quiet">no goal set</span>
+          )}
+        </div>
+
         {campaign.goalCents ? (
           <>
+            {/* The goal on a bar of its own. With stretch goals above it, one
+                bar for both leaves the goal as a tick somewhere in the middle
+                — and the goal is the promise the campaign made. */}
             <div
-              className={`manager-meter is-segmented${
-                progress.tiers.length > 0 ? " has-marks" : ""
-              }`}
+              className="manager-meter is-segmented"
               role="img"
               aria-label={`${progress.percent}% of the goal in monetary donations`}
             >
@@ -192,55 +217,28 @@ export default async function CampaignDashboard({
                 <span
                   key={segment.status}
                   className={statusTone(segment.status)}
-                  style={{ width: `${Math.min(100, segment.percent)}%` }}
+                  style={{ width: `${segment.goalSharePercent}%` }}
                   title={`${DONATION_STATUS_LABELS[segment.status]}: ${formatDollars(
                     segment.cents
                   )}`}
-                />
-              ))}
-
-              {/* With tiers the bar stands for the goal and everything above
-                  it, so the goal itself needs marking or it disappears. */}
-              {progress.tiers.length > 0 ? (
-                <span
-                  className="meter-mark is-goal"
-                  style={{ left: `${progress.goalPercent}%` }}
-                  title={`Goal: ${formatDollars(campaign.goalCents)}`}
-                />
-              ) : null}
-
-              {progress.tiers.map((tier) => (
-                <span
-                  key={tier.step}
-                  className={`meter-mark${tier.isMet ? " is-met" : ""}`}
-                  style={{ left: `${tier.markerPercent}%` }}
-                  title={`${formatDollars(tier.thresholdCents)}: ${
-                    tier.description
-                  }`}
                 />
               ))}
             </div>
 
             <div className="manager-figures">
               <span>
-                <strong>{formatDollars(progress.totalCents)}</strong> of{" "}
-                {formatDollars(campaign.goalCents)}
-                {progress.tiers.length > 0
-                  ? `, and ${formatDollars(progress.scaleCents)} with every stretch goal`
-                  : ""}
+                {progress.goalFillPercent >= 100
+                  ? "Goal reached"
+                  : `${formatDollars(
+                      campaign.goalCents - progress.totalCents
+                    )} to the goal`}
               </span>
-              <span className="manager-figure-end">{progress.percent}%</span>
+              <span className="manager-figure-end">
+                {formatDollars(campaign.goalCents)}
+              </span>
             </div>
           </>
-        ) : (
-          <div className="manager-figures">
-            <span>
-              <strong>{formatDollars(progress.totalCents)}</strong> in monetary
-              donations
-            </span>
-            <span className="manager-figure-end">no goal set</span>
-          </div>
-        )}
+        ) : null}
 
         {progress.segments.length > 0 ? (
           <ul className="tone-key">
@@ -256,18 +254,68 @@ export default async function CampaignDashboard({
         )}
 
         {progress.tiers.length > 0 ? (
-          <>
-            <h3 className="member-card-subtitle">Stretch goals</h3>
+          <div className="stretch-block">
+            <div className="stretch-block-head">
+              <h3 className="member-card-subtitle">Beyond the goal</h3>
+              <span className="stretch-block-figure">
+                {formatDollars(progress.intoStretchCents)} of{" "}
+                {formatDollars(progress.stretchCents)}
+              </span>
+            </div>
+
+            {/* A run per tier, each sized to what that tier asks for, so a
+                part-filled one reads as part-filled rather than as a share of
+                a number nobody is thinking about. */}
+            <div
+              className="stretch-track"
+              role="img"
+              aria-label={`${formatDollars(
+                progress.intoStretchCents
+              )} of ${formatDollars(progress.stretchCents)} beyond the goal`}
+            >
+              {progress.tiers.map((tier) => (
+                <span
+                  key={tier.id}
+                  className={`stretch-run${
+                    tier.isMet ? " is-met tone-complete" : ""
+                  }`}
+                  style={{ width: `${tier.trackPercent}%` }}
+                  title={`${tier.description} — ${formatDollars(
+                    tier.thresholdCents
+                  )}`}
+                >
+                  <span
+                    className="stretch-run-fill"
+                    style={{ width: `${tier.fillPercent}%` }}
+                  />
+                </span>
+              ))}
+            </div>
+
             <ol className="stretch-list">
               {progress.tiers.map((tier) => (
                 <li
-                  key={tier.step}
-                  className={`stretch-tier${tier.isMet ? " is-met" : ""}`}
+                  key={tier.id}
+                  className={`stretch-tier${
+                    tier.isMet ? " is-met tone-complete" : ""
+                  }`}
                 >
-                  <span className="stretch-tier-figure">
-                    {formatDollars(tier.thresholdCents)}
+                  <span className="stretch-tier-step" aria-hidden="true">
+                    {tier.isMet ? "✓" : tier.step}
                   </span>
-                  <span className="stretch-tier-what">{tier.description}</span>
+                  <span className="stretch-tier-what">
+                    {tier.description}
+                    <span className="stretch-tier-given">
+                      at {formatDollars(tier.thresholdCents)}
+                      {tier.earmarkedCount > 0
+                        ? ` · ${formatDollars(
+                            tier.earmarkedCents
+                          )} given for it, across ${tier.earmarkedCount} gift${
+                            tier.earmarkedCount === 1 ? "" : "s"
+                          }`
+                        : ""}
+                    </span>
+                  </span>
                   <span className="stretch-tier-state">
                     {tier.isMet
                       ? "reached"
@@ -278,18 +326,46 @@ export default async function CampaignDashboard({
                 </li>
               ))}
             </ol>
-          </>
+
+            <p className="help-text">
+              A gift can be applied to a stretch goal when it is recorded. That
+              is an earmark rather than a separate pot — it fills the campaign
+              either way, and a tier is reached by the campaign&rsquo;s total.
+            </p>
+          </div>
         ) : null}
 
-        <p className="help-text" style={{ marginTop: "0.5rem" }}>
-          Monetary donations only — an in-kind donation is recorded against the
-          sponsor who gave it, but does not fill a money goal.
-          {progress.uncountedCents > 0
-            ? ` A further ${formatDollars(
-                progress.uncountedCents
-              )} is recorded but marked as not counting towards the goal.`
-            : ""}
-        </p>
+        {inKind.count > 0 ? (
+          <div className="in-kind-callout tone-in-kind">
+            <span className="in-kind-mark" aria-hidden="true" />
+            <div>
+              {/* A campaign can have in-kind gifts promised and none arrived
+                  yet, and leading on a nought would read as nothing given. */}
+              <strong className="in-kind-figure">
+                {inKind.completeCents > 0
+                  ? `${formatDollars(inKind.completeCents)} in goods and services`
+                  : `${formatDollars(inKind.pendingCents)} in goods and services promised`}
+              </strong>
+              <p className="help-text">
+                {inKind.count} in-kind gift{inKind.count === 1 ? "" : "s"} from{" "}
+                {inKind.sponsorCount} sponsor
+                {inKind.sponsorCount === 1 ? "" : "s"}
+                {inKind.completeCents > 0 && inKind.pendingCents > 0
+                  ? `, with ${formatDollars(inKind.pendingCents)} more promised`
+                  : ""}
+                . Held apart from the figures above: a lent hall is worth having
+                and is not money raised.
+              </p>
+            </div>
+          </div>
+        ) : null}
+
+        {progress.uncountedCents > 0 ? (
+          <p className="help-text" style={{ marginTop: "0.5rem" }}>
+            A further {formatDollars(progress.uncountedCents)} is recorded but
+            marked as not counting towards the goal.
+          </p>
+        ) : null}
       </section>
 
       <section className="member-card manager-card">

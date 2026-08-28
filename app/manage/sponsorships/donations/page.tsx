@@ -82,6 +82,7 @@ export default async function ManagerDonationsPage() {
           _id: campaign._id,
           name: campaign.name,
           isClosed: campaign.status === "closed",
+          stretchGoals: campaign.stretchGoals,
         }))}
         sponsors={sponsors.map((sponsor) => ({
           _id: sponsor._id,

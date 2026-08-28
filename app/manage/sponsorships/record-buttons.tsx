@@ -73,6 +73,8 @@ export function DonationButton({
   campaigns,
   sponsors,
   members,
+  defaultSponsorId,
+  defaultCampaignId,
   label,
   primary = false,
   icon = false,
@@ -82,6 +84,9 @@ export function DonationButton({
   campaigns: CampaignOption[];
   sponsors: PickerOption[];
   members: PickerOption[];
+  /** What the page opening this already knows about a new gift. */
+  defaultSponsorId?: string;
+  defaultCampaignId?: string;
   label: string;
   primary?: boolean;
   /** A square pencil rather than a worded button, for a compact row. */
@@ -110,6 +115,8 @@ export function DonationButton({
           campaigns={campaigns}
           sponsors={sponsors}
           members={members}
+          defaultSponsorId={defaultSponsorId}
+          defaultCampaignId={defaultCampaignId}
           onClose={() => setOpen(false)}
           onSaved={() => {
             setOpen(false);

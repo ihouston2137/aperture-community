@@ -1,5 +1,7 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
+
 import { revalidatePath } from "next/cache";
 
 import { requirePermission } from "@/lib/access";
@@ -71,6 +73,16 @@ export async function saveCampaignAction(
     return { ok: false, error: "Say what each stretch goal is for." };
   }
 
+  // A tier keeps its id for life, because donations are applied to it by id.
+  // Two tiers sharing one would take each other's gifts, so a repeat is given
+  // a fresh id rather than being allowed through.
+  const seen = new Set<string>();
+  stretchGoals = stretchGoals.map((goal) => {
+    const id = seen.has(goal.id) ? randomUUID() : goal.id;
+    seen.add(id);
+    return id === goal.id ? goal : { ...goal, id };
+  });
+
   // Everything named has to still exist, or the campaign would list a sponsor
   // nobody can open and credit a member who has gone.
   const sponsorIds = assignments.map((entry) => entry.sponsorId);
@@ -115,8 +127,22 @@ export async function saveCampaignAction(
     ),
   };
 
-  if (id) await SponsorshipCampaign.findByIdAndUpdate(id, payload);
-  else await SponsorshipCampaign.create(payload);
+  if (id) {
+    await SponsorshipCampaign.findByIdAndUpdate(id, payload);
+
+    // A tier that has gone takes its earmarks with it: a gift pointing at
+    // nothing would read as unallocated anyway, and saying so in the data
+    // beats working it out at every place that shows one.
+    await Donation.updateMany(
+      {
+        campaignId: id,
+        stretchGoalId: { $nin: ["", ...stretchGoals.map((goal) => goal.id)] },
+      },
+      { $set: { stretchGoalId: "" } }
+    );
+  } else {
+    await SponsorshipCampaign.create(payload);
+  }
 
   revalidate();
   return { ok: true };

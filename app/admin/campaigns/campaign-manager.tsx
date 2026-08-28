@@ -32,7 +32,20 @@ export type SponsorOption = PickerOption & { isUnassignable?: boolean };
  * half-typed "12.5" survives the keystroke that follows it. It becomes cents
  * once, on save.
  */
-type StretchRow = { description: string; amount: string };
+type StretchRow = { id: string; description: string; amount: string };
+
+/**
+ * An id for a tier being added.
+ *
+ * Minted here rather than on save so that the row keeps the same id across
+ * reorders and re-renders — and so a gift applied to it keeps pointing at the
+ * tier the manager meant, not at whatever ends up in that position.
+ */
+function newTierId(): string {
+  return typeof crypto !== "undefined" && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `tier-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
 
 export type CampaignTotalsMap = Record<
   string,
@@ -241,6 +254,7 @@ export function CampaignDialog({
   );
   const [stretchRows, setStretchRows] = useState<StretchRow[]>(
     (campaign?.stretchGoals ?? []).map((goal) => ({
+      id: goal.id,
       description: goal.description,
       amount: centsToDollarInput(goal.amountCents),
     }))
@@ -301,6 +315,7 @@ export function CampaignDialog({
       "stretchGoals",
       JSON.stringify(
         stretchRows.map((row) => ({
+          id: row.id,
           description: row.description,
           amountCents: dollarsToCents(row.amount),
         }))
@@ -455,7 +470,7 @@ export function CampaignDialog({
               ) : null}
 
               {stretchRows.map((row, index) => (
-                <div key={index} className="stretch-row">
+                <div key={row.id} className="stretch-row">
                   <div className="field stretch-amount">
                     <label htmlFor={`stretch-amount-${index}`}>
                       {index === 0 ? "Above the goal, a further" : "Then a further"}
@@ -527,7 +542,7 @@ export function CampaignDialog({
                 onClick={() =>
                   setStretchRows((current) => [
                     ...current,
-                    { description: "", amount: "" },
+                    { id: newTierId(), description: "", amount: "" },
                   ])
                 }
               >

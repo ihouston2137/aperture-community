@@ -130,6 +130,7 @@ export function toDonationSummary(record: any): DonationSummary {
     // Absent on everything recorded before the flag existed, and those were
     // all counted at the time, so the absence has to read as true.
     isCounted: record.isCounted !== false,
+    stretchGoalId: String(record.stretchGoalId ?? ""),
     description: String(record.description ?? ""),
     memberIds: uniqueIds((record.memberIds ?? []).map(String)),
   };

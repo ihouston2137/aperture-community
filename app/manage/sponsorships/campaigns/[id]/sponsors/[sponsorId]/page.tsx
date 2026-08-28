@@ -111,6 +111,7 @@ export default async function CampaignSponsorDashboard({
     _id: entry._id,
     name: entry.name,
     isClosed: entry.status === "closed",
+    stretchGoals: entry.stretchGoals,
   }));
   const sponsorOptions = sponsors.map((entry) => ({
     _id: entry._id,
@@ -207,6 +208,8 @@ export default async function CampaignSponsorDashboard({
               campaigns={campaignOptions}
               sponsors={sponsorOptions}
               members={members}
+              defaultSponsorId={sponsor._id}
+              defaultCampaignId={campaign._id}
               label="Record a donation"
               primary
             />

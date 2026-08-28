@@ -17,6 +17,7 @@ import {
   formatDollars,
   isRealised,
   type DonationSummary,
+  type StretchGoal,
 } from "@/lib/sponsorship-types";
 
 import { deleteDonationAction, saveDonationAction } from "./actions";
@@ -28,7 +29,11 @@ export type PickerOption = { _id: string; name: string; title?: string };
  * arrive after it closes — but it is named as closed so nobody files one
  * against the wrong drive by accident.
  */
-export type CampaignOption = PickerOption & { isClosed?: boolean };
+export type CampaignOption = PickerOption & {
+  isClosed?: boolean;
+  /** So a gift can be applied to one of them. Absent where none are defined. */
+  stretchGoals?: StretchGoal[];
+};
 
 type DialogState =
   | { mode: "create" }
@@ -64,6 +69,13 @@ export function DonationManager({
 
   const nameOf = (list: PickerOption[], id: string) =>
     list.find((entry) => entry._id === id)?.name ?? "one that has gone";
+
+  /** What a gift was given for, when it was given for a stretch goal. */
+  const appliedTo = (donation: DonationSummary) =>
+    campaigns
+      .find((entry) => entry._id === donation.campaignId)
+      ?.stretchGoals?.find((goal) => goal.id === donation.stretchGoalId)
+      ?.description ?? "";
 
   const shown = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -197,6 +209,7 @@ export function DonationManager({
                   {` · ${DONATION_KIND_LABELS[donation.kind]}`}
                   {` · ${DONATION_STATUS_LABELS[donation.status]}`}
                   {donation.isCounted ? "" : " · not counted"}
+                  {appliedTo(donation) ? ` · for ${appliedTo(donation)}` : ""}
                 </div>
                 <div className="admin-list-meta">
                   {donation.memberIds.length > 0
@@ -264,6 +277,8 @@ export function DonationDialog({
   campaigns,
   sponsors,
   members,
+  defaultSponsorId = "",
+  defaultCampaignId = "",
   onClose,
   onSaved,
 }: {
@@ -271,11 +286,43 @@ export function DonationDialog({
   campaigns: CampaignOption[];
   sponsors: PickerOption[];
   members: PickerOption[];
+  /*
+   * Who and what a new gift is for, when the page opening this already knows.
+   * Somebody recording a donation from a sponsor's page on a campaign has
+   * answered both questions by being there, and should not be asked again.
+   * Ignored when editing: an existing gift carries its own.
+   */
+  defaultSponsorId?: string;
+  defaultCampaignId?: string;
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const [sponsorId, setSponsorId] = useState(donation?.sponsorId ?? "");
+  // `||` rather than `??`: an absent default is an empty string, which has to
+  // fall through to the first campaign the way an absent one does.
+  const [sponsorId, setSponsorId] = useState(
+    donation?.sponsorId || defaultSponsorId
+  );
+  const [campaignId, setCampaignId] = useState(
+    donation?.campaignId || defaultCampaignId || campaigns[0]?._id || ""
+  );
+  const [stretchGoalId, setStretchGoalId] = useState(
+    donation?.stretchGoalId ?? ""
+  );
   const [memberIds, setMemberIds] = useState<string[]>(donation?.memberIds ?? []);
+
+  /*
+   * The tiers on the campaign currently chosen.
+   *
+   * Held to the campaign rather than offered from every campaign at once: a
+   * gift belongs to one drive, and a tier belongs to one drive too. Moving the
+   * gift to another campaign drops the earmark, because the thing it was for
+   * is not on the new one.
+   */
+  const stretchGoals =
+    campaigns.find((entry) => entry._id === campaignId)?.stretchGoals ?? [];
+  const appliesTo = stretchGoals.some((goal) => goal.id === stretchGoalId)
+    ? stretchGoalId
+    : "";
   const [error, setError] = useState("");
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -294,6 +341,8 @@ export function DonationDialog({
   function save(formData: FormData) {
     setError("");
     formData.set("sponsorId", sponsorId);
+    formData.set("campaignId", campaignId);
+    formData.set("stretchGoalId", appliesTo);
     for (const id of memberIds) formData.append("memberIds", id);
 
     startTransition(async () => {
@@ -357,8 +406,8 @@ export function DonationDialog({
                   <label htmlFor="donation-for">Campaign</label>
                   <select
                     id="donation-for"
-                    name="campaignId"
-                    defaultValue={donation?.campaignId ?? campaigns[0]?._id ?? ""}
+                    value={campaignId}
+                    onChange={(event) => setCampaignId(event.target.value)}
                   >
                     {campaigns.map((campaign) => (
                       <option key={campaign._id} value={campaign._id}>
@@ -367,6 +416,28 @@ export function DonationDialog({
                     ))}
                   </select>
                 </div>
+
+                {stretchGoals.length > 0 ? (
+                  <div className="field">
+                    <label htmlFor="donation-applies">Applies to</label>
+                    <select
+                      id="donation-applies"
+                      value={appliesTo}
+                      onChange={(event) => setStretchGoalId(event.target.value)}
+                    >
+                      <option value="">The campaign itself</option>
+                      {stretchGoals.map((goal) => (
+                        <option key={goal.id} value={goal.id}>
+                          {goal.description}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="help-text">
+                      An earmark, not a separate pot — it fills the campaign
+                      either way. This records what the gift was given for.
+                    </span>
+                  </div>
+                ) : null}
 
                 <div className="field">
                   <span className="field-label">Sponsor</span>

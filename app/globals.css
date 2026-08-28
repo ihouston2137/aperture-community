@@ -7528,6 +7528,170 @@ html:has(.admin-shell) body::-webkit-scrollbar {
   opacity: 0.6;
 }
 
+/* ------------------------------------------------- Campaign progress box
+
+   Three readings, in order of how often they are wanted: what has been raised
+   against the goal, what lies beyond it, and what came in as goods rather than
+   money. Each is its own block, because reading them as one bar was what made
+   the goal hard to find. */
+
+/* The figure first, at a size that can be read across a room. */
+.progress-headline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.6rem;
+  margin-bottom: 0.75rem;
+}
+
+.progress-figure {
+  font-family: var(--heading-font);
+  font-size: clamp(1.75rem, 5vw, 2.5rem);
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+}
+
+.progress-of {
+  font-size: 0.9375rem;
+  opacity: 0.75;
+}
+
+.progress-percent {
+  margin-left: auto;
+  align-self: center;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid var(--admin-border);
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* A goal that has been met says so in the colour the complete gifts already
+   use, so the two read as the same fact. The markup carries `tone-complete`,
+   which is where the colour comes from — it is never restated here. */
+.progress-percent.is-met {
+  border-color: var(--tone);
+  color: var(--tone);
+}
+
+.progress-percent.is-quiet {
+  opacity: 0.6;
+}
+
+/* Everything above the goal, set apart by a rule and its own heading so the
+   goal above it is not read as one target among several. */
+.stretch-block {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(128, 128, 128, 0.28);
+}
+
+.stretch-block-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.stretch-block-head .member-card-subtitle {
+  margin: 0;
+}
+
+.stretch-block-figure {
+  margin-left: auto;
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.75;
+}
+
+/* One run per tier, each as wide as what that tier asks for. The gaps between
+   them are the tier boundaries — no marks needed to say where one ends. */
+.stretch-track {
+  display: flex;
+  gap: 0.25rem;
+  margin: 0.6rem 0 0.75rem;
+}
+
+.stretch-run {
+  display: block;
+  height: 0.5rem;
+  min-width: 0.75rem;
+  border-radius: 999px;
+  background: rgba(128, 128, 128, 0.2);
+  overflow: hidden;
+}
+
+.stretch-run-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.55;
+}
+
+/* A tier that has been reached fills in the colour of a gift in hand. */
+.stretch-run.is-met .stretch-run-fill {
+  background: var(--tone);
+  opacity: 1;
+}
+
+/* The number of the tier, or a tick once it is reached. */
+.stretch-tier-step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 50%;
+  border: 1px solid var(--admin-border);
+  font-size: 0.6875rem;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.7;
+}
+
+.stretch-tier.is-met .stretch-tier-step {
+  border-color: var(--tone);
+  color: var(--tone);
+  opacity: 1;
+}
+
+/* Goods and services, called out rather than tucked into a sentence: a
+   campaign lent a hall has been given something real, and the money figures
+   above cannot say so. */
+.in-kind-callout {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(128, 128, 128, 0.28);
+  /* The callout itself carries `tone-in-kind`, so the edge that marks it is
+     the same grey the in-kind chips use everywhere else. */
+  border-left: 3px solid var(--tone);
+  background: rgba(128, 128, 128, 0.08);
+}
+
+.in-kind-callout .help-text {
+  margin: 0.15rem 0 0;
+}
+
+.in-kind-mark {
+  flex: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  margin-top: 0.4rem;
+  border-radius: 50%;
+  background: var(--tone);
+}
+
+.in-kind-figure {
+  font-size: 1.0625rem;
+  font-variant-numeric: tabular-nums;
+}
+
 /* Each tier: where it lands, what it is for, and how far off it is. */
 .member-card-subtitle {
   font-family: var(--heading-font);
@@ -7570,6 +7734,13 @@ html:has(.admin-shell) body::-webkit-scrollbar {
 .stretch-tier-what {
   flex: 1 1 12rem;
   min-width: 0;
+}
+
+/* What has been given for this tier by name, under what the tier is for. */
+.stretch-tier-given {
+  display: block;
+  font-size: 0.8125rem;
+  opacity: 0.7;
 }
 
 .stretch-tier-state {

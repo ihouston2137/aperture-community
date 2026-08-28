@@ -297,6 +297,8 @@ export type CampaignAssignment = {
  * totals are the one thing that can be worked out from the steps.
  */
 export type StretchGoal = {
+  /** Stable for the life of the tier, so a donation can be applied to it. */
+  id: string;
   /** What the extra money is for. Without one there is nothing to aim at. */
   description: string;
   /** Additional whole cents, above the tier before it. */
@@ -308,7 +310,11 @@ export function normalizeStretchGoals(value: unknown): StretchGoal[] {
   if (!Array.isArray(value)) return [];
 
   return value
-    .map((entry) => ({
+    .map((entry, index) => ({
+      // Tiers saved before ids existed fall back to their position, which is
+      // stable for as long as nobody reorders them — and the next save writes
+      // the id back, after which position stops mattering.
+      id: String((entry as any)?.id ?? "").trim() || `tier-${index + 1}`,
       description: String((entry as any)?.description ?? "")
         .trim()
         .slice(0, 300),
@@ -583,10 +589,13 @@ export type ProgressSegment = {
   cents: number;
   /** Percent of the bar's full width, which is `scaleCents`. */
   percent: number;
+  /** Percent of the goal alone, for a bar that shows only the goal. */
+  goalSharePercent: number;
 };
 
 /** One stretch goal, placed against what the campaign has actually raised. */
 export type StretchTier = {
+  id: string;
   /** 1 for the first tier above the goal. */
   step: number;
   description: string;
@@ -596,7 +605,20 @@ export type StretchTier = {
   thresholdCents: number;
   /** Where the tier sits along the bar, as a percent of its full width. */
   markerPercent: number;
+  /** This tier's share of a track holding the stretch goals alone. */
+  trackPercent: number;
+  /** How full this tier's own share of that track is, 0–100. */
+  fillPercent: number;
   isMet: boolean;
+  /*
+   * Given for this tier by name.
+   *
+   * An earmark, not a separate pot: the money fills the campaign wherever it
+   * was aimed, and a tier is reached by the campaign total like any other. This
+   * says how much of what came in was given with this tier in mind.
+   */
+  earmarkedCents: number;
+  earmarkedCount: number;
 };
 
 export type MonetaryProgress = {
@@ -611,6 +633,12 @@ export type MonetaryProgress = {
   /** Where the goal itself falls along the bar, once tiers widen it. */
   goalPercent: number;
   tiers: StretchTier[];
+  /** Every tier added up: what the stretch goals ask for beyond the goal. */
+  stretchCents: number;
+  /** How much has been raised beyond the goal, for the stretch track. */
+  intoStretchCents: number;
+  /** The goal alone, filled and capped — a goal cannot be more than met. */
+  goalFillPercent: number;
   /** The furthest tier reached, or null while the goal itself is unmet. */
   reached: StretchTier | null;
   /** The next one to aim at, or null once every tier is met. */
@@ -633,11 +661,13 @@ export function monetaryProgress(
     kind: DonationKind;
     valueCents: number;
     isCounted?: boolean;
+    stretchGoalId?: string;
   }[],
   goalCents: number,
   stretchGoals: StretchGoal[] = []
 ): MonetaryProgress {
   const byStatus = new Map<DonationStatus, number>();
+  const earmarked = new Map<string, { cents: number; count: number }>();
   let uncountedCents = 0;
 
   for (const donation of donations) {
@@ -653,6 +683,13 @@ export function monetaryProgress(
       donation.status,
       (byStatus.get(donation.status) ?? 0) + donation.valueCents
     );
+
+    if (donation.stretchGoalId) {
+      const held = earmarked.get(donation.stretchGoalId) ?? { cents: 0, count: 0 };
+      held.cents += donation.valueCents;
+      held.count += 1;
+      earmarked.set(donation.stretchGoalId, held);
+    }
   }
 
   // Complete first, so the bar fills from what is certain towards what is not.
@@ -680,20 +717,36 @@ export function monetaryProgress(
     status,
     cents,
     percent: scaleCents ? (cents / scaleCents) * 100 : 0,
+    goalSharePercent: goalCents ? (cents / goalCents) * 100 : 0,
   }));
 
   const tiers: StretchTier[] = [];
   let thresholdCents = goalCents;
 
   for (const [index, goal] of stretchGoals.entries()) {
+    const opensAtCents = thresholdCents;
     thresholdCents += goal.amountCents;
+    const given = earmarked.get(goal.id);
+    // How far into this tier alone the money has come. Each tier is read as
+    // its own run, so a part-filled one shows as part-filled rather than as
+    // a share of a total nobody is thinking about.
+    const intoTier = Math.min(
+      goal.amountCents,
+      Math.max(0, totalCents - opensAtCents)
+    );
+
     tiers.push({
+      id: goal.id,
       step: index + 1,
       description: goal.description,
       amountCents: goal.amountCents,
       thresholdCents,
       markerPercent: scaleCents ? (thresholdCents / scaleCents) * 100 : 0,
+      trackPercent: stretchCents ? (goal.amountCents / stretchCents) * 100 : 0,
+      fillPercent: goal.amountCents ? (intoTier / goal.amountCents) * 100 : 0,
       isMet: thresholdCents > 0 && totalCents >= thresholdCents,
+      earmarkedCents: given?.cents ?? 0,
+      earmarkedCount: given?.count ?? 0,
     });
   }
 
@@ -706,10 +759,59 @@ export function monetaryProgress(
     scaleCents,
     goalPercent: scaleCents ? (goalCents / scaleCents) * 100 : 0,
     tiers,
+    stretchCents,
+    intoStretchCents: Math.max(0, totalCents - goalCents),
+    goalFillPercent: goalCents
+      ? Math.min(100, (totalCents / goalCents) * 100)
+      : 0,
     reached: met.length > 0 ? met[met.length - 1] : null,
     next: tiers.find((tier) => !tier.isMet) ?? null,
     uncountedCents,
   };
+}
+
+/**
+ * What was given in goods and services, rather than in money.
+ *
+ * Kept apart from every money figure on purpose — a donated venue does not fill
+ * a money goal — but worth stating plainly, because a campaign that was lent a
+ * hall and a projector has been given something real and a page that only
+ * counts cash says it has not.
+ */
+export type InKindTotals = {
+  /** Arrived. */
+  completeCents: number;
+  /** Proposed and in progress together: promised, not yet here. */
+  pendingCents: number;
+  count: number;
+  /** How many sponsors it came from. */
+  sponsorCount: number;
+};
+
+export function inKindTotals(
+  donations: {
+    kind: DonationKind;
+    status: DonationStatus;
+    valueCents: number;
+    sponsorId: string;
+  }[]
+): InKindTotals {
+  const sponsors = new Set<string>();
+  let completeCents = 0;
+  let pendingCents = 0;
+  let count = 0;
+
+  for (const donation of donations) {
+    if (donation.kind !== "in-kind") continue;
+    if (donation.status === "cancelled") continue;
+
+    if (donation.status === "complete") completeCents += donation.valueCents;
+    else pendingCents += donation.valueCents;
+    count += 1;
+    sponsors.add(donation.sponsorId);
+  }
+
+  return { completeCents, pendingCents, count, sponsorCount: sponsors.size };
 }
 
 export type DonationSummary = {
@@ -724,6 +826,8 @@ export type DonationSummary = {
   valueCents: number;
   /** Whether it fills the goal and earns leaderboard credit. */
   isCounted: boolean;
+  /** The stretch goal it was given for, or empty for the campaign at large. */
+  stretchGoalId: string;
   description: string;
   /** The members credited with bringing it in. */
   memberIds: string[];
