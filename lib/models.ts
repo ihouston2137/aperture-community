@@ -708,6 +708,8 @@ const SponsorSchema = new Schema<any>(
   {
     name: { type: String, required: true },
     type: { type: String, default: "business" },
+    /** Who they are, in the site's own words. */
+    description: { type: String, default: "" },
     industry: { type: String, default: "" },
     size: { type: String, default: "" },
     email: { type: String, default: "" },

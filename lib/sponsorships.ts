@@ -38,6 +38,7 @@ export function toSponsorSummary(record: any): SponsorSummary {
     _id: String(record._id),
     name: String(record.name ?? ""),
     type: sponsorType(record.type),
+    description: String(record.description ?? ""),
     industry: String(record.industry ?? ""),
     size: sponsorSize(record.size),
     email: String(record.email ?? ""),

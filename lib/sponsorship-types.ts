@@ -234,6 +234,8 @@ export type SponsorSummary = {
   _id: string;
   name: string;
   type: SponsorType;
+  /** Who they are, in the site's own words. */
+  description: string;
   industry: string;
   size: SponsorSize;
   email: string;

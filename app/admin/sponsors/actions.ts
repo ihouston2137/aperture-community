@@ -58,6 +58,7 @@ export async function saveSponsorAction(
   const payload = {
     name,
     type: sponsorType(formData.get("type")),
+    description: String(formData.get("description") ?? "").trim().slice(0, 2000),
     industry: String(formData.get("industry") ?? "").trim().slice(0, 120),
     size: sponsorSize(formData.get("size")),
     email: String(formData.get("email") ?? "").trim().slice(0, 200),

@@ -440,6 +440,22 @@ function SponsorDialog({
               </div>
 
               <div className="field" style={{ marginTop: "0.875rem" }}>
+                <label htmlFor="sponsor-description">Description</label>
+                <textarea
+                  id="sponsor-description"
+                  name="description"
+                  rows={4}
+                  defaultValue={sponsor?.description ?? ""}
+                  placeholder="Who they are, in a few sentences."
+                />
+                <span className="help-text">
+                  Written for readers rather than for the record — this is the
+                  blurb that goes beside their logo. Notes further down stay
+                  internal.
+                </span>
+              </div>
+
+              <div className="field" style={{ marginTop: "0.875rem" }}>
                 <span className="field-label">Categories</span>
                 {categories.length === 0 ? (
                   <span className="help-text">
