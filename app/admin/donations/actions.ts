@@ -53,7 +53,7 @@ export async function saveDonationAction(
   if (!campaign) return { ok: false, error: "That campaign no longer exists." };
   if (!sponsor) return { ok: false, error: "That sponsor no longer exists." };
 
-  // A gift can only be applied to a stretch goal of the campaign it is for.
+  // A donation can only be applied to a stretch goal of the campaign it is for.
   // The dialog only offers those, so this catches a campaign changed under an
   // open dialog rather than a mistake somebody could make on screen.
   const stretchGoalId = String(formData.get("stretchGoalId") ?? "").trim();
@@ -83,7 +83,7 @@ export async function saveDonationAction(
     sponsorId,
     kind: donationKind(formData.get("kind")),
     status: donationStatus(formData.get("status")),
-    // Recorded today unless somebody says otherwise; a gift almost always
+    // Recorded today unless somebody says otherwise; a donation almost always
     // arrives before anyone gets round to entering it.
     date: isoDate(formData.get("date")) || new Date().toISOString().slice(0, 10),
     valueCents,

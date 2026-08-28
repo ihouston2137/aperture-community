@@ -118,7 +118,7 @@ export default async function CampaignDashboard({
    * Money and in-kind are added together for the ordering only — the card
    * still shows them apart, because they are not the same thing. Ranking on
    * money alone would put a sponsor who lent a hall worth thousands below one
-   * who sent a small cheque. Cancelled gifts never happened, so they order
+   * who sent a small cheque. Cancelled donations never happened, so they order
    * nobody; sponsors who have given nothing yet fall to the back, by name.
    */
   const onCampaign = campaign.assignments
@@ -135,7 +135,7 @@ export default async function CampaignDashboard({
         assignment,
         sponsor,
         chips: sponsorChips(given),
-        giftCount: given.length,
+        donationCount: given.length,
         givenCents,
       };
     })
@@ -330,7 +330,7 @@ export default async function CampaignDashboard({
                       {tier.earmarkedCount > 0
                         ? ` · ${formatDollars(
                             tier.earmarkedCents
-                          )} given for it, across ${tier.earmarkedCount} gift${
+                          )} given for it, across ${tier.earmarkedCount} donation${
                             tier.earmarkedCount === 1 ? "" : "s"
                           }`
                         : ""}
@@ -394,36 +394,21 @@ export default async function CampaignDashboard({
                       {formatDollars(goal.targetCents)}
                     </span>
                     <span className="manager-figure-end">
-                      {goal.giftCount} gift{goal.giftCount === 1 ? "" : "s"}
+                      {goal.donationCount} donation{goal.donationCount === 1 ? "" : "s"}
                     </span>
                   </div>
                 </article>
               ))}
             </div>
 
-            <p className="help-text">
-              Separate efforts, raised alongside the campaign. What is given to
-              one of these fills that goal only and is kept out of every figure
-              above, so the appeal is never shown doing better on money that is
-              already spoken for.
-            </p>
           </div>
-        ) : null}
-
-        {progress.tiers.length > 0 ? (
-          <p className="help-text" style={{ marginTop: "0.75rem" }}>
-            A gift can be applied to a stretch goal when it is recorded. On a
-            tier above the goal that is an earmark rather than a separate pot —
-            it fills the campaign either way, and the tier is reached by the
-            campaign&rsquo;s total.
-          </p>
         ) : null}
 
         {inKind.count > 0 ? (
           <div className="in-kind-callout tone-in-kind">
             <span className="in-kind-mark" aria-hidden="true" />
             <div>
-              {/* A campaign can have in-kind gifts promised and none arrived
+              {/* A campaign can have in-kind donations promised and none arrived
                   yet, and leading on a nought would read as nothing given. */}
               <strong className="in-kind-figure">
                 {inKind.completeCents > 0
@@ -431,14 +416,12 @@ export default async function CampaignDashboard({
                   : `${formatDollars(inKind.pendingCents)} in goods and services promised`}
               </strong>
               <p className="help-text">
-                {inKind.count} in-kind gift{inKind.count === 1 ? "" : "s"} from{" "}
+                {inKind.count} in-kind donation{inKind.count === 1 ? "" : "s"} from{" "}
                 {inKind.sponsorCount} sponsor
                 {inKind.sponsorCount === 1 ? "" : "s"}
                 {inKind.completeCents > 0 && inKind.pendingCents > 0
                   ? `, with ${formatDollars(inKind.pendingCents)} more promised`
                   : ""}
-                . Held apart from the figures above: a lent hall is worth having
-                and is not money raised.
               </p>
             </div>
           </div>
@@ -476,7 +459,7 @@ export default async function CampaignDashboard({
         ) : (
           <ul className="sponsor-cards">
             {onCampaign.map(
-              ({ assignment, sponsor, chips, giftCount, givenCents }) => {
+              ({ assignment, sponsor, chips, donationCount, givenCents }) => {
                 const level = levels.find(
                   (entry) => entry._id === sponsor?.recognitionLevelId
                 );
@@ -517,9 +500,9 @@ export default async function CampaignDashboard({
                           ? formatDollars(givenCents)
                           : "Nothing yet"}
                       </strong>
-                      {giftCount > 0 ? (
+                      {donationCount > 0 ? (
                         <span className="help-text">
-                          {giftCount} gift{giftCount === 1 ? "" : "s"}
+                          {donationCount} donation{donationCount === 1 ? "" : "s"}
                         </span>
                       ) : null}
                     </div>
@@ -576,7 +559,7 @@ export default async function CampaignDashboard({
                               campaignId={campaign._id}
                               sponsorId={assignment.sponsorId}
                               sponsorName={sponsor?.name ?? "this sponsor"}
-                              giftCount={giftCount}
+                              donationCount={donationCount}
                             />
                           </>
                         ) : null}

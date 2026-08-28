@@ -43,7 +43,7 @@ type StretchRow = {
  * An id for a tier being added.
  *
  * Minted here rather than on save so that the row keeps the same id across
- * reorders and re-renders — and so a gift applied to it keeps pointing at the
+ * reorders and re-renders — and so a donation applied to it keeps pointing at the
  * tier the manager meant, not at whatever ends up in that position.
  */
 function newTierId(): string {
@@ -482,7 +482,7 @@ export function CampaignDialog({
                 own goal: its amount is on top of the one before it, and the
                 campaign&rsquo;s total carries it there. A{" "}
                 <strong>separate goal</strong> is an effort of its own, with its
-                own target, filled only by the gifts applied to it — and its
+                own target, filled only by the donations applied to it — and its
                 money is kept out of the campaign&rsquo;s total, so the appeal
                 is never shown doing better on money that is spoken for
                 elsewhere.
@@ -615,8 +615,8 @@ export function CampaignDialog({
               </h4>
               <p className="help-text">
                 Assigning somebody here says who owns the relationship for this
-                campaign. Credit for a gift is recorded on the donation itself,
-                so the two can differ when they need to.
+                campaign. Credit is recorded on the donation itself, so the
+                two can differ when they need to.
               </p>
 
               {assignments.map((assignment) => (
@@ -644,7 +644,7 @@ export function CampaignDialog({
                     <p className="help-text">
                       Nobody looks after this sponsor — they are set to take no
                       assignment. They still belong to the campaign, and their
-                      gifts are still recorded against them.
+                      donations are still recorded against them.
                     </p>
                   ) : (
                     <>

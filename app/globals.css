@@ -6449,7 +6449,7 @@ html:has(.admin-shell) body::-webkit-scrollbar {
 }
 
 .manager-assignments,
-.manager-gifts {
+.manager-donations {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -6459,7 +6459,7 @@ html:has(.admin-shell) body::-webkit-scrollbar {
 }
 
 .manager-assignments li,
-.manager-gifts li {
+.manager-donations li {
   display: flex;
   align-items: center;
   gap: 0.75rem;
@@ -6469,7 +6469,7 @@ html:has(.admin-shell) body::-webkit-scrollbar {
 }
 
 .manager-assignments li > div,
-.manager-gifts li > div {
+.manager-donations li > div {
   display: flex;
   flex-direction: column;
   gap: 0.1rem;
@@ -7383,7 +7383,7 @@ html:has(.admin-shell) body::-webkit-scrollbar {
   --tone: #e2585d;
 }
 
-/* An in-kind gift is not money and never becomes money, so it is read only as
+/* An in-kind donation is not money and never becomes money, so it is read only as
    arrived or not — grey rather than a colour that would put it on the same
    footing as a cheque. */
 .tone-in-kind {
@@ -7582,7 +7582,7 @@ html:has(.admin-shell) body::-webkit-scrollbar {
   white-space: nowrap;
 }
 
-/* A goal that has been met says so in the colour the complete gifts already
+/* A goal that has been met says so in the colour the complete donations already
    use, so the two read as the same fact. The markup carries `tone-complete`,
    which is where the colour comes from — it is never restated here. */
 .progress-percent.is-met {
@@ -7645,7 +7645,7 @@ html:has(.admin-shell) body::-webkit-scrollbar {
   opacity: 0.55;
 }
 
-/* A tier that has been reached fills in the colour of a gift in hand. */
+/* A tier that has been reached fills in the colour of a donation in hand. */
 .stretch-run.is-met .stretch-run-fill {
   background: var(--tone);
   opacity: 1;
@@ -7689,7 +7689,7 @@ html:has(.admin-shell) body::-webkit-scrollbar {
   background: rgba(128, 128, 128, 0.05);
 }
 
-/* A goal that has been met borrows the colour of a gift in hand, on its edge
+/* A goal that has been met borrows the colour of a donation in hand, on its edge
    so the card is recognisable before it is read. */
 .goal-card.is-met {
   border-color: var(--tone);

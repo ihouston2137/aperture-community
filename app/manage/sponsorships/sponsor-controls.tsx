@@ -426,20 +426,20 @@ export function ChangeLevelButton({
  * sponsor does not belong on the campaign at all should not have to guess that
  * the answer is behind a pencil.
  *
- * Nothing is deleted: the sponsor stays on file and their gifts stay recorded
+ * Nothing is deleted: the sponsor stays on file and their donations stay recorded
  * against the campaign, which is what the confirmation says.
  */
 export function RemoveSponsorButton({
   campaignId,
   sponsorId,
   sponsorName,
-  giftCount,
+  donationCount,
 }: {
   campaignId: string;
   sponsorId: string;
   sponsorName: string;
-  /** Gifts this sponsor has already given to this campaign. */
-  giftCount: number;
+  /** Donations this sponsor has already given to this campaign. */
+  donationCount: number;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -505,9 +505,9 @@ export function RemoveSponsorButton({
         >
           <p className="help-text">
             Take {sponsorName} off this campaign?{" "}
-            {giftCount > 0
-              ? `Their ${giftCount} gift${
-                  giftCount === 1 ? "" : "s"
+            {donationCount > 0
+              ? `Their ${donationCount} donation${
+                  donationCount === 1 ? "" : "s"
                 } to it stay recorded, and still count towards what it raised.`
               : "They stay on file, and can be put back on at any time."}
           </p>
@@ -623,7 +623,7 @@ export function ChangeAssignedButton({
               {confirmingRemove ? (
                 <>
                   <span className="help-text">
-                    Take {sponsorName} off this campaign? Their gifts to it stay
+                    Take {sponsorName} off this campaign? Their donations to it stay
                     recorded.
                   </span>
                   <button
@@ -672,7 +672,7 @@ export function ChangeAssignedButton({
             <p className="help-text">
               Nobody looks after {sponsorName} — they are set to take no
               assignment, which is changed on the sponsor itself. They still
-              belong to this campaign, and their gifts are still recorded
+              belong to this campaign, and their donations are still recorded
               against them.
             </p>
           ) : (
@@ -711,8 +711,8 @@ export function ChangeAssignedButton({
                 disabled={pending}
               />
               <span className="help-text">
-                Who owns this relationship for this campaign. Credit for a gift is
-                recorded on the gift itself, so the two can differ.
+                Who owns this relationship for this campaign. Credit is
+                recorded on the donation itself, so the two can differ.
               </span>
             </div>
           )}

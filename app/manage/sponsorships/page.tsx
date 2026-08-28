@@ -179,7 +179,7 @@ export default async function SponsorshipsDashboard() {
             {active.map((campaign) => {
               const raised = totals.get(campaign._id);
               const pending = raised?.pendingCents ?? 0;
-              // The same reading as the campaign's own page: monetary gifts
+              // The same reading as the campaign's own page: monetary donations
               // only, banded by status, cancelled left out.
               const progress = monetaryProgress(
                 donations.filter(
@@ -209,7 +209,7 @@ export default async function SponsorshipsDashboard() {
                             progress.tiers.length > 0 ? " has-marks" : ""
                           }`}
                           role="img"
-                          aria-label={`${progress.percent}% of the goal in monetary gifts`}
+                          aria-label={`${progress.percent}% of the goal in monetary donations`}
                         >
                           {progress.segments.map((segment) => (
                             <span
@@ -259,7 +259,7 @@ export default async function SponsorshipsDashboard() {
                       <div className="manager-figures">
                         <span>
                           <strong>{formatDollars(progress.totalCents)}</strong> in
-                          monetary gifts
+                          monetary donations
                         </span>
                         <span className="manager-figure-end">no goal set</span>
                       </div>

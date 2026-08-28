@@ -25,13 +25,13 @@ import { deleteDonationAction, saveDonationAction } from "./actions";
 export type PickerOption = { _id: string; name: string; title?: string };
 
 /**
- * A closed campaign is still offered — a gift promised while it ran can
+ * A closed campaign is still offered — a donation promised while it ran can
  * arrive after it closes — but it is named as closed so nobody files one
  * against the wrong drive by accident.
  */
 export type CampaignOption = PickerOption & {
   isClosed?: boolean;
-  /** So a gift can be applied to one of them. Absent where none are defined. */
+  /** So a donation can be applied to one of them. Absent where none are defined. */
   stretchGoals?: StretchGoal[];
 };
 
@@ -41,9 +41,9 @@ type DialogState =
   | null;
 
 /**
- * Every gift, and who is credited with bringing it in.
+ * Every donation, and who is credited with bringing it in.
  *
- * A gift credited to three people counts in full for each of them: the figure
+ * A donation credited to three people counts in full for each of them: the figure
  * answers "what did this member bring in", not "what share of the total is
  * theirs", and splitting it would blur those two questions together.
  */
@@ -70,7 +70,7 @@ export function DonationManager({
   const nameOf = (list: PickerOption[], id: string) =>
     list.find((entry) => entry._id === id)?.name ?? "one that has gone";
 
-  /** What a gift was given for, when it was given for a stretch goal. */
+  /** What a donation was given for, when it was given for a stretch goal. */
   const appliedTo = (donation: DonationSummary) =>
     campaigns
       .find((entry) => entry._id === donation.campaignId)
@@ -97,7 +97,7 @@ export function DonationManager({
     // The lookups read from the three lists, which is what actually changes.
   }, [donations, query, campaignId, kind, status, sponsors, campaigns, members]);
 
-  // Cancelled gifts never happened, so they are left out of the figure — and
+  // Cancelled donations never happened, so they are left out of the figure — and
   // what has arrived is reported apart from what is still being worked on.
   const counted = shown.filter((donation) => countsTowardTotals(donation.status));
   const shownTotal = counted.reduce((sum, entry) => sum + entry.valueCents, 0);
@@ -287,10 +287,10 @@ export function DonationDialog({
   sponsors: PickerOption[];
   members: PickerOption[];
   /*
-   * Who and what a new gift is for, when the page opening this already knows.
+   * Who and what a new donation is for, when the page opening this already knows.
    * Somebody recording a donation from a sponsor's page on a campaign has
    * answered both questions by being there, and should not be asked again.
-   * Ignored when editing: an existing gift carries its own.
+   * Ignored when editing: an existing donation carries its own.
    */
   defaultSponsorId?: string;
   defaultCampaignId?: string;
@@ -314,8 +314,8 @@ export function DonationDialog({
    * The tiers on the campaign currently chosen.
    *
    * Held to the campaign rather than offered from every campaign at once: a
-   * gift belongs to one drive, and a tier belongs to one drive too. Moving the
-   * gift to another campaign drops the earmark, because the thing it was for
+   * donation belongs to one drive, and a tier belongs to one drive too. Moving the
+   * donation to another campaign drops the earmark, because the thing it was for
    * is not on the new one.
    */
   const stretchGoals =
@@ -446,8 +446,8 @@ export function DonationDialog({
                     </select>
                     <span className="help-text">
                       {appliedGoal?.isSeparate
-                        ? "A separate goal is raised alongside the campaign, so this gift fills that goal and is kept out of the campaign's own total."
-                        : "For a stretch goal this is an earmark, not a separate pot — the gift fills the campaign either way, and records what it was given for."}
+                        ? "A separate goal is raised alongside the campaign, so this donation fills that goal and is kept out of the campaign's own total."
+                        : "For a stretch goal this is an earmark, not a separate pot — it fills the campaign either way, and records what the donation was given for."}
                     </span>
                   </div>
                 ) : null}
@@ -478,7 +478,7 @@ export function DonationDialog({
                     ))}
                   </select>
                   <span className="help-text">
-                    Only a complete gift counts as in hand. A cancelled one is
+                    Only a complete donation counts as in hand. A cancelled one is
                     left out of every total.
                   </span>
                 </div>
@@ -520,7 +520,7 @@ export function DonationDialog({
                     required
                   />
                   <span className="help-text">
-                    In dollars. For an in-kind gift, what it is worth.
+                    In dollars. For an in-kind donation, what it is worth.
                   </span>
                 </div>
               </div>
@@ -534,10 +534,10 @@ export function DonationDialog({
                 Counts towards the goal and the leaderboard
               </label>
               <span className="help-text">
-                Clear it for a gift that should be on the record without filling
-                the campaign&apos;s goal or earning anybody credit — money moved from
-                another fund, or a gift already counted elsewhere. It still
-                appears against the sponsor who gave it.
+                Clear it for a donation that should be on the record without
+                filling the campaign&apos;s goal or earning anybody credit — money
+                moved from another fund, or an amount already counted elsewhere.
+                It still appears against the sponsor who gave it.
               </span>
 
               <div className="field" style={{ marginTop: "0.875rem" }}>

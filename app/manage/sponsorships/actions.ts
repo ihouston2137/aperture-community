@@ -117,7 +117,7 @@ export async function createCampaignSponsorAction(
   return { ok: true };
 }
 
-/** Takes a sponsor off a campaign. Their gifts to it are untouched. */
+/** Takes a sponsor off a campaign. Their donations to it are untouched. */
 export async function removeCampaignSponsorAction(
   formData: FormData
 ): Promise<ManageResult> {

@@ -50,7 +50,7 @@ export default async function DonationsPage() {
 
   const nameById = new Map(members.map((member) => [member._id, member.name]));
 
-  // Who has brought in what, most first. The figure counts a shared gift in
+  // Who has brought in what, most first. The figure counts a shared donation in
   // full for each member credited with it.
   const credit = [...creditByMember(donations)]
     .map(([memberId, entry]) => ({
@@ -63,7 +63,7 @@ export default async function DonationsPage() {
     <>
       <AdminHeader
         title="Donations"
-        subtitle="Every gift, what it was worth, and the members credited with bringing it in."
+        subtitle="Every donation, what it was worth, and the members credited with bringing it in."
       />
 
       <DonationManager
@@ -85,7 +85,7 @@ export default async function DonationsPage() {
       {credit.length > 0 ? (
         <Panel title="Credit by member">
           <p className="help-text">
-            A gift credited to several people counts in full for each of them —
+            A donation credited to several people counts in full for each of them —
             this answers what somebody brought in, not what share of the total is
             theirs.
           </p>

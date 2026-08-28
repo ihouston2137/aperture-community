@@ -96,7 +96,7 @@ export default async function ManagerDonationsPage() {
         <section className="member-card manager-card">
           <h2 className="member-card-title">Credit by member</h2>
           <p className="help-text">
-            A gift credited to several people counts in full for each of them —
+            A donation credited to several people counts in full for each of them —
             this answers what somebody brought in, not what share of the total is
             theirs.
           </p>

@@ -219,7 +219,7 @@ export default async function CampaignSponsorDashboard({
         {here.length === 0 ? (
           <p className="member-note">Nothing recorded from them on this campaign.</p>
         ) : (
-          <ul className="manager-gifts">
+          <ul className="manager-donations">
             {here.map((donation) => (
               <li key={donation._id}>
                 <div style={{ minWidth: 0 }}>
@@ -307,7 +307,7 @@ export default async function CampaignSponsorDashboard({
             {access.canEditSponsors ? " Add the person to ask for." : ""}
           </p>
         ) : (
-          <ul className="manager-gifts" style={{ marginTop: "1rem" }}>
+          <ul className="manager-donations" style={{ marginTop: "1rem" }}>
             {sponsor.contacts.map((contact, index) => (
               <li key={`${contact.name}-${index}`}>
                 <div style={{ minWidth: 0 }}>

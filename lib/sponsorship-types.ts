@@ -356,7 +356,7 @@ export type CampaignSummary = {
 /* --------------------------------------------------------------- Donations */
 
 /**
- * Where a gift has got to.
+ * Where a donation has got to.
  *
  * A pledge that has not arrived is worth recording — it is what the next
  * conversation is about — but it is not the same as money in hand, so the two
@@ -384,12 +384,12 @@ export function donationStatus(value: unknown): DonationStatus {
     : "proposed";
 }
 
-/** A cancelled gift never happened, so it is left out of every total. */
+/** A cancelled donation never happened, so it is left out of every total. */
 export function countsTowardTotals(status: DonationStatus): boolean {
   return status !== "cancelled";
 }
 
-/** Money in hand, as opposed to a gift still being worked on. */
+/** Money in hand, as opposed to a donation still being worked on. */
 export function isRealised(status: DonationStatus): boolean {
   return status === "complete";
 }
@@ -427,10 +427,10 @@ export function statusTone(status: DonationStatus): string {
 }
 
 /**
- * What a set of gifts amounts to, split by status and by kind.
+ * What a set of donations amounts to, split by status and by kind.
  *
  * Rows worth nothing are left out entirely: a campaign that has taken no in-kind
- * gifts should not carry a line saying so.
+ * donations should not carry a line saying so.
  */
 export type DonationBreakdownRow = {
   status: DonationStatus;
@@ -469,9 +469,9 @@ export function donationBreakdown(
  * What one sponsor has given, as the chips shown on their row.
  *
  * Money is read by status, because the difference between a cheque banked and a
- * cheque promised is the whole question. An in-kind gift is not money and never
+ * cheque promised is the whole question. An in-kind donation is not money and never
  * will be, so it is read only as arrived or not: dark for what has come, light
- * for what is still coming. A cancelled gift stays red either way.
+ * for what is still coming. A cancelled donation stays red either way.
  */
 export type SponsorChip = {
   key: string;
@@ -553,8 +553,8 @@ export function sponsorChips(
  * One campaign's worth of a sponsor's giving, for the history at the foot of
  * their page.
  *
- * Cancelled gifts are left out: this is a record of what somebody has actually
- * given, and a cancelled gift is not part of it.
+ * Cancelled donations are left out: this is a record of what somebody has actually
+ * given, and a cancelled donation is not part of it.
  */
 export type ContributionRow = {
   campaignId: string;
@@ -589,12 +589,12 @@ export function contributionsByCampaign(
 }
 
 /**
- * How a campaign's goal is being filled, in monetary gifts only.
+ * How a campaign's goal is being filled, in monetary donations only.
  *
- * An in-kind gift is worth having and worth recording, but a goal is money to
+ * An in-kind donation is worth having and worth recording, but a goal is money to
  * be raised — counting a lent projector towards it would say the money had come
- * in when it had not. Cancelled gifts are ignored for the same reason they are
- * ignored everywhere else, and so is a gift recorded as not counting.
+ * in when it had not. Cancelled donations are ignored for the same reason they are
+ * ignored everywhere else, and so is a donation recorded as not counting.
  */
 export type ProgressSegment = {
   status: DonationStatus;
@@ -637,7 +637,7 @@ export type StretchTier = {
  * A goal raised alongside the campaign rather than out of it.
  *
  * It has no threshold, because it is not a point along the campaign's own
- * run: it fills only from the gifts given to it by name, and the campaign's
+ * run: it fills only from the donations given to it by name, and the campaign's
  * total never includes them.
  */
 export type SecondaryGoal = {
@@ -647,7 +647,7 @@ export type SecondaryGoal = {
   targetCents: number;
   /** Given to it by name: counted, monetary, not cancelled. */
   raisedCents: number;
-  giftCount: number;
+  donationCount: number;
   /** Of its target, capped — for the width of its bar. */
   fillPercent: number;
   /** Of its target, uncapped — for the figure beside it. */
@@ -668,7 +668,7 @@ export type MonetaryProgress = {
   goalPercent: number;
   /** The tiers stacked above the goal. Separate goals are not among them. */
   tiers: StretchTier[];
-  /** The efforts raised alongside, whose gifts stay out of every figure above. */
+  /** The efforts raised alongside, whose donations stay out of every figure above. */
   secondary: SecondaryGoal[];
   /** Given to those efforts, and so deliberately absent from `totalCents`. */
   secondaryCents: number;
@@ -705,7 +705,7 @@ export function monetaryProgress(
   goalCents: number,
   stretchGoals: StretchGoal[] = []
 ): MonetaryProgress {
-  // Which ids belong to an effort of its own, so a gift to one can be kept
+  // Which ids belong to an effort of its own, so a donation to one can be kept
   // out of the campaign's total rather than counted twice over.
   const separateIds = new Set(
     stretchGoals.filter((goal) => goal.isSeparate).map((goal) => goal.id)
@@ -815,7 +815,7 @@ export function monetaryProgress(
         description: goal.description,
         targetCents: goal.amountCents,
         raisedCents,
-        giftCount: given?.count ?? 0,
+        donationCount: given?.count ?? 0,
         fillPercent: goal.amountCents
           ? Math.min(100, (raisedCents / goal.amountCents) * 100)
           : 0,

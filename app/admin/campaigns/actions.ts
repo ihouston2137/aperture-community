@@ -76,7 +76,7 @@ export async function saveCampaignAction(
   }
 
   // A tier keeps its id for life, because donations are applied to it by id.
-  // Two tiers sharing one would take each other's gifts, so a repeat is given
+  // Two tiers sharing one would take each other's donations, so a repeat is given
   // a fresh id rather than being allowed through.
   const seen = new Set<string>();
   stretchGoals = stretchGoals.map((goal) => {
@@ -132,7 +132,7 @@ export async function saveCampaignAction(
   if (id) {
     await SponsorshipCampaign.findByIdAndUpdate(id, payload);
 
-    // A tier that has gone takes its earmarks with it: a gift pointing at
+    // A tier that has gone takes its earmarks with it: a donation pointing at
     // nothing would read as unallocated anyway, and saying so in the data
     // beats working it out at every place that shows one.
     await Donation.updateMany(
@@ -159,7 +159,7 @@ export async function deleteCampaignAction(
   if (!id) return { ok: false, error: "That campaign no longer exists." };
 
   // The donations are the record of what was raised; deleting the campaign
-  // under them would leave gifts belonging to nothing.
+  // under them would leave donations belonging to nothing.
   const donations = await Donation.countDocuments({ campaignId: id });
   if (donations > 0) {
     return {

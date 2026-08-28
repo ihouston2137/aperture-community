@@ -113,8 +113,8 @@ export async function deleteSponsorAction(
   const id = String(formData.get("id") ?? "");
   if (!id) return { ok: false, error: "That sponsor no longer exists." };
 
-  // A sponsor with gifts recorded against it is the only record of where those
-  // gifts came from, so it is not something to delete by accident.
+  // A sponsor with donations recorded against it is the only record of where those
+  // donations came from, so it is not something to delete by accident.
   const donations = await Donation.countDocuments({ sponsorId: id });
   if (donations > 0) {
     return {

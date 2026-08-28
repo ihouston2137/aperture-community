@@ -20,7 +20,7 @@ export type SponsorshipAccess = {
    * Reading back what is already finished.
    *
    * Separate from seeing the section, because a campaign's final figures are
-   * often the sensitive part: somebody brought in to enter this year's gifts
+   * often the sensitive part: somebody brought in to enter this year's donations
    * has no need of what every previous year raised.
    */
   canSeeClosed: boolean;

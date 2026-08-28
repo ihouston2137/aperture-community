@@ -12,7 +12,7 @@ import {
  * should not have to go up a level to find out what grey stands for.
  *
  * Money is read by status, because the difference between a cheque banked and a
- * cheque promised is the whole question. An in-kind gift is not money and never
+ * cheque promised is the whole question. An in-kind donation is not money and never
  * becomes money, so it is read only as arrived or not.
  */
 export function ToneLegend() {

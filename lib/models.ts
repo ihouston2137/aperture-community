@@ -840,7 +840,7 @@ const SponsorshipCampaignSchema = new Schema<any>(
         /*
          * Minted when the tier is first saved and kept for its lifetime, so a
          * donation can be applied to one. A position would not do: deleting
-         * the first tier would silently move every gift below it up one.
+         * the first tier would silently move every donation below it up one.
          */
         id: { type: String, default: "" },
         description: { type: String, default: "" },
@@ -879,10 +879,10 @@ export const SponsorshipCampaign = model(
 );
 
 /**
- * One gift, from one sponsor, to one campaign.
+ * One donation, from one sponsor, to one campaign.
  *
- * `valueCents` is what it is worth either way: a monetary gift is the amount,
- * and an in-kind gift is what it stands in for, so a campaign total means the
+ * `valueCents` is what it is worth either way: a monetary donation is the amount,
+ * and an in-kind donation is what it stands in for, so a campaign total means the
  * same thing whichever kind it is made of.
  */
 const DonationSchema = new Schema<any>(
@@ -898,18 +898,18 @@ const DonationSchema = new Schema<any>(
     /*
      * Whether it fills the campaign's goal and earns leaderboard credit.
      *
-     * A transfer from another fund, a gift the committee arranged with itself,
+     * A transfer from another fund, a donation the committee arranged with itself,
      * or money already counted somewhere else is worth recording and would
      * flatter both if it were counted. Everything else is counted, so an
      * existing record and a new one both start true.
      */
     isCounted: { type: Boolean, default: true },
     /*
-     * The stretch goal this gift was given for, if it was given for one.
+     * The stretch goal this donation was given for, if it was given for one.
      *
      * An earmark rather than a redirection: the money fills the campaign the
      * same way whatever it is marked for, and this records what the giver
-     * meant it to pay for. Empty for a gift to the campaign at large.
+     * meant it to pay for. Empty for a donation to the campaign at large.
      */
     stretchGoalId: { type: String, default: "" },
     /** The members credited with bringing it in. */

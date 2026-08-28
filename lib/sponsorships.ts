@@ -161,7 +161,7 @@ export async function getDonations(): Promise<DonationSummary[]> {
 /**
  * What each campaign has taken, and what is still being worked on.
  *
- * Cancelled gifts are left out entirely — they never happened. The rest are
+ * Cancelled donations are left out entirely — they never happened. The rest are
  * split, because a pledge that has not arrived is worth knowing about but is
  * not the same as money in hand.
  */
@@ -223,9 +223,9 @@ export function totalsByCampaign(
  *
  * Deliberately a different question from `creditByMember`, and deliberately a
  * different answer. That one asks "what did this member bring in", and counts a
- * shared gift in full for everybody on it. This one asks "how do the members
+ * shared donation in full for everybody on it. This one asks "how do the members
  * compare", which only means something if the shares add up to the whole — so a
- * gift credited to three people is a third each.
+ * donation credited to three people is a third each.
  *
  * Split in whole cents, with the remainder going to the first named. Three
  * people sharing a dollar get 34, 33 and 33 rather than 33 each and a cent lost
@@ -263,7 +263,7 @@ export function splitCreditByMember(
   const credit = new Map<string, MemberCredit>();
 
   for (const donation of donations) {
-    // A cancelled gift is nobody's credit, and neither is one recorded as not
+    // A cancelled donation is nobody's credit, and neither is one recorded as not
     // counting — the board and the goal answer to the same flag.
     if (!countsTowardTotals(donation.status)) continue;
     if (!donation.isCounted) continue;
@@ -326,7 +326,7 @@ export function creditByMember(
   const credit = new Map<string, { totalCents: number; count: number }>();
 
   for (const donation of donations) {
-    // A gift that was cancelled is nobody's credit, nor is one recorded as not
+    // A donation that was cancelled is nobody's credit, nor is one recorded as not
     // counting towards the goal and the board.
     if (!countsTowardTotals(donation.status)) continue;
     if (!donation.isCounted) continue;

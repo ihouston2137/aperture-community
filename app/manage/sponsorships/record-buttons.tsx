@@ -84,7 +84,7 @@ export function DonationButton({
   campaigns: CampaignOption[];
   sponsors: PickerOption[];
   members: PickerOption[];
-  /** What the page opening this already knows about a new gift. */
+  /** What the page opening this already knows about a new donation. */
   defaultSponsorId?: string;
   defaultCampaignId?: string;
   label: string;
