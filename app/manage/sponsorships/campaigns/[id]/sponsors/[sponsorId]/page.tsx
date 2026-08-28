@@ -109,7 +109,6 @@ export default async function CampaignSponsorDashboard({
   // figures stand either way — only the link is withheld.
   const history = contributionsByCampaign(fromThisSponsor);
   const historyTotal = history.reduce((sum, row) => sum + row.cents, 0);
-  const largest = history.reduce((most, row) => Math.max(most, row.cents), 0);
 
   const level = levels.find((entry) => entry._id === sponsor.recognitionLevelId);
   const logoSrc = sponsorLogoSrc(primaryLogo(sponsor.logos));
@@ -406,19 +405,23 @@ export default async function CampaignSponsorDashboard({
                       ) : null}
                     </span>
 
-                    {/* Each campaign's bar is drawn against the largest, so the
-                        rows can be compared by eye rather than by reading. */}
-                    <span className="contrib-bar" aria-hidden="true">
+                    {/* What the campaign's total is made of, in the same
+                        chips this sponsor's giving is shown in everywhere
+                        else. It was a bar before, which borrowed the shape of
+                        the goal meters and so read as progress towards
+                        something — and there is nothing here to progress
+                        towards. */}
+                    <span className="contrib-chips">
                       {row.chips.map((chip) => (
                         <span
                           key={chip.key}
-                          className={chip.tone}
-                          style={{
-                            width: largest
-                              ? `${(chip.cents / largest) * 100}%`
-                              : "0%",
-                          }}
-                        />
+                          className={`tone-chip ${chip.tone}`}
+                          title={chip.label}
+                        >
+                          <span className="tone-dot" aria-hidden="true" />
+                          <span className="visually-hidden">{chip.label}</span>
+                          {formatDollars(chip.cents)}
+                        </span>
                       ))}
                     </span>
 

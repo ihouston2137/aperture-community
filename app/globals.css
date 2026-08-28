@@ -8257,18 +8257,14 @@ html:has(.admin-shell) body::-webkit-scrollbar {
   color: inherit;
 }
 
-.contrib-bar {
+/* What one campaign's total is made of. Chips rather than a bar: a bar of
+   this shape means "progress towards a goal" everywhere else on the site, and
+   a sponsor's giving history has no goal to be progressing towards. */
+.contrib-chips {
   display: flex;
-  height: 0.75rem;
-  border-radius: 999px;
-  background: rgba(128, 128, 128, 0.15);
-  overflow: hidden;
-}
-
-.contrib-bar > span {
-  display: block;
-  height: 100%;
-  background: var(--tone, var(--content-accent));
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
 }
 
 .contrib-amount {
@@ -8292,7 +8288,7 @@ html:has(.admin-shell) body::-webkit-scrollbar {
     grid-template-columns: 1fr auto;
   }
 
-  .contrib-bar {
+  .contrib-chips {
     grid-column: 1 / -1;
   }
 }
