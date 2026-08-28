@@ -5,17 +5,22 @@ import { useEffect, useState, useTransition } from "react";
 
 import { BioPicker } from "@/components/bio-picker";
 import { ModalPortal } from "@/components/modal-portal";
+import { protectedMediaUrl } from "@/lib/protected-media-url";
 import {
   formatDollars,
   type RecognitionLevelSummary,
+  type SponsorLogo,
 } from "@/lib/sponsorship-types";
 
 import {
   addCampaignSponsorAction,
   createCampaignSponsorAction,
+  deleteSponsorLogoAction,
   removeCampaignSponsorAction,
   setCampaignAssignedAction,
+  setPrimarySponsorLogoAction,
   setSponsorRecognitionAction,
+  uploadSponsorLogoAction,
 } from "./actions";
 
 export type Option = { _id: string; name: string; title?: string };
@@ -510,6 +515,251 @@ export function RemoveSponsorButton({
                   donationCount === 1 ? "" : "s"
                 } to it stay recorded, and still count towards what it raised.`
               : "They stay on file, and can be put back on at any time."}
+          </p>
+        </Popup>
+      ) : null}
+    </>
+  );
+}
+
+/**
+ * The sponsor's artwork: what is on file, and the ways it changes.
+ *
+ * Logos are wanted at the moment somebody is looking at the sponsor — a
+ * programme is being laid out, or a logo has just arrived by email — which is
+ * here rather than in the media library. Taking a copy is offered to anybody
+ * who can see the page: they are already looking at the artwork. Putting one
+ * on file or taking one off is a change to the sponsor, and asks for the grant
+ * that covers those.
+ */
+/**
+ * The link that hands a copy over.
+ *
+ * `dl=1` is what the media route counts a download by — the same file behind
+ * the same link is otherwise indistinguishable from the picture on screen.
+ * A logo held as an outside address never goes through that route, so it is
+ * linked as it stands.
+ */
+function downloadHref(url: string): string {
+  const src = protectedMediaUrl(url);
+  return src.startsWith("/api/media?") ? `${src}&dl=1` : src;
+}
+
+export function SponsorLogosButton({
+  sponsorId,
+  sponsorName,
+  logos,
+  canEdit,
+}: {
+  sponsorId: string;
+  sponsorName: string;
+  logos: SponsorLogo[];
+  /** Whether this reader may put artwork on file or take it off. */
+  canEdit: boolean;
+}) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [confirming, setConfirming] = useState(-1);
+  // Bumped after each upload to remount the form. Without it the file stays
+  // chosen in the box and the same artwork goes up twice on a second press.
+  const [formKey, setFormKey] = useState(0);
+  const [error, setError] = useState("");
+  const [pending, startTransition] = useTransition();
+
+  function close() {
+    if (pending) return;
+    setOpen(false);
+    setError("");
+    setConfirming(-1);
+  }
+
+  function upload(formData: FormData) {
+    setError("");
+    formData.set("sponsorId", sponsorId);
+
+    startTransition(async () => {
+      const result = await uploadSponsorLogoAction(formData);
+      if (result.ok) {
+        setError("");
+        setFormKey((current) => current + 1);
+        router.refresh();
+      } else {
+        setError(result.error ?? "Could not add that logo.");
+      }
+    });
+  }
+
+  function remove(index: number, url: string) {
+    setError("");
+    startTransition(async () => {
+      const formData = new FormData();
+      formData.set("sponsorId", sponsorId);
+      formData.set("index", String(index));
+      formData.set("expectedUrl", url);
+
+      const result = await deleteSponsorLogoAction(formData);
+      if (result.ok) {
+        setConfirming(-1);
+        router.refresh();
+      } else {
+        setError(result.error ?? "Could not remove that logo.");
+      }
+    });
+  }
+
+  function makePrimary(index: number) {
+    setError("");
+    startTransition(async () => {
+      const formData = new FormData();
+      formData.set("sponsorId", sponsorId);
+      formData.set("index", String(index));
+
+      const result = await setPrimarySponsorLogoAction(formData);
+      if (result.ok) router.refresh();
+      else setError(result.error ?? "Could not change that.");
+    });
+  }
+
+  return (
+    <>
+      <button type="button" className="btn btn-sm" onClick={() => setOpen(true)}>
+        Logos ({logos.length})
+      </button>
+
+      {open ? (
+        <Popup
+          title={`${sponsorName} logos`}
+          pending={pending}
+          error={error}
+          onClose={close}
+          footer={
+            <button
+              type="button"
+              className="btn btn-sm"
+              style={{ marginLeft: "auto" }}
+              disabled={pending}
+              onClick={close}
+            >
+              Done
+            </button>
+          }
+        >
+          {logos.length === 0 ? (
+            <p className="help-text">Nothing on file yet.</p>
+          ) : (
+            <ul className="logo-manager">
+              {logos.map((logo, index) => (
+                <li key={`${logo.url}-${index}`} className="logo-manager-row">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={protectedMediaUrl(logo.url)}
+                    alt=""
+                    className="logo-manager-thumb"
+                  />
+
+                  <div className="logo-manager-what">
+                    <strong>{logo.label || `Logo ${index + 1}`}</strong>
+                    {logo.isPrimary ? (
+                      <span className="badge">shown on the site</span>
+                    ) : canEdit ? (
+                      <button
+                        type="button"
+                        className="btn btn-sm"
+                        disabled={pending}
+                        onClick={() => makePrimary(index)}
+                      >
+                        Show this one
+                      </button>
+                    ) : null}
+                  </div>
+
+                  <div className="logo-manager-actions">
+                    <a
+                      className="btn btn-sm"
+                      href={downloadHref(logo.url)}
+                      download
+                    >
+                      Download
+                    </a>
+
+                    {canEdit ? (
+                      confirming === index ? (
+                        <>
+                          <button
+                            type="button"
+                            className="btn btn-danger btn-sm"
+                            disabled={pending}
+                            onClick={() => remove(index, logo.url)}
+                          >
+                            {pending ? "Removing…" : "Yes, remove"}
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-sm"
+                            disabled={pending}
+                            onClick={() => setConfirming(-1)}
+                          >
+                            Keep
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          type="button"
+                          className="btn btn-danger btn-sm"
+                          disabled={pending}
+                          onClick={() => setConfirming(index)}
+                        >
+                          Remove
+                        </button>
+                      )
+                    ) : null}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {canEdit ? (
+            <form key={formKey} action={upload} className="logo-manager-add">
+              <div className="field">
+                <label htmlFor="logo-file">Add a logo</label>
+                <input
+                  id="logo-file"
+                  name="file"
+                  type="file"
+                  accept="image/png,image/jpeg,image/svg+xml,image/webp,image/gif"
+                  required
+                  disabled={pending}
+                />
+              </div>
+              <div className="field">
+                <label htmlFor="logo-label">Label</label>
+                <input
+                  id="logo-label"
+                  name="label"
+                  type="text"
+                  placeholder="Full colour, on dark…"
+                  disabled={pending}
+                />
+              </div>
+              <button
+                type="submit"
+                className="btn btn-primary btn-sm"
+                disabled={pending}
+              >
+                {pending ? "Uploading…" : "Upload"}
+              </button>
+            </form>
+          ) : (
+            <p className="help-text">
+              Taking a copy is all this page offers you. Putting artwork on file
+              or taking it off needs the grant that covers editing sponsors.
+            </p>
+          )}
+
+          <p className="help-text">
+            Removing a logo takes it off this sponsor. The file stays in the
+            media library, where what else uses it can be seen.
           </p>
         </Popup>
       ) : null}

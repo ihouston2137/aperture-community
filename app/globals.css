@@ -7736,6 +7736,75 @@ html:has(.admin-shell) body::-webkit-scrollbar {
   font-size: 0.875rem;
 }
 
+/* The artwork on file for one sponsor: what each is, and what can be done
+   with it. Wide rows rather than a grid — the label and the controls are what
+   is being read, and the picture is only there to say which is which. */
+.logo-manager {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.logo-manager-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  padding-bottom: 0.6rem;
+  border-bottom: 1px solid rgba(128, 128, 128, 0.18);
+}
+
+.logo-manager-row:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.logo-manager-thumb {
+  width: 4rem;
+  height: 4rem;
+  flex: none;
+  border-radius: var(--radius);
+  object-fit: contain;
+  box-sizing: border-box;
+  padding: 0.25rem;
+  border: 1px solid var(--admin-border);
+  background: var(--sponsor-logo-backdrop);
+}
+
+.logo-manager-what {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.3rem;
+  flex: 1 1 8rem;
+  min-width: 0;
+}
+
+.logo-manager-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  margin-left: auto;
+}
+
+.logo-manager-add {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.5rem 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(128, 128, 128, 0.28);
+}
+
+.logo-manager-add .field {
+  flex: 1 1 10rem;
+  min-width: 0;
+}
+
 /* Goods and services, called out rather than tucked into a sentence: a
    campaign lent a hall has been given something real, and the money figures
    above cannot say so. */
@@ -7894,7 +7963,9 @@ html:has(.admin-shell) body::-webkit-scrollbar {
   margin: 1rem 0 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(18rem, 100%), 1fr));
+  /* Wide enough for the logo and a name beside it without the name wrapping
+     to one word a line. */
+  grid-template-columns: repeat(auto-fill, minmax(min(21rem, 100%), 1fr));
   gap: 0.85rem;
 }
 
@@ -7924,8 +7995,8 @@ html:has(.admin-shell) body::-webkit-scrollbar {
 /* Larger than the row logo it replaces: artwork is the fastest way to
    recognise a sponsor, and at row size it was decoration. */
 .sponsor-card-logo {
-  width: 4rem;
-  height: 4rem;
+  width: 8rem;
+  height: 8rem;
   flex: none;
   border-radius: var(--radius);
   object-fit: contain;
@@ -7942,8 +8013,16 @@ html:has(.admin-shell) body::-webkit-scrollbar {
 .sponsor-card-name {
   display: flex;
   flex-direction: column;
-  gap: 0.1rem;
+  gap: 0.15rem;
   min-width: 0;
+}
+
+/* The recognition level is a standing fact about the sponsor, not an aside —
+   it was set in the help-text grey, which read as something to skip. */
+.sponsor-card-name .help-text {
+  font-size: 0.9375rem;
+  opacity: 1;
+  font-weight: 600;
 }
 
 .sponsor-card-name strong {
@@ -8096,13 +8175,22 @@ html:has(.admin-shell) body::-webkit-scrollbar {
 
 .sponsor-header {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 1rem;
 }
 
+/* Pushed to the far edge, away from the name it is not part of. */
+.sponsor-header-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
 .sponsor-header-logo {
-  width: 4rem;
-  height: 4rem;
+  width: 8rem;
+  height: 8rem;
   flex: none;
   border-radius: var(--radius);
   object-fit: contain;

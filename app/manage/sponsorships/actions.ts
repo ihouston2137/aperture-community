@@ -4,10 +4,22 @@ import { revalidatePath } from "next/cache";
 
 import { getUserAccess } from "@/lib/access";
 import { connectDB } from "@/lib/db";
-import { RecognitionLevel, Sponsor, SponsorshipCampaign, User } from "@/lib/models";
+import {
+  MediaAsset,
+  RecognitionLevel,
+  Sponsor,
+  SponsorshipCampaign,
+  User,
+} from "@/lib/models";
+import { syncMediaUsage } from "@/lib/media-usage-sync";
+import { generateThumbnail, storeUpload } from "@/lib/media-upload";
 import { requireSession } from "@/lib/session";
 import { sponsorshipAccess } from "@/lib/sponsorship-access";
-import { normalizeContacts, uniqueIds } from "@/lib/sponsorship-types";
+import {
+  normalizeContacts,
+  normalizeLogos,
+  uniqueIds,
+} from "@/lib/sponsorship-types";
 
 /** The dialog stays open on failure to show the message, so these report back. */
 export type ManageResult = { ok: boolean; error?: string };
@@ -293,6 +305,172 @@ export async function deleteSponsorContactAction(
 
   contacts.splice(index, 1);
   sponsor.contacts = contacts;
+  await sponsor.save();
+
+  revalidate();
+  return { ok: true };
+}
+
+/* --------------------------------------------------------------- Logos */
+
+/**
+ * Artwork cleared for use, kept where the sponsor is read rather than where
+ * media is administered.
+ *
+ * Somebody who has just been sent a logo by a sponsor they look after should
+ * not need the media library and its permissions to put it on file — the
+ * grant that lets them edit the sponsor is the grant that matters here. The
+ * file still lands in the library like any other, so it can be found, reused
+ * and accounted for.
+ */
+
+/** Only what a logo can sensibly be. A PDF brand pack is not a logo. */
+const LOGO_MIME_TYPES: Record<string, string> = {
+  "image/jpeg": ".jpg",
+  "image/png": ".png",
+  "image/svg+xml": ".svg",
+  "image/webp": ".webp",
+  "image/gif": ".gif",
+};
+
+async function logosOf(sponsorId: string) {
+  if (!sponsorId) return null;
+  return Sponsor.findById(sponsorId);
+}
+
+export async function uploadSponsorLogoAction(
+  formData: FormData
+): Promise<ManageResult> {
+  if (!(await access()).canEditSponsors) {
+    return { ok: false, error: "You cannot change this sponsor." };
+  }
+
+  const sponsorId = String(formData.get("sponsorId") ?? "");
+  const sponsor = await logosOf(sponsorId);
+  if (!sponsor) return { ok: false, error: "That sponsor no longer exists." };
+
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) {
+    return { ok: false, error: "Choose an image to upload." };
+  }
+
+  let stored;
+  try {
+    stored = await storeUpload(file, "media", LOGO_MIME_TYPES);
+  } catch {
+    return {
+      ok: false,
+      error: "That file is not an image this site can use, or it is too large.",
+    };
+  }
+
+  const thumbnail = await generateThumbnail(stored.absolutePath, stored.fileName);
+  const label = String(formData.get("label") ?? "").trim().slice(0, 60);
+
+  const asset = await MediaAsset.create({
+    filename: stored.fileName,
+    fileName: stored.fileName,
+    url: stored.url,
+    thumbnailUrl: thumbnail?.thumbnailUrl ?? "",
+    width: thumbnail?.width ?? 0,
+    height: thumbnail?.height ?? 0,
+    originalName: stored.originalName,
+    mimeType: stored.mimeType,
+    size: stored.size,
+    title: label || `${sponsor.name} logo`,
+    alt: `${sponsor.name} logo`,
+  });
+
+  const logos = normalizeLogos(sponsor.logos);
+  logos.push({
+    label,
+    url: stored.url,
+    mediaId: String(asset._id),
+    // The first one on file is the one the site shows, since otherwise
+    // nothing would be.
+    isPrimary: logos.length === 0,
+  });
+
+  sponsor.logos = normalizeLogos(logos);
+  await sponsor.save();
+
+  await syncMediaUsage(sponsorId, sponsor.name, [
+    { kind: "sponsor-logo", source: sponsor.logos },
+  ]);
+
+  revalidate();
+  return { ok: true };
+}
+
+/**
+ * Takes one logo off the sponsor.
+ *
+ * The file itself stays in the media library: this says the sponsor no longer
+ * uses that artwork, not that the artwork should be destroyed for everybody.
+ * Deleting it outright is the library's job, where what else uses it is shown.
+ */
+export async function deleteSponsorLogoAction(
+  formData: FormData
+): Promise<ManageResult> {
+  if (!(await access()).canEditSponsors) {
+    return { ok: false, error: "You cannot change this sponsor." };
+  }
+
+  const sponsorId = String(formData.get("sponsorId") ?? "");
+  const sponsor = await logosOf(sponsorId);
+  if (!sponsor) return { ok: false, error: "That sponsor no longer exists." };
+
+  const logos = normalizeLogos(sponsor.logos);
+  const index = Number(formData.get("index") ?? -1);
+  const expected = String(formData.get("expectedUrl") ?? "");
+
+  // The row is identified by both position and what was there, so a logo
+  // added or removed since the page loaded cannot be deleted by mistake.
+  if (!logos[index] || logos[index].url !== expected) {
+    return {
+      ok: false,
+      error: "That logo has changed since this page was opened. Reload and try again.",
+    };
+  }
+
+  logos.splice(index, 1);
+  // `normalizeLogos` hands the primary to whatever is left, so removing the
+  // one the site shows does not leave the sponsor showing nothing.
+  sponsor.logos = normalizeLogos(logos);
+  await sponsor.save();
+
+  await syncMediaUsage(sponsorId, sponsor.name, [
+    { kind: "sponsor-logo", source: sponsor.logos },
+  ]);
+
+  revalidate();
+  return { ok: true };
+}
+
+/** Chooses which logo the site shows, when a sponsor has more than one. */
+export async function setPrimarySponsorLogoAction(
+  formData: FormData
+): Promise<ManageResult> {
+  if (!(await access()).canEditSponsors) {
+    return { ok: false, error: "You cannot change this sponsor." };
+  }
+
+  const sponsorId = String(formData.get("sponsorId") ?? "");
+  const sponsor = await logosOf(sponsorId);
+  if (!sponsor) return { ok: false, error: "That sponsor no longer exists." };
+
+  const logos = normalizeLogos(sponsor.logos);
+  const index = Number(formData.get("index") ?? -1);
+  if (!logos[index]) {
+    return {
+      ok: false,
+      error: "That logo has changed since this page was opened. Reload and try again.",
+    };
+  }
+
+  sponsor.logos = normalizeLogos(
+    logos.map((logo, position) => ({ ...logo, isPrimary: position === index }))
+  );
   await sponsor.save();
 
   revalidate();

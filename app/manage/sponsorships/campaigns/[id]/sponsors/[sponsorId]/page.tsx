@@ -30,7 +30,11 @@ import {
 import { ContactButton, DeleteContactButton } from "../../../../contact-controls";
 import { DonationButton } from "../../../../record-buttons";
 import { ToneLegend } from "../../../../tone-legend";
-import { ChangeAssignedButton, ChangeLevelButton } from "../../../../sponsor-controls";
+import {
+  ChangeAssignedButton,
+  ChangeLevelButton,
+  SponsorLogosButton,
+} from "../../../../sponsor-controls";
 
 /**
  * One sponsor, on one campaign.
@@ -142,6 +146,17 @@ export default async function CampaignSponsorDashboard({
             {sponsor.industry ? ` · ${sponsor.industry}` : ""}
           </p>
         </div>
+
+        {/* Artwork is wanted at the moment somebody is looking at the sponsor,
+            so the way to it is here rather than in the media library. */}
+        <span className="sponsor-header-actions">
+          <SponsorLogosButton
+            sponsorId={sponsor._id}
+            sponsorName={sponsor.name}
+            logos={sponsor.logos}
+            canEdit={access.canEditSponsors}
+          />
+        </span>
       </header>
 
       <section className="member-card manager-card">
