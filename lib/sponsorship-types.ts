@@ -6,6 +6,7 @@
  * from the browser bundle would drag Mongoose in with it.
  */
 
+import { normalizePhone } from "./member-types";
 import {
   protectedMediaUrl,
   sanitizeMediaPath,
@@ -84,7 +85,7 @@ export function sponsorType(value: unknown): SponsorType {
  * quietly dropped.
  */
 export const SPONSOR_INDUSTRIES = [
-  "Accounting",
+  "Accounting and investing",
   "Advertising and marketing",
   "Agriculture",
   "Architecture",
@@ -932,7 +933,7 @@ export function normalizeContacts(value: unknown): SponsorContact[] {
       name: String((entry as any)?.name ?? "").trim().slice(0, 120),
       title: String((entry as any)?.title ?? "").trim().slice(0, 120),
       email: String((entry as any)?.email ?? "").trim().slice(0, 200),
-      phone: String((entry as any)?.phone ?? "").trim().slice(0, 40),
+      phone: normalizePhone(String((entry as any)?.phone ?? "")),
     }))
     .filter((contact) => contact.name || contact.email || contact.phone)
     .slice(0, 25);

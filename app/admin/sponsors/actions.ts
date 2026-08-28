@@ -12,6 +12,7 @@ import {
   SponsorCategory,
   SponsorshipCampaign,
 } from "@/lib/models";
+import { normalizePhone } from "@/lib/member-types";
 import {
   normalizeContacts,
   normalizeLinks,
@@ -62,7 +63,7 @@ export async function saveSponsorAction(
     industry: String(formData.get("industry") ?? "").trim().slice(0, 120),
     size: sponsorSize(formData.get("size")),
     email: String(formData.get("email") ?? "").trim().slice(0, 200),
-    phone: String(formData.get("phone") ?? "").trim().slice(0, 40),
+    phone: normalizePhone(String(formData.get("phone") ?? "")),
     address: String(formData.get("address") ?? "").trim().slice(0, 400),
     website: String(formData.get("website") ?? "").trim().slice(0, 500),
     links,

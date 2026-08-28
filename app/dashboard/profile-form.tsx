@@ -1,5 +1,7 @@
 "use client";
 
+import { formatPhone } from "@/lib/member-types";
+
 export type OwnProfile = {
   firstName: string;
   lastName: string;
@@ -77,7 +79,7 @@ export function ProfileForm({
             id="me-phone"
             name="phone"
             type="tel"
-            defaultValue={member.phone}
+            defaultValue={formatPhone(member.phone)}
             autoComplete="tel"
           />
         </div>

@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { MediaField } from "@/app/admin/media/media-picker";
 import { Panel } from "@/components/admin-ui";
 import { ModalPortal } from "@/components/modal-portal";
+import { formatPhone } from "@/lib/member-types";
 import {
   SPONSOR_INDUSTRIES,
   SPONSOR_SIZES,
@@ -205,7 +206,7 @@ export function SponsorManager({
                   </div>
                   <div className="admin-list-meta">
                     {sponsor.email || "no email"}
-                    {sponsor.phone ? ` · ${sponsor.phone}` : ""}
+                    {sponsor.phone ? ` · ${formatPhone(sponsor.phone)}` : ""}
                     {sponsor.contacts.length > 0
                       ? ` · ${sponsor.contacts.length} contact${
                           sponsor.contacts.length === 1 ? "" : "s"
@@ -281,7 +282,10 @@ function SponsorDialog({
 }) {
   const [logos, setLogos] = useState<SponsorLogo[]>(sponsor?.logos ?? []);
   const [contacts, setContacts] = useState<SponsorContact[]>(
-    sponsor?.contacts ?? []
+    (sponsor?.contacts ?? []).map((contact) => ({
+      ...contact,
+      phone: formatPhone(contact.phone),
+    }))
   );
 
   // A value recorded before the list existed stays on the list, so opening an
@@ -507,7 +511,7 @@ function SponsorDialog({
                     id="sponsor-phone"
                     name="phone"
                     type="tel"
-                    defaultValue={sponsor?.phone ?? ""}
+                    defaultValue={formatPhone(sponsor?.phone ?? "")}
                   />
                 </div>
                 <div className="field">

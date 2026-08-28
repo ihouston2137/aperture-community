@@ -68,12 +68,47 @@ export function fullName(user: {
 }
 
 /**
- * A phone number is stored as typed — formats differ by country and rewriting
- * them loses information — but anything that is plainly not part of a number
- * is dropped.
+ * A phone number is stored as digits and nothing else.
+ *
+ * Everybody types one differently — dots, dashes, spaces, brackets, a leading
+ * plus — and storing the punctuation means the same number is held a dozen
+ * ways, none of which match each other when searched. The digits are the
+ * number; how it is written is a matter for the screen it is shown on, which
+ * is what `formatPhone` is for.
+ *
+ * Capped at fifteen, the most digits any number in the world has.
  */
 export function normalizePhone(value: string): string {
-  return value.replace(/[^\d+()\-.\sx]/gi, "").trim().slice(0, 40);
+  return value.replace(/\D/g, "").slice(0, 15);
+}
+
+/**
+ * A phone number as it is read: `(555) 123-4567`.
+ *
+ * Normalises first, so a number stored before the digits-only rule — or one
+ * pasted in with brackets already — comes out the same as everything else.
+ *
+ * Ten digits is the shape the pattern is for. A longer number carries a
+ * country code, which is kept in front rather than thrown away; a shorter one
+ * is not a number that can be laid out, and is shown as it stands rather than
+ * padded into a shape it does not have.
+ */
+export function formatPhone(value: string): string {
+  const digits = normalizePhone(value ?? "");
+  if (digits.length < 10) return digits;
+
+  const country = digits.slice(0, digits.length - 10);
+  const area = digits.slice(-10, -7);
+  const exchange = digits.slice(-7, -4);
+  const line = digits.slice(-4);
+
+  return `${country ? `+${country} ` : ""}(${area}) ${exchange}-${line}`;
+}
+
+/** The `tel:` a link dials. Digits, with the plus a country code needs. */
+export function telHref(value: string): string {
+  const digits = normalizePhone(value ?? "");
+  return digits.length > 10 ? `tel:+${digits}` : `tel:${digits}`;
 }
 
 export function isEmailAddress(value: string): boolean {

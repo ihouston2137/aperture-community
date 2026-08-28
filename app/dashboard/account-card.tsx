@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { PasswordFields } from "@/app/admin/change-password/password-fields";
+import { formatPhone } from "@/lib/member-types";
 
 import { AccountDialog } from "./account-dialog";
 import { changeOwnPasswordAction, saveOwnBioAction, saveOwnProfileAction } from "./actions";
@@ -108,7 +109,7 @@ export function AccountCard({
         <dt>Email</dt>
         <dd>{member.email}</dd>
         <dt>Phone</dt>
-        <dd>{member.phone || "—"}</dd>
+        <dd>{formatPhone(member.phone) || "—"}</dd>
       </dl>
 
       {notice ? (

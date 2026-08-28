@@ -24,13 +24,20 @@ function buildFilter(query: UserQuery): Record<string, unknown> {
     // One term against every way somebody might be looked up. Anchored nowhere,
     // so "smith" finds "Smithson" and a partial phone number finds its owner.
     const term = new RegExp(escapeRegex(query.search), "i");
-    filter.$or = [
+    const or: Record<string, unknown>[] = [
       { firstName: term },
       { lastName: term },
       { name: term },
       { email: term },
       { phone: term },
     ];
+
+    // Phone numbers are stored as digits, so a search typed the way one is
+    // written — "(555) 123" — has to be reduced to digits to match anything.
+    const digits = query.search.replace(/\D/g, "");
+    if (digits) or.push({ phone: new RegExp(escapeRegex(digits)) });
+
+    filter.$or = or;
   }
 
   if (query.role === NO_ROLE) filter.roleIds = { $size: 0 };

@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { getUserAccess } from "@/lib/access";
 import { connectDB } from "@/lib/db";
-import { fullName } from "@/lib/member-types";
+import { formatPhone, fullName } from "@/lib/member-types";
 import { getRoleSummaries } from "@/lib/members";
 import { User } from "@/lib/models";
 import { getSession } from "@/lib/session";
@@ -296,7 +296,7 @@ export default async function CampaignSponsorDashboard({
             </dd>
 
             <dt>Phone</dt>
-            <dd>{sponsor.phone || "—"}</dd>
+            <dd>{formatPhone(sponsor.phone) || "—"}</dd>
 
             <dt>Website</dt>
             <dd>
@@ -330,7 +330,7 @@ export default async function CampaignSponsorDashboard({
                   <span className="help-text">
                     {contact.title || "no title"}
                     {contact.email ? ` · ${contact.email}` : ""}
-                    {contact.phone ? ` · ${contact.phone}` : ""}
+                    {contact.phone ? ` · ${formatPhone(contact.phone)}` : ""}
                   </span>
                 </div>
 

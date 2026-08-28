@@ -4,7 +4,11 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 
 import { Panel } from "@/components/admin-ui";
-import { fullName, type MemberSummary } from "@/lib/member-types";
+import {
+  formatPhone,
+  fullName,
+  type MemberSummary,
+} from "@/lib/member-types";
 import { membershipStatusLabels } from "@/lib/permissions";
 
 import { decideMembershipAction, setMembershipStatusAction } from "./actions";
@@ -33,7 +37,12 @@ export function MemberDirectory({
     return members.filter((member) => {
       if (levelFilter && !member.communityRoleIds.includes(levelFilter)) return false;
       if (!needle) return true;
-      return [fullName(member), member.email, member.phone]
+      return [
+        fullName(member),
+        member.email,
+        member.phone,
+        formatPhone(member.phone),
+      ]
         .join(" ")
         .toLowerCase()
         .includes(needle);
@@ -161,7 +170,7 @@ function MemberRow({
         <h3>{fullName(member)}</h3>
         <div className="admin-list-meta">
           {member.email}
-          {member.phone ? ` · ${member.phone}` : ""}
+          {member.phone ? ` · ${formatPhone(member.phone)}` : ""}
           {levelNames.length > 0 ? ` · ${levelNames.join(", ")}` : " · no level"}
           {member.emailVerified ? "" : " · email not confirmed"}
         </div>

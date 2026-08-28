@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 
+import { formatPhone, telHref } from "@/lib/member-types";
 import type { MemberLink } from "@/lib/relationships";
 
 export type DirectoryLevel = { _id: string; name: string };
@@ -175,7 +176,7 @@ export function DirectoryList({
                   ) : null}
                   {entry.email && entry.phone ? " · " : ""}
                   {entry.phone ? (
-                    <a href={`tel:${entry.phone.replace(/\s+/g, "")}`}>{entry.phone}</a>
+                    <a href={telHref(entry.phone)}>{formatPhone(entry.phone)}</a>
                   ) : null}
                 </p>
               ) : null}

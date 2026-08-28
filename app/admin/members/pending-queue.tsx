@@ -4,7 +4,11 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { Panel } from "@/components/admin-ui";
-import { fullName, type MemberSummary } from "@/lib/member-types";
+import {
+  formatPhone,
+  fullName,
+  type MemberSummary,
+} from "@/lib/member-types";
 
 import { decideMembershipAction } from "./actions";
 
@@ -124,7 +128,7 @@ function PendingRow({
         <h3>{fullName(member)}</h3>
         <div className="admin-list-meta">
           {member.email}
-          {member.phone ? ` · ${member.phone}` : ""}
+          {member.phone ? ` · ${formatPhone(member.phone)}` : ""}
           {requested ? ` · applied as ${requested.name}` : " · no level requested"}
           {member.emailVerified ? "" : " · email not confirmed yet"}
           {member.registeredAt

@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 
 import { ModalPortal } from "@/components/modal-portal";
+import { formatPhone } from "@/lib/member-types";
 
 import { deleteSponsorContactAction, saveSponsorContactAction } from "./actions";
 import { IconButton, TrashIcon } from "./sponsor-controls";
@@ -105,7 +106,9 @@ export function ContactButton({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<Contact>(
-    contact ?? { name: "", title: "", email: "", phone: "" }
+    contact
+      ? { ...contact, phone: formatPhone(contact.phone) }
+      : { name: "", title: "", email: "", phone: "" }
   );
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
@@ -114,7 +117,11 @@ export function ContactButton({
     if (pending) return;
     setOpen(false);
     setError("");
-    setDraft(contact ?? { name: "", title: "", email: "", phone: "" });
+    setDraft(
+      contact
+        ? { ...contact, phone: formatPhone(contact.phone) }
+        : { name: "", title: "", email: "", phone: "" }
+    );
   }
 
   function save() {

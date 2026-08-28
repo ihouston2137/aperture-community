@@ -5,7 +5,11 @@ import { useEffect, useState, useTransition } from "react";
 
 import { Panel } from "@/components/admin-ui";
 import { ModalPortal } from "@/components/modal-portal";
-import { fullName, type MemberSummary } from "@/lib/member-types";
+import {
+  formatPhone,
+  fullName,
+  type MemberSummary,
+} from "@/lib/member-types";
 import {
   MEMBERSHIP_STATUSES,
   membershipStatusLabels,
@@ -84,7 +88,7 @@ export function UserManager({
                 <h3>{fullName(user)}</h3>
                 <div className="admin-list-meta">
                   {user.email}
-                  {user.phone ? ` · ${user.phone}` : ""}
+                  {user.phone ? ` · ${formatPhone(user.phone)}` : ""}
                   {levels.length > 0 ? ` · ${levels.join(", ")}` : ""}
                   {managing.length > 0 ? ` · manages: ${managing.join(", ")}` : ""}
                   {levels.length === 0 && managing.length === 0 ? " · no roles" : ""}
@@ -262,7 +266,7 @@ function UserDialog({
                     id="user-phone"
                     type="tel"
                     name="phone"
-                    defaultValue={user?.phone ?? ""}
+                    defaultValue={formatPhone(user?.phone ?? "")}
                     autoComplete="off"
                   />
                 </div>
