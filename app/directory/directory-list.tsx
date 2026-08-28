@@ -7,6 +7,16 @@ import type { MemberLink } from "@/lib/relationships";
 
 export type DirectoryLevel = { _id: string; name: string };
 
+/**
+ * Two readings of the same people.
+ *
+ * Cards are for meeting the membership — a face, a few words, room for what
+ * somebody wrote about themselves. The list is for finding one person among
+ * two hundred, where every line of prose is a line between you and the name
+ * you came for. Neither is the right default for both jobs, so both are here.
+ */
+export type DirectoryView = "cards" | "list";
+
 export type DirectoryEntry = {
   _id: string;
   name: string;
@@ -42,6 +52,7 @@ export function DirectoryList({
 }) {
   const [query, setQuery] = useState("");
   const [chosen, setChosen] = useState<string[]>([]);
+  const [view, setView] = useState<DirectoryView>("cards");
 
   const shown = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -126,14 +137,95 @@ export function DirectoryList({
         ) : null}
       </div>
 
-      <p className="help-text" style={{ margin: "0.75rem 0 1.25rem" }}>
-        {shown.length === entries.length
-          ? `Showing all ${entries.length}.`
-          : `${shown.length} of ${entries.length} match.`}
-      </p>
+      <div className="directory-count">
+        <p className="help-text">
+          {shown.length === entries.length
+            ? `Showing all ${entries.length}.`
+            : `${shown.length} of ${entries.length} match.`}
+        </p>
+
+        <div
+          className="level-toggles directory-view"
+          role="group"
+          aria-label="How the directory is shown"
+        >
+          <button
+            type="button"
+            className="btn btn-sm"
+            aria-pressed={view === "cards"}
+            onClick={() => setView("cards")}
+          >
+            Cards
+          </button>
+          <button
+            type="button"
+            className="btn btn-sm"
+            aria-pressed={view === "list"}
+            onClick={() => setView("list")}
+          >
+            List
+          </button>
+        </div>
+      </div>
 
       {shown.length === 0 ? (
         <p className="member-note">No members match that.</p>
+      ) : view === "list" ? (
+        <ul className="directory-rows">
+          {shown.map((entry) => (
+            <li key={entry._id} className="directory-row">
+              {entry.headshotUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={entry.headshotUrl}
+                  alt=""
+                  className="directory-headshot is-small"
+                />
+              ) : (
+                <div
+                  className="directory-headshot is-small is-empty"
+                  aria-hidden="true"
+                />
+              )}
+
+              <div className="directory-row-who">
+                <h2 className="directory-name">
+                  {entry.name}
+                  {entry.isSelf ? <span className="badge">you</span> : null}
+                </h2>
+                <p className="directory-meta">
+                  {entry.title ? `${entry.title} · ` : ""}
+                  {entry.levels.join(", ") || "No level"}
+                  {entry.location ? ` · ${entry.location}` : ""}
+                </p>
+                {/* Kept to one line here. The whole of it is on the card, and
+                    a list of paragraphs is not a list. */}
+                {entry.description ? (
+                  <p className="directory-row-about">{entry.description}</p>
+                ) : null}
+              </div>
+
+              {entry.links.length > 0 ? (
+                <p className="directory-row-links">
+                  {entry.links
+                    .map((link) => `${link.label}: ${link.people.join(", ")}`)
+                    .join(" · ")}
+                </p>
+              ) : null}
+
+              {showContact && (entry.email || entry.phone) ? (
+                <p className="directory-row-contact">
+                  {entry.email ? (
+                    <a href={`mailto:${entry.email}`}>{entry.email}</a>
+                  ) : null}
+                  {entry.phone ? (
+                    <a href={telHref(entry.phone)}>{formatPhone(entry.phone)}</a>
+                  ) : null}
+                </p>
+              ) : null}
+            </li>
+          ))}
+        </ul>
       ) : (
         <ul className="directory-grid">
           {shown.map((entry) => (

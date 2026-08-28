@@ -8495,6 +8495,24 @@ html:has(.admin-shell) body::-webkit-scrollbar {
   flex: 1 1 20rem;
 }
 
+/* The count and the way it is shown, on one line: the reader is told how many
+   there are and offered the other reading of them in the same breath. */
+.directory-count {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  margin: 0.75rem 0 1.25rem;
+}
+
+.directory-count .help-text {
+  margin: 0;
+}
+
+.directory-view {
+  margin-left: auto;
+}
+
 .directory-grid {
   list-style: none;
   margin: 0;
@@ -8503,6 +8521,66 @@ html:has(.admin-shell) body::-webkit-scrollbar {
   grid-template-columns: repeat(auto-fill, minmax(min(20rem, 100%), 1fr));
   gap: 1.25rem;
   align-items: start;
+}
+
+/* The same people, one to a line, for finding somebody rather than reading
+   about them. */
+.directory-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.directory-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  padding: 0.7rem 0;
+  border-bottom: 1px solid rgba(128, 128, 128, 0.18);
+}
+
+.directory-row:last-child {
+  border-bottom: 0;
+}
+
+.directory-row-who {
+  flex: 1 1 14rem;
+  min-width: 0;
+}
+
+.directory-row .directory-name {
+  font-size: 1.0625rem;
+}
+
+/* One line of it, because a column of paragraphs is the card view again. */
+.directory-row-about {
+  margin: 0.15rem 0 0;
+  font-size: 0.875rem;
+  opacity: 0.75;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.directory-row-links {
+  flex: 0 1 auto;
+  margin: 0;
+  font-size: 0.8125rem;
+  opacity: 0.75;
+  min-width: 0;
+}
+
+.directory-row-contact {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.1rem;
+  margin: 0 0 0 auto;
+  font-size: 0.875rem;
+  white-space: nowrap;
 }
 
 .directory-card {
@@ -8515,6 +8593,12 @@ html:has(.admin-shell) body::-webkit-scrollbar {
   display: flex;
   align-items: center;
   gap: 0.875rem;
+}
+
+/* Smaller on a line, where the height of the row is the constraint. */
+.directory-headshot.is-small {
+  width: 2.5rem;
+  height: 2.5rem;
 }
 
 .directory-headshot {
