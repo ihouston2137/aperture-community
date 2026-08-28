@@ -14,6 +14,7 @@ import {
   SPONSOR_TYPE_LABELS,
   formatDollars,
   primaryLogo,
+  sponsorLogoSrc,
   type RecognitionLevelSummary,
   type SponsorCategorySummary,
   type SponsorContact,
@@ -177,16 +178,13 @@ export function SponsorManager({
         <ul className="admin-list" style={{ marginTop: "1rem" }}>
           {shown.map((sponsor) => {
             const given = totals[sponsor._id];
+            const logoSrc = sponsorLogoSrc(primaryLogo(sponsor.logos));
 
             return (
               <li key={sponsor._id} className="admin-list-item">
-                {primaryLogo(sponsor.logos)?.url ? (
+                {logoSrc ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={primaryLogo(sponsor.logos)?.url}
-                    alt=""
-                    className="sponsor-row-logo"
-                  />
+                  <img src={logoSrc} alt="" className="sponsor-row-logo" />
                 ) : (
                   <div className="sponsor-row-logo is-empty" aria-hidden="true" />
                 )}

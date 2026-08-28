@@ -17,6 +17,7 @@ import {
   formatDollars,
   primaryLogo,
   sponsorChips,
+  sponsorLogoSrc,
   statusTone,
 } from "@/lib/sponsorship-types";
 import {
@@ -104,7 +105,7 @@ export default async function CampaignSponsorDashboard({
   const largest = history.reduce((most, row) => Math.max(most, row.cents), 0);
 
   const level = levels.find((entry) => entry._id === sponsor.recognitionLevelId);
-  const logo = primaryLogo(sponsor.logos);
+  const logoSrc = sponsorLogoSrc(primaryLogo(sponsor.logos));
 
   const campaignOptions = campaigns.map((entry) => ({
     _id: entry._id,
@@ -129,9 +130,9 @@ export default async function CampaignSponsorDashboard({
       </nav>
 
       <header className="manager-header sponsor-header">
-        {logo?.url ? (
+        {logoSrc ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={logo.url} alt="" className="sponsor-header-logo" />
+          <img src={logoSrc} alt="" className="sponsor-header-logo" />
         ) : null}
         <div>
           <h1 className="member-title">{sponsor.name}</h1>

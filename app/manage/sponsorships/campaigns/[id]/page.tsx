@@ -15,6 +15,7 @@ import {
   monetaryProgress,
   primaryLogo,
   sponsorChips,
+  sponsorLogoSrc,
   statusTone,
 } from "@/lib/sponsorship-types";
 import {
@@ -246,7 +247,9 @@ export default async function CampaignDashboard({
               const level = levels.find(
                 (entry) => entry._id === sponsor?.recognitionLevelId
               );
-              const logo = sponsor ? primaryLogo(sponsor.logos) : null;
+              const logoSrc = sponsor
+                ? sponsorLogoSrc(primaryLogo(sponsor.logos))
+                : "";
 
               return (
                 <li key={assignment.sponsorId} className="sponsor-line">
@@ -254,9 +257,9 @@ export default async function CampaignDashboard({
                     href={`/manage/sponsorships/campaigns/${campaign._id}/sponsors/${assignment.sponsorId}`}
                     className="sponsor-line-name"
                   >
-                    {logo?.url ? (
+                    {logoSrc ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={logo.url} alt="" className="sponsor-row-logo" />
+                      <img src={logoSrc} alt="" className="sponsor-row-logo" />
                     ) : (
                       <span className="sponsor-row-logo is-empty" aria-hidden="true" />
                     )}

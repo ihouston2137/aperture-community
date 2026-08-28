@@ -6,6 +6,11 @@
  * from the browser bundle would drag Mongoose in with it.
  */
 
+import {
+  protectedMediaUrl,
+  sanitizeMediaPath,
+} from "./protected-media-url";
+
 /* ------------------------------------------------------------------ Money */
 
 /**
@@ -638,7 +643,9 @@ export function normalizeLogos(value: unknown): SponsorLogo[] {
   const logos = value
     .map((entry) => ({
       label: String((entry as any)?.label ?? "").trim().slice(0, 60),
-      url: String((entry as any)?.url ?? "").trim(),
+      // Stored as the bare path the media library knows, so usage lookups can
+      // still match the asset; the `/api/media` rewrite happens at render.
+      url: sanitizeMediaPath(String((entry as any)?.url ?? "")),
       mediaId: String((entry as any)?.mediaId ?? "").trim(),
       isPrimary: Boolean((entry as any)?.isPrimary),
     }))
@@ -656,6 +663,17 @@ export function normalizeLogos(value: unknown): SponsorLogo[] {
 /** The logo the site should use, or nothing if the sponsor has none on file. */
 export function primaryLogo(logos: SponsorLogo[]): SponsorLogo | null {
   return logos.find((logo) => logo.isPrimary) ?? logos[0] ?? null;
+}
+
+/**
+ * The `src` for a sponsor logo, wherever one is shown.
+ *
+ * Uploaded artwork lives under `/uploads/` and is only served through
+ * `/api/media`, so a page that renders the stored path straight into an `<img>`
+ * shows a broken image. Every logo on screen goes through here.
+ */
+export function sponsorLogoSrc(logo: SponsorLogo | null | undefined): string {
+  return protectedMediaUrl(logo?.url);
 }
 
 export function normalizeAssignments(value: unknown): CampaignAssignment[] {
