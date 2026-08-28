@@ -7726,6 +7726,21 @@ html:has(.admin-shell) body::-webkit-scrollbar {
   margin-top: 0.6rem;
 }
 
+/* A member's entries run over several rows of the report. The rule above the
+   first says where one member's block ends and the next begins, which the row
+   striping alone cannot. */
+.admin-table tr.is-entry-start > td {
+  border-top: 1px solid rgba(128, 128, 128, 0.35);
+}
+
+.admin-table th.is-narrow,
+.admin-table td.is-narrow {
+  width: 2.5rem;
+  text-align: right;
+  opacity: 0.7;
+  font-variant-numeric: tabular-nums;
+}
+
 /* One pass through a repeatable group's questions. Boxed and numbered, so a
    page of three emergency contacts reads as three of something rather than as
    one long form with the same questions three times. */

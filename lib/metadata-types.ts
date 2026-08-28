@@ -20,20 +20,28 @@
 
 /* ------------------------------------------------------------- Questions */
 
-export const QUESTION_TYPES = ["short", "long", "one", "many"] as const;
+export const QUESTION_TYPES = [
+  "short",
+  "long",
+  "number",
+  "one",
+  "many",
+] as const;
 
 export type QuestionType = (typeof QUESTION_TYPES)[number];
 
 export const QUESTION_TYPE_LABELS: Record<QuestionType, string> = {
   short: "Short text",
   long: "Long text",
+  number: "Number",
   one: "Choose one",
   many: "Choose any",
 };
 
 export const QUESTION_TYPE_HELP: Record<QuestionType, string> = {
-  short: "A line: a name, a size, a number.",
+  short: "A line: a name, a size, a reference.",
   long: "A paragraph, for anything that needs explaining.",
+  number: "A figure and nothing else — a count, an age, an amount.",
   one: "One answer from the list, as radio buttons.",
   many: "None, one or several from the list, as checkboxes.",
 };
@@ -41,6 +49,24 @@ export const QUESTION_TYPE_HELP: Record<QuestionType, string> = {
 /** Whether a type is answered from a list rather than typed. */
 export function isChoiceType(type: QuestionType): boolean {
   return type === "one" || type === "many";
+}
+
+/**
+ * A figure, or nothing.
+ *
+ * Held as text like every other typed answer rather than as its own field: a
+ * number that has not been given has to be distinguishable from nought, and a
+ * numeric column with no value is either null — a second state to handle
+ * everywhere — or nought, which is a lie about somebody's answer.
+ *
+ * Anything that is not a number reads as unanswered, so a stray letter cannot
+ * be stored where a figure is expected.
+ */
+export function normalizeNumberText(value: unknown): string {
+  const text = String(value ?? "").trim();
+  if (!text) return "";
+  const parsed = Number(text);
+  return Number.isFinite(parsed) ? String(parsed) : "";
 }
 
 export type MetadataQuestion = {
@@ -241,7 +267,10 @@ export function normalizeValues(
 
     values.push({
       questionId,
-      text: String(entry.text ?? "").trim().slice(0, TEXT_LIMIT),
+      text:
+        question.type === "number"
+          ? normalizeNumberText(entry.text)
+          : String(entry.text ?? "").trim().slice(0, TEXT_LIMIT),
       choices: [],
     });
   }
@@ -339,24 +368,6 @@ export function answerText(
   const value = values.find((entry) => entry.questionId === question.id);
   if (!value) return "";
   return isChoiceType(question.type) ? value.choices.join(", ") : value.text;
-}
-
-/**
- * One question's answers across every entry, for a report's cell.
- *
- * Numbered when there is more than one, because "Dad, Mum" in one column and
- * "07700 900461, 07700 900912" in the next only line up if the reader can see
- * that they are both in the order the entries were given.
- */
-export function answerAcross(
-  question: MetadataQuestion,
-  entries: MetadataEntry[]
-): string {
-  const answers = entries.map((entry) => answerText(question, entry.values));
-  if (answers.length <= 1) return answers[0] ?? "";
-  return answers
-    .map((answer, index) => `${index + 1}. ${answer || "—"}`)
-    .join("  ");
 }
 
 /* ---------------------------------------------------------------- Access */

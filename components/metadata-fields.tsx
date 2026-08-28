@@ -212,6 +212,19 @@ export function MetadataFields({
               />
             ) : null}
 
+            {question.type === "number" ? (
+              <input
+                id={fieldId}
+                type="number"
+                inputMode="decimal"
+                value={value.text}
+                disabled={disabled}
+                onChange={(event) =>
+                  write(question.id, { text: event.target.value, choices: [] })
+                }
+              />
+            ) : null}
+
             {question.type === "long" ? (
               <textarea
                 id={fieldId}
