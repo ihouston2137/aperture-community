@@ -149,6 +149,13 @@ export default async function CampaignDashboard({
   // this one alone.
   const leaderboard = splitCreditByMember(mine);
 
+  // Built once: three controls on this page open the campaign dialog.
+  const campaignSponsorOptions = sponsors.map((sponsor) => ({
+    _id: sponsor._id,
+    name: sponsor.name,
+    isUnassignable: sponsor.isUnassignable,
+  }));
+
   const availableSponsors = sponsors
     .filter(
       (sponsor) =>
@@ -164,36 +171,49 @@ export default async function CampaignDashboard({
         <span>{campaign.name}</span>
       </nav>
 
-      <header className="manager-header">
-        <h1 className="member-title">
-          {campaign.name}
-          {campaign.status === "closed" ? (
-            <span className="badge" style={{ marginLeft: "0.6rem" }}>
-              closed
-            </span>
+      <header className="manager-header sponsor-header">
+        <div style={{ minWidth: 0 }}>
+          <h1 className="member-title">
+            {campaign.name}
+            {campaign.status === "closed" ? (
+              <span className="badge" style={{ marginLeft: "0.6rem" }}>
+                closed
+              </span>
+            ) : null}
+          </h1>
+          <p className="member-lede">
+            {dateRangeLabel(campaign.startDate, campaign.endDate)}
+          </p>
+          {campaign.description ? (
+            <p className="member-note">{campaign.description}</p>
           ) : null}
-        </h1>
-        <p className="member-lede">
-          {dateRangeLabel(campaign.startDate, campaign.endDate)}
-        </p>
-        {campaign.description ? (
-          <p className="member-note">{campaign.description}</p>
+        </div>
+
+        {/* Beside the name, the dates and the description it changes. */}
+        {access.canEditCampaigns ? (
+          <span className="sponsor-header-actions">
+            <CampaignButton
+              campaign={campaign}
+              sponsors={campaignSponsorOptions}
+              members={members}
+              label="Edit campaign"
+            />
+          </span>
         ) : null}
       </header>
 
       <section className="member-card manager-card">
         <div className="manager-card-head">
           <h2 className="member-card-title">Progress</h2>
-          {access.canEditCampaigns ? (
+          {/* The goal and everything above it are edited in the campaign
+              dialog, so the way to them is offered where they are shown
+              rather than only at the top of the page. */}
+          {access.canEditCampaigns && campaign.goalCents ? (
             <CampaignButton
               campaign={campaign}
-              sponsors={sponsors.map((sponsor) => ({
-                _id: sponsor._id,
-                name: sponsor.name,
-                isUnassignable: sponsor.isUnassignable,
-              }))}
+              sponsors={campaignSponsorOptions}
               members={members}
-              label="Edit campaign"
+              label="Edit the goal"
             />
           ) : null}
         </div>
@@ -281,6 +301,14 @@ export default async function CampaignDashboard({
                 {formatDollars(progress.intoStretchCents)} of{" "}
                 {formatDollars(progress.stretchCents)}
               </span>
+              {access.canEditCampaigns ? (
+                <CampaignButton
+                  campaign={campaign}
+                  sponsors={campaignSponsorOptions}
+                  members={members}
+                  label="Edit"
+                />
+              ) : null}
             </div>
 
             {/* A run per tier, each sized to what that tier asks for, so a
@@ -492,6 +520,21 @@ export default async function CampaignDashboard({
                       </span>
                     </Link>
 
+                    {/* Beside the level it changes, rather than in a row of
+                        controls at the foot of the card. It cannot sit inside
+                        the link above, which would make one control open two
+                        things. */}
+                    {access.canEditSponsors && sponsor ? (
+                      <span className="sponsor-card-level">
+                        <ChangeLevelButton
+                          sponsorId={sponsor._id}
+                          levels={levels}
+                          current={sponsor.recognitionLevelId}
+                          label={level ? "Change level" : "Set a level"}
+                        />
+                      </span>
+                    ) : null}
+
                     {/* The figure the cards are ordered by, said out loud —
                         an order nobody can see is not an order. */}
                     <div className="sponsor-card-given">
@@ -536,14 +579,6 @@ export default async function CampaignDashboard({
                       </span>
 
                       <span className="sponsor-card-actions">
-                        {access.canEditSponsors && sponsor ? (
-                          <ChangeLevelButton
-                            sponsorId={sponsor._id}
-                            levels={levels}
-                            current={sponsor.recognitionLevelId}
-                            icon
-                          />
-                        ) : null}
                         {access.canEditCampaigns ? (
                           <>
                             <ChangeAssignedButton

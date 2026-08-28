@@ -7646,6 +7646,7 @@ html:has(.admin-shell) body::-webkit-scrollbar {
 
 .stretch-block-figure {
   margin-left: auto;
+  margin-right: 0.5rem;
   font-size: 0.875rem;
   font-variant-numeric: tabular-nums;
   opacity: 0.75;
@@ -8277,6 +8278,13 @@ html:has(.admin-shell) body::-webkit-scrollbar {
 
 .sponsor-card-name strong {
   overflow-wrap: anywhere;
+}
+
+/* The level control, under the name it changes rather than in the row of
+   controls at the foot of the card. */
+.sponsor-card-level {
+  display: flex;
+  margin-top: -0.25rem;
 }
 
 /* What they have given, at the size of a figure worth reading. */

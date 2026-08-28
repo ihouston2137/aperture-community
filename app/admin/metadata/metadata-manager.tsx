@@ -7,6 +7,11 @@ import { useEffect, useState, useTransition } from "react";
 import { Panel } from "@/components/admin-ui";
 import { ModalPortal } from "@/components/modal-portal";
 import {
+  DIMENSION_HELP,
+  DIMENSION_LABELS,
+  REPORT_DIMENSIONS,
+} from "@/lib/metadata-report";
+import {
   isChoiceType,
   MANAGED_BY,
   METADATA_PERMISSIONS,
@@ -192,12 +197,26 @@ function GroupDialog({
 }) {
   const [kind, setKind] = useState<ManagedBy>(group?.managedBy ?? "member");
   const [repeats, setRepeats] = useState(group?.isRepeatable ?? false);
+  const [reportRows, setReportRows] = useState(group?.reportRows ?? "user");
+  const [reportColumns, setReportColumns] = useState(
+    group?.reportColumns ?? "question"
+  );
+
   const [questions, setQuestions] = useState<MetadataQuestion[]>(
     group?.questions ?? [blankQuestion()]
   );
   const [error, setError] = useState("");
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [pending, startTransition] = useTransition();
+
+  /*
+   * The number questions as they stand in the dialog, not as they were saved:
+   * somebody adding one and choosing it in the same pass should not have to
+   * save twice.
+   */
+  const summable = questions.filter(
+    (question) => question.type === "number" && question.label.trim() !== ""
+  );
 
   useEffect(() => {
     function onKeyDown(keyEvent: KeyboardEvent) {
@@ -457,6 +476,90 @@ function GroupDialog({
               >
                 Add a question
               </button>
+
+              <h4 className="inspector-title" style={{ marginTop: "1.25rem" }}>
+                How it is reported
+              </h4>
+              <p className="help-text">
+                The member data dashboard shows this group the way it is set up
+                here, to everybody who may read its answers. How a group is
+                usefully read is a property of what it asks — shirt sizes are
+                always a count by size — so it is settled once, here, rather
+                than by everybody who opens the dashboard.
+              </p>
+
+              <div className="field-grid">
+                <div className="field">
+                  <label htmlFor="report-rows">Down the side</label>
+                  <select
+                    id="report-rows"
+                    name="reportRows"
+                    value={reportRows}
+                    disabled={pending}
+                    onChange={(event) => setReportRows(event.target.value)}
+                  >
+                    {REPORT_DIMENSIONS.map((dimension) => (
+                      <option key={dimension} value={dimension}>
+                        {DIMENSION_LABELS[dimension]}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="help-text">
+                    {DIMENSION_HELP[
+                      reportRows as (typeof REPORT_DIMENSIONS)[number]
+                    ] ?? ""}
+                  </span>
+                </div>
+
+                <div className="field">
+                  <label htmlFor="report-cols">Across the top</label>
+                  <select
+                    id="report-cols"
+                    name="reportColumns"
+                    value={reportColumns}
+                    disabled={pending}
+                    onChange={(event) => setReportColumns(event.target.value)}
+                  >
+                    {REPORT_DIMENSIONS.map((dimension) => (
+                      <option key={dimension} value={dimension}>
+                        {DIMENSION_LABELS[dimension]}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="help-text">
+                    {DIMENSION_HELP[
+                      reportColumns as (typeof REPORT_DIMENSIONS)[number]
+                    ] ?? ""}
+                  </span>
+                </div>
+              </div>
+
+              <div className="field" style={{ marginTop: "0.75rem" }}>
+                <span className="field-label">Added up</span>
+                {summable.length === 0 ? (
+                  <span className="help-text">
+                    This group asks no number questions, so its report counts
+                    records instead — how many entries each member has given.
+                    Add a question of the Number type above to total something.
+                  </span>
+                ) : (
+                  <>
+                    <ChipPicker
+                      name="reportSumIds"
+                      options={summable.map((question) => ({
+                        _id: question.id,
+                        name: question.label,
+                      }))}
+                      chosen={group?.reportSumIds ?? []}
+                    />
+                    <span className="help-text">
+                      Which of its numbers to total. None chosen takes them all,
+                      which is worth watching when they measure different
+                      things — tickets and pounds do not add.
+                    </span>
+                  </>
+                )}
+              </div>
 
               <label className="checkbox-row" style={{ marginTop: "1.25rem" }}>
                 <input

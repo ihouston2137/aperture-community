@@ -12,7 +12,19 @@ const MAX_SHOWN = 40;
 /** Tall enough to be worth scrolling, short enough to fit beside a field. */
 const LIST_MAX_HEIGHT = 224;
 
-type Anchor = { left: number; top: number; width: number; maxHeight: number };
+/**
+ * Where the list sits, given as the edge it is fixed to.
+ *
+ * A list that opens upwards is held by its **bottom**, not its top. Its height
+ * changes as the typing narrows the matches, and one held by the top would
+ * keep its top edge and shrink away from the field — leaving the names
+ * floating somewhere above the box they belong to.
+ */
+type Anchor = {
+  left: number;
+  width: number;
+  maxHeight: number;
+} & ({ top: number; bottom?: undefined } | { bottom: number; top?: undefined });
 
 /**
  * Picks one person — a profile, or a member — by typing their name.
@@ -116,13 +128,18 @@ export function BioPicker({
     setAnchor({
       left: box.left,
       width: box.width,
-      top: dropDown ? box.bottom + 4 : box.top - 4 - maxHeight,
       maxHeight,
+      // Fixed to the edge nearest the field, so the list stays against it
+      // however tall it happens to be at the moment.
+      ...(dropDown
+        ? { top: box.bottom + 4 }
+        : { bottom: window.innerHeight - box.top + 4 }),
     });
   }, []);
 
   // The field can move under a list that is already open — the dialog behind it
-  // scrolls, the window resizes — so its position is followed, not taken once.
+  // scrolls, the window resizes, a chip added above it pushes it down — so its
+  // position is followed, not taken once.
   useEffect(() => {
     if (!open) return;
     measure();
@@ -139,10 +156,24 @@ export function BioPicker({
     // Captured, so a scroll inside a dialog body counts and not just the page.
     window.addEventListener("scroll", measure, true);
 
+    /*
+     * Scrolling and resizing are not the only ways a field moves. In a dialog
+     * that grows as it is filled in — a chip added above this one, an error
+     * appearing at the top — nothing scrolls and nothing resizes, and the list
+     * would be left behind where the field used to be.
+     */
+    const observer =
+      typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
+    if (observer && field.current) {
+      observer.observe(field.current);
+      if (document.body) observer.observe(document.body);
+    }
+
     return () => {
       document.removeEventListener("mousedown", onPointerDown);
       window.removeEventListener("resize", measure);
       window.removeEventListener("scroll", measure, true);
+      observer?.disconnect();
     };
   }, [open, measure]);
 
@@ -195,6 +226,10 @@ export function BioPicker({
           setOpen(true);
           setActive(0);
         }}
+        /* Choosing somebody closes the list but leaves the box focused, so a
+           second click on it fires no focus event. Without this, adding two
+           people in a row means clicking a field that does nothing. */
+        onClick={() => setOpen(true)}
         onChange={(event) => {
           setQuery(event.target.value);
           setActive(0);
@@ -213,6 +248,7 @@ export function BioPicker({
             style={{
               left: anchor.left,
               top: anchor.top,
+              bottom: anchor.bottom,
               width: anchor.width,
               maxHeight: anchor.maxHeight,
             }}

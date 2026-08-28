@@ -15,6 +15,7 @@ import {
   normalizeQuestions,
   type MetadataViewer,
 } from "@/lib/metadata-types";
+import { reportDimension } from "@/lib/metadata-report";
 import { MetadataAnswer, MetadataGroup } from "@/lib/models";
 import { requireSession } from "@/lib/session";
 
@@ -81,6 +82,9 @@ export async function saveMetadataGroupAction(
       0,
       Math.min(50, Number(formData.get("maxEntries") ?? 0) || 0)
     ),
+    reportRows: reportDimension(formData.get("reportRows")),
+    reportColumns: reportDimension(formData.get("reportColumns")),
+    reportSumIds: list("reportSumIds"),
     viewRoleIds: list("viewRoleIds"),
     viewUserIds: list("viewUserIds"),
     editRoleIds: list("editRoleIds"),

@@ -120,6 +120,13 @@ export type MetadataGroupSummary = {
   entryLabel: string;
   /** The most that may be given. Zero for no limit. */
   maxEntries: number;
+  /* --- how the dashboard reads this group ------------------------------- */
+  /** What the rows of its report are: none, user, question or record. */
+  reportRows: string;
+  /** And its columns. */
+  reportColumns: string;
+  /** Which of its number questions are added up. Empty means all of them. */
+  reportSumIds: string[];
   /* --- who may do what, on a manager-managed group ---------------------- */
   /** Management roles whose holders may read the answers. */
   viewRoleIds: string[];

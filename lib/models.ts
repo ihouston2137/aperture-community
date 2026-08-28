@@ -740,6 +740,18 @@ const MetadataGroupSchema = new Schema<any>(
     entryLabel: { type: String, default: "" },
     maxEntries: { type: Number, default: 0 },
     /*
+     * How the member-data dashboard reads this group.
+     *
+     * Kept with the questions rather than chosen by whoever opens the
+     * dashboard: how a group is usefully read is a property of what it asks —
+     * shirt sizes are always a count by size — and it is settled once by the
+     * person writing the questions.
+     */
+    reportRows: { type: String, default: "user" },
+    reportColumns: { type: String, default: "question" },
+    /** Which number questions are totalled. Empty means all of them. */
+    reportSumIds: [{ type: String }],
+    /*
      * Who may read, who may change, and who may see everybody at once.
      *
      * Each is a pair: the management roles that carry it, and the individual

@@ -64,13 +64,13 @@ export function Leaderboard({
 
         {levels.length > 0 ? (
           <div className="field leaderboard-filter">
-            <label htmlFor="leaderboard-level">Level</label>
+            <label htmlFor="leaderboard-level">Membership</label>
             <select
               id="leaderboard-level"
               value={levelId}
               onChange={(event) => setLevelId(event.target.value)}
             >
-              <option value="">Every level</option>
+              <option value="">Everyone</option>
               {levels.map((level) => (
                 <option key={level._id} value={level._id}>
                   {level.name}
@@ -84,7 +84,9 @@ export function Leaderboard({
       <p className="help-text">{caption}</p>
 
       {shown.length === 0 ? (
-        <p className="member-note">Nobody at that level has brought anything in.</p>
+        <p className="member-note">
+          Nobody with that membership has brought anything in.
+        </p>
       ) : (
         <ol className="leaderboard">
           {shown.map((entry, index) => (
