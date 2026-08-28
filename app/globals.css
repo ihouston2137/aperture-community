@@ -7726,6 +7726,31 @@ html:has(.admin-shell) body::-webkit-scrollbar {
   margin-top: 0.6rem;
 }
 
+/* A figure in a table: the number itself, with what it was drawn from under
+   it in a smaller hand. */
+.admin-table td.is-figure {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.admin-table td.is-figure .help-text {
+  display: block;
+  margin: 0;
+  font-size: 0.6875rem;
+}
+
+/* The row and column totals, marked off from the figures they add up. */
+.admin-table td.is-total {
+  font-weight: 600;
+  border-left: 1px solid rgba(128, 128, 128, 0.28);
+}
+
+.admin-table tfoot td,
+.admin-table tfoot th {
+  border-top: 1px solid rgba(128, 128, 128, 0.35);
+}
+
 /* A member's entries run over several rows of the report. The rule above the
    first says where one member's block ends and the next begins, which the row
    striping alone cannot. */

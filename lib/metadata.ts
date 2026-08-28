@@ -10,6 +10,7 @@ import { connectDB } from "./db";
 import { MetadataAnswer, MetadataGroup, User } from "./models";
 import {
   managedBy,
+  METADATA_PERMISSIONS,
   normalizeEntries,
   normalizeQuestions,
   unanswered,
@@ -177,4 +178,73 @@ export async function outstandingMetadataCount(
 ): Promise<number> {
   const tasks = await memberMetadataTasks(userId, roleIds);
   return tasks.reduce((total, task) => total + task.outstanding, 0);
+}
+
+/* --------------------------------------------------------- Reporting reach */
+
+/**
+ * Whether this account can reach the member-data dashboard at all.
+ *
+ * Asked on every page render, for the header menu, so it is one narrow query
+ * and none at all for somebody who defines the groups. A role only counts
+ * where the account also carries the matching permission — see
+ * `canViewGroup` — so the filter is assembled from what they actually hold.
+ */
+export async function canReachMemberData(
+  userId: string,
+  roleIds: string[],
+  permissions: string[]
+): Promise<boolean> {
+  if (permissions.includes(METADATA_PERMISSIONS.define)) return true;
+
+  const clauses: Record<string, unknown>[] = [
+    // Named directly is a share of one group and needs no permission.
+    { viewUserIds: userId },
+    { editUserIds: userId },
+    { reportUserIds: userId },
+  ];
+
+  if (roleIds.length > 0) {
+    if (permissions.includes(METADATA_PERMISSIONS.view)) {
+      clauses.push({ viewRoleIds: { $in: roleIds } });
+    }
+    if (permissions.includes(METADATA_PERMISSIONS.edit)) {
+      clauses.push({ editRoleIds: { $in: roleIds } });
+    }
+    if (permissions.includes(METADATA_PERMISSIONS.report)) {
+      clauses.push({ reportRoleIds: { $in: roleIds } });
+    }
+  }
+
+  await connectDB();
+  return Boolean(await MetadataGroup.exists({ $or: clauses }));
+}
+
+/**
+ * The answers to several groups at once, for the dashboard.
+ *
+ * Keyed group then member, which is the shape the fact builder walks.
+ */
+export async function getAnswersForGroups(
+  groups: MetadataGroupSummary[]
+): Promise<Map<string, Map<string, MetadataEntry[]>>> {
+  const byGroup = new Map<string, Map<string, MetadataEntry[]>>();
+  if (groups.length === 0) return byGroup;
+
+  await connectDB();
+  const records = await MetadataAnswer.find({
+    groupId: { $in: groups.map((group) => group._id) },
+  }).lean<any[]>();
+
+  for (const group of groups) byGroup.set(group._id, new Map());
+
+  for (const record of records) {
+    const group = groups.find((entry) => entry._id === String(record.groupId));
+    if (!group) continue;
+    byGroup
+      .get(group._id)!
+      .set(String(record.userId), toMetadataAnswer(record, group).entries);
+  }
+
+  return byGroup;
 }

@@ -7,6 +7,7 @@ import { contentPermissions } from "./content-access";
 import { sponsorshipAccess } from "./sponsorship-access";
 import { getAuthSettings } from "./auth-settings";
 import { connectDB } from "./db";
+import { canReachMemberData } from "./metadata";
 import { getRoleSummaries, splitRoles } from "./members";
 import { User } from "./models";
 import { getSession } from "./session";
@@ -84,7 +85,7 @@ async function readUser(userId: string): Promise<AccountUser | null> {
   // menu belonging to nobody.
   if (!record) return null;
 
-  const [{ permissions, isAdministrator }, roles, calendarPage] = await Promise.all([
+  const [{ permissions, isAdministrator, roleIds }, roles, calendarPage] = await Promise.all([
     getUserAccess(userId),
     getRoleSummaries(),
     // The calendar page is a place rather than a permission, so whether it
@@ -116,6 +117,15 @@ async function readUser(userId: string): Promise<AccountUser | null> {
   }
   if (sponsorshipAccess(permissions).canView) {
     sections.push({ label: "Sponsorships", href: "/manage/sponsorships" });
+  }
+  /*
+   * Offered to anybody who may read a metadata group's answers — by the
+   * permission that defines them, by a role named on one, or by having been
+   * handed one directly. The last of those cannot be read off the permissions,
+   * so it costs one narrow query for an account that holds none of the others.
+   */
+  if (await canReachMemberData(userId, roleIds, permissions)) {
+    sections.push({ label: "Member data", href: "/manage/member-data" });
   }
 
   return {
