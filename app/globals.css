@@ -60,6 +60,10 @@
 
   --radius: 0.5rem;
   --shell-max: 76rem;
+
+  /* Behind sponsor logos, wherever one is shown. 50% grey, the same in both
+     themes on purpose — it is a backdrop for artwork, not part of the page. */
+  --sponsor-logo-backdrop: #808080;
 }
 
 /* --------------------------------------------------------- 2. Base/reset */
@@ -7701,7 +7705,9 @@ html:has(.admin-shell) body::-webkit-scrollbar {
   border-radius: var(--radius);
   object-fit: contain;
   border: 1px solid rgba(128, 128, 128, 0.3);
-  background: rgba(128, 128, 128, 0.1);
+  /* 50% grey behind every logo: sponsor artwork is drawn for white or for
+     black, and a neutral mid-tone lets both read in either theme. */
+  background: var(--sponsor-logo-backdrop);
 }
 
 /* -------------------------------------------------------------- Sponsorships
@@ -7745,6 +7751,12 @@ html:has(.admin-shell) body::-webkit-scrollbar {
   box-sizing: border-box;
   padding: 0.25rem;
   border: 1px solid var(--admin-border);
+  background: var(--sponsor-logo-backdrop);
+}
+
+/* No artwork on file: the same square, without the mid-grey that is there to
+   sit behind a logo. */
+.sponsor-row-logo.is-empty {
   background: rgba(128, 128, 128, 0.12);
 }
 
