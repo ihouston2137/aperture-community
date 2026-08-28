@@ -7703,6 +7703,44 @@ html:has(.admin-shell) body::-webkit-scrollbar {
   opacity: 1;
 }
 
+/* --------------------------------------------------------- Member metadata
+
+   The questions a community asks of its people: the editor that defines them,
+   and the fields that answer them. */
+
+/* One question while it is being written. Boxed, because a question is several
+   fields that belong together and a flat run of them reads as one long form. */
+.metadata-question {
+  padding: 0.85rem;
+  margin-top: 0.75rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(128, 128, 128, 0.28);
+  background: rgba(128, 128, 128, 0.05);
+}
+
+.metadata-question-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}
+
+/* The answers offered by a choice question, as they are picked. */
+.metadata-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin-top: 0.2rem;
+}
+
+/* A member's outstanding questions, one card per group. */
+.member-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
 /* ------------------------------------------------------ Recognition report
 
    A card that is entirely a link, and the list it leads to. */

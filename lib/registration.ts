@@ -1,6 +1,7 @@
 import { getAuthSettings, type AuthSettingsValues } from "./auth-settings";
 import { connectDB } from "./db";
 import { sendRegistrationNotification, sendVerificationCodeEmail } from "./email";
+import { outstandingMetadataCount } from "./metadata";
 import { fullName } from "./members";
 import { Role, User } from "./models";
 import { getUserAccess } from "./access";
@@ -136,7 +137,20 @@ export async function holdsManagementRole(roleIds: unknown[]): Promise<boolean> 
  * pages are built on top of the community permissions.
  */
 export async function postLoginPath(userId: string): Promise<string> {
-  const { permissions, isAdministrator } = await getUserAccess(userId);
+  const { permissions, isAdministrator, roleIds } = await getUserAccess(userId);
+
+  /*
+   * A member who owes a required answer is taken to the questions.
+   *
+   * This is the reminder at sign-in. It is a landing page rather than a gate —
+   * they can navigate away, and nothing is withheld from them — because
+   * holding somebody out of the site until they have filled in a form is a
+   * punishment for being asked a question.
+   */
+  if (await outstandingMetadataCount(userId, roleIds)) {
+    return "/dashboard/metadata";
+  }
+
   if (isAdministrator) return "/admin";
   return permissions.some((permission) => !permission.startsWith("community.")) ? "/admin" : "/";
 }

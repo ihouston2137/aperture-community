@@ -71,6 +71,11 @@ export const adminNavGroups: NavGroup[] = [
         permission: "members.relationships",
       },
       {
+        href: "/admin/metadata",
+        label: "Member metadata",
+        permission: "members.metadata",
+      },
+      {
         href: "/admin/registration",
         label: "Registration",
         permission: "registration.manage",

@@ -89,6 +89,22 @@ export const permissionGroups: PermissionGroup[] = [
       { key: "members.view", label: "View the member list" },
       { key: "members.relationships", label: "Link members to one another" },
       { key: "members.groups", label: "Put members into groups" },
+      {
+        key: "members.metadata",
+        label: "Define metadata groups, and read every answer to them",
+      },
+      {
+        key: "members.metadata.view",
+        label: "Read answers to the metadata groups they are named on",
+      },
+      {
+        key: "members.metadata.edit",
+        label: "Fill in and change answers on the groups they are named on",
+      },
+      {
+        key: "members.metadata.reports",
+        label: "Open metadata reports for the groups they are named on",
+      },
       { key: "registration.manage", label: "Manage registration settings" },
       { key: "attendance.view", label: "See who attended events" },
       { key: "attendance.record", label: "Record event attendance" },

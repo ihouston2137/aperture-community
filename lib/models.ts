@@ -695,6 +695,90 @@ const MemberGroupSchema = new Schema<any>(
 
 export const MemberGroup = model("MemberGroup", MemberGroupSchema);
 
+/* ------------------------------------------------------- Member metadata */
+
+/**
+ * A set of questions asked of, or kept about, the members holding a role.
+ *
+ * `managedBy` is the whole distinction. A `member` group is asked of them and
+ * answered by them; a `manager` group is kept about them and never shown to
+ * them. The access lists below only bear on the second kind — a member always
+ * reads and writes their own answers to the first.
+ */
+const MetadataQuestionSchema = new Schema<any>(
+  {
+    _id: false,
+    /** Minted when the question is first saved; answers are stored by it. */
+    id: { type: String, required: true },
+    label: { type: String, required: true },
+    help: { type: String, default: "" },
+    /** short | long | one | many. */
+    type: { type: String, default: "short" },
+    /** What `one` and `many` offer. Empty for the text types. */
+    options: [{ type: String }],
+    isRequired: { type: Boolean, default: false },
+  },
+  { _id: false }
+);
+
+const MetadataGroupSchema = new Schema<any>(
+  {
+    name: { type: String, required: true },
+    description: { type: String, default: "" },
+    /** `member` — they answer it. `manager` — it is kept about them. */
+    managedBy: { type: String, default: "member" },
+    /** The membership roles it is asked of, active accounts and inactive alike. */
+    roleIds: [{ type: String }],
+    questions: { type: [MetadataQuestionSchema], default: [] },
+    /*
+     * Who may read, who may change, and who may see everybody at once.
+     *
+     * Each is a pair: the management roles that carry it, and the individual
+     * accounts named on this group. Reading is implied by editing, and the
+     * permission that defines groups carries all three.
+     */
+    viewRoleIds: [{ type: String }],
+    viewUserIds: [{ type: String }],
+    editRoleIds: [{ type: String }],
+    editUserIds: [{ type: String }],
+    reportRoleIds: [{ type: String }],
+    reportUserIds: [{ type: String }],
+  },
+  { timestamps: true }
+);
+
+export const MetadataGroup = model("MetadataGroup", MetadataGroupSchema);
+
+/**
+ * One member's answers to one group.
+ *
+ * A document per pair rather than a field on the account: the questions are
+ * defined by the site and change, and a member who leaves takes their answers
+ * with them without the account schema having to know what was ever asked.
+ */
+const MetadataAnswerSchema = new Schema<any>(
+  {
+    userId: { type: String, required: true, index: true },
+    groupId: { type: String, required: true, index: true },
+    values: [
+      {
+        _id: false,
+        questionId: { type: String, required: true },
+        text: { type: String, default: "" },
+        choices: [{ type: String }],
+      },
+    ],
+    /** Who last wrote it: the member themselves, or the manager who did. */
+    updatedById: { type: String, default: "" },
+  },
+  { timestamps: true }
+);
+
+// One set of answers per member per group, enforced where it cannot drift.
+MetadataAnswerSchema.index({ userId: 1, groupId: 1 }, { unique: true });
+
+export const MetadataAnswer = model("MetadataAnswer", MetadataAnswerSchema);
+
 /* ------------------------------------------------------------ Sponsorships */
 
 /**

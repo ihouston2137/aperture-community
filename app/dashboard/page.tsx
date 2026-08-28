@@ -1,9 +1,11 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { SiteChrome } from "@/components/site-chrome";
 import { getUserAccess } from "@/lib/access";
 import { connectDB } from "@/lib/db";
 import { getMemberProfile } from "@/lib/member-profiles";
+import { memberMetadataTasks } from "@/lib/metadata";
 import { fullName } from "@/lib/members";
 import { User } from "@/lib/models";
 import { getSession } from "@/lib/session";
@@ -29,7 +31,9 @@ export default async function DashboardPage() {
   // The account was deleted while the cookie lived on.
   if (!record) redirect("/login");
 
-  const { permissions, membershipStatus } = await getUserAccess(session.userId);
+  const { permissions, membershipStatus, roleIds } = await getUserAccess(
+    session.userId
+  );
 
   // A suspended or unapproved member is told where they stand rather than shown
   // a dashboard for a membership they do not currently have.
@@ -53,6 +57,10 @@ export default async function DashboardPage() {
   // can be empty.
   const bio = await getMemberProfile(session.userId);
 
+  // What the community has asked of them, and how much of it is still owed.
+  const tasks = await memberMetadataTasks(session.userId, roleIds);
+  const outstanding = tasks.reduce((total, task) => total + task.outstanding, 0);
+
   return (
     <SiteChrome>
       <div className="member-page">
@@ -61,6 +69,27 @@ export default async function DashboardPage() {
             {record.firstName ? `Hello, ${record.firstName}` : "Your dashboard"}
           </h1>
         </header>
+
+        {tasks.length > 0 ? (
+          <section
+            className={`member-card${outstanding > 0 ? " is-flagged" : ""}`}
+            style={{ marginBottom: "1.25rem" }}
+          >
+            <h2 className="member-card-title">Your details</h2>
+            <p className="member-note">
+              {outstanding > 0
+                ? `${outstanding} question${
+                    outstanding === 1 ? "" : "s"
+                  } asked of you still needs an answer.`
+                : "Everything asked of you has been answered."}
+            </p>
+            <div className="member-actions">
+              <Link href="/dashboard/metadata" className="btn btn-sm">
+                {outstanding > 0 ? "Answer them" : "Review your answers"}
+              </Link>
+            </div>
+          </section>
+        ) : null}
 
         <AccountCard
           member={{

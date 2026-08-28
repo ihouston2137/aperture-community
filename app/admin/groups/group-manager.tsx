@@ -15,7 +15,13 @@ import {
 import { deleteGroupAction, saveGroupAction } from "./actions";
 
 /** A member as the picker and the list need them. */
-export type MemberOption = { _id: string; name: string; title?: string };
+export type MemberOption = {
+  _id: string;
+  name: string;
+  title?: string;
+  /** Left the site. Still nameable here: a group is a record of who was in it. */
+  isInactive?: boolean;
+};
 
 type DialogState =
   | { mode: "create" }

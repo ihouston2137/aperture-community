@@ -75,6 +75,15 @@ export async function ensureDefaultCommunityRole() {
 
 export type UserAccess = {
   permissions: string[];
+  /**
+   * Every role held, management and community alike.
+   *
+   * Carried alongside the permissions because some things are granted to a
+   * role by name rather than by what the role can do — a metadata group names
+   * the roles that may read it — and asking again would be a second read of
+   * the account this function has already made.
+   */
+  roleIds: string[];
   membershipStatus: MembershipStatus;
   isActive: boolean;
   isAdministrator: boolean;
@@ -99,7 +108,13 @@ export async function getUserAccess(userId: string): Promise<UserAccess> {
   const isActive = Boolean(user) && user?.isActive !== false;
 
   if (!user || !isActive || status !== "active") {
-    return { permissions: [], membershipStatus: status, isActive, isAdministrator: false };
+    return {
+      permissions: [],
+      roleIds: [],
+      membershipStatus: status,
+      isActive,
+      isAdministrator: false,
+    };
   }
 
   const roles = await Role.find({ _id: { $in: user.roleIds ?? [] } }).lean<
@@ -120,7 +135,13 @@ export async function getUserAccess(userId: string): Promise<UserAccess> {
     for (const permission of allCommunityPermissions) permissions.add(permission);
   }
 
-  return { permissions: [...permissions], membershipStatus: status, isActive, isAdministrator };
+  return {
+    permissions: [...permissions],
+    roleIds: (user.roleIds ?? []).map(String),
+    membershipStatus: status,
+    isActive,
+    isAdministrator,
+  };
 }
 
 export async function getUserPermissions(userId: string): Promise<string[]> {

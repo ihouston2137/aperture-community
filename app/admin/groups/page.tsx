@@ -14,9 +14,17 @@ export default async function GroupsPage() {
   await requirePermission("members.groups");
   await connectDB();
 
+  /*
+   * Inactive accounts included, deliberately.
+   *
+   * A group is a record of who was in something, and the 2019 committee does
+   * not stop having had its members because they have since left. Leaving them
+   * out would quietly empty every historical group as people move on, and
+   * would stop anybody putting one together after the fact.
+   */
   const [users, roles, groups] = await Promise.all([
-    User.find({ isActive: { $ne: false } })
-      .select("_id firstName lastName name email roleIds")
+    User.find()
+      .select("_id firstName lastName name email roleIds isActive")
       .sort({ lastName: 1, firstName: 1, email: 1 })
       .lean<any[]>(),
     getRoleSummaries("community"),
@@ -33,16 +41,24 @@ export default async function GroupsPage() {
       }
       return roles.some((role) => (user.roleIds ?? []).map(String).includes(role._id));
     })
-    .map((user) => ({
-      // Full names, as on the relationships screen: this is behind a management
-      // permission and never public.
-      _id: String(user._id),
-      name: fullName(user),
-      title: roles
+    .map((user) => {
+      const heldRoles = roles
         .filter((role) => (user.roleIds ?? []).map(String).includes(role._id))
-        .map((role) => role.name)
-        .join(", "),
-    }));
+        .map((role) => role.name);
+
+      return {
+        // Full names, as on the relationships screen: this is behind a
+        // management permission and never public.
+        _id: String(user._id),
+        name: fullName(user),
+        // Said in the picker, because putting somebody who has left into a
+        // group is usually deliberate and occasionally a mistake.
+        title: [...heldRoles, user.isActive === false ? "inactive" : ""]
+          .filter(Boolean)
+          .join(", "),
+        isInactive: user.isActive === false,
+      };
+    });
 
   return (
     <>
