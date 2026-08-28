@@ -20,6 +20,7 @@ import type { UserQuery } from "@/lib/user-query-types";
 
 import { deleteUserAction, saveUserAction } from "./actions";
 import { UserFilters, UserPagination } from "./user-filters";
+import { ImportUsersButton } from "./user-import";
 
 export type UserRecord = MemberSummary & {
   /** The signed-in account, which cannot lock itself out. */
@@ -65,6 +66,7 @@ export function UserManager({
         >
           Add user
         </button>
+        <ImportUsersButton />
       </div>
 
       <UserFilters query={query} roles={roles} total={total} overall={overall} />

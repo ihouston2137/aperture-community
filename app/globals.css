@@ -3745,6 +3745,37 @@ input, select, textarea {
   overflow: hidden;
 }
 
+/* For a dialog holding a table of what is about to happen, where the usual
+   width would wrap every column onto two lines. */
+.style-modal.is-wide {
+  width: min(72rem, 100%);
+}
+
+/* One row per field of an account, each naming the column it reads. Two
+   abreast where there is room: the list is long, and reading down it to check
+   a guess is the whole job. */
+.import-map {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(20rem, 100%), 1fr));
+  gap: 0.75rem 1.25rem;
+  margin-bottom: 1rem;
+}
+
+/* The preview scrolls sideways rather than squeezing the columns, so a long
+   address stays readable. */
+.import-preview {
+  overflow-x: auto;
+  margin-bottom: 0.5rem;
+}
+
+.import-preview .admin-table {
+  min-width: 44rem;
+}
+
+.import-preview .help-text {
+  display: block;
+}
+
 /* When a dialog wraps its header/body/footer in a <form>, that form becomes
    the modal's only flex child. Without this it collapses the column layout and
    the body stops scrolling, so the footer buttons fall off a short screen. */
