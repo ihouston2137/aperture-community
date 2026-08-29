@@ -9,6 +9,7 @@ import { User } from "@/lib/models";
 import { getSession } from "@/lib/session";
 import { sponsorshipAccess } from "@/lib/sponsorship-access";
 import {
+  DONATION_KIND_LABELS,
   DONATION_STATUS_LABELS,
   dateRangeLabel,
   countsTowardTotals,
@@ -21,11 +22,14 @@ import {
   statusTone,
 } from "@/lib/sponsorship-types";
 import {
+  breakdown,
   getCampaigns,
   getDonations,
   getRecognitionLevels,
+  getSponsorCategories,
   getSponsors,
   splitCreditByMember,
+  type BreakdownRow,
 } from "@/lib/sponsorships";
 
 import { Leaderboard } from "../../leaderboard";
@@ -42,6 +46,64 @@ import { SponsorList, type CampaignSponsorRow } from "./sponsor-list";
  * campaign — a campaign with thirty sponsors would otherwise open with a
  * hundred rows of donations and no way to see the shape of it.
  */
+/**
+ * One slice of a campaign, as a short list.
+ *
+ * A bar per line, measured against the largest line rather than against a
+ * target — there is no target here, and the bar says only "this one is bigger
+ * than that one", which is the whole question a breakdown answers.
+ */
+function Breakdown({
+  title,
+  help,
+  rows,
+}: {
+  title: string;
+  help: string;
+  rows: BreakdownRow[];
+}) {
+  const largest = rows.reduce((most, row) => Math.max(most, row.rankCents), 0);
+
+  return (
+    <section className="breakdown">
+      <h3 className="member-card-subtitle">{title}</h3>
+
+      {rows.length === 0 ? (
+        <p className="help-text">Nothing recorded yet.</p>
+      ) : (
+        <ul className="breakdown-rows">
+          {rows.map((row) => (
+            <li key={row.label} className="breakdown-row">
+              <span className="breakdown-label">{row.label}</span>
+
+              <span className="breakdown-figure">
+                {row.monetaryCents > 0 ? formatDollars(row.monetaryCents) : "—"}
+                {row.inKindCents > 0 ? (
+                  <span className="help-text">
+                    and {formatDollars(row.inKindCents)} in kind
+                  </span>
+                ) : null}
+              </span>
+
+              <span className="breakdown-bar" aria-hidden="true">
+                <span
+                  style={{
+                    width: largest
+                      ? `${(row.rankCents / largest) * 100}%`
+                      : "0%",
+                  }}
+                />
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <p className="help-text">{help}</p>
+    </section>
+  );
+}
+
 export default async function CampaignDashboard({
   params,
 }: {
@@ -54,26 +116,28 @@ export default async function CampaignDashboard({
   const access = sponsorshipAccess(permissions);
   await connectDB();
 
-  const [campaigns, donations, sponsors, levels, users, roles] = await Promise.all([
-    getCampaigns(),
-    getDonations(),
-    getSponsors(),
-    getRecognitionLevels(),
-    /*
-     * Inactive accounts included.
-     *
-     * A campaign is a record of who looked after whom, and last year's
-     * campaign does not stop having had its people because they have since
-     * left. Filtering them out did two things wrong at once: an assignment
-     * already on file read as "somebody who has gone", and nobody could put a
-     * past member back on a past campaign to correct it.
-     */
-    User.find()
-      .select("_id firstName lastName name email roleIds isActive")
-      .sort({ lastName: 1, firstName: 1, email: 1 })
-      .lean<any[]>(),
-    getRoleSummaries("community"),
-  ]);
+  const [campaigns, donations, sponsors, levels, categories, users, roles] =
+    await Promise.all([
+      getCampaigns(),
+      getDonations(),
+      getSponsors(),
+      getRecognitionLevels(),
+      getSponsorCategories(),
+      /*
+       * Inactive accounts included.
+       *
+       * A campaign is a record of who looked after whom, and last year's
+       * campaign does not stop having had its people because they have since
+       * left. Filtering them out did two things wrong at once: an assignment
+       * already on file read as "somebody who has gone", and nobody could put
+       * a past member back on a past campaign to correct it.
+       */
+      User.find()
+        .select("_id firstName lastName name email roleIds isActive")
+        .sort({ lastName: 1, firstName: 1, email: 1 })
+        .lean<any[]>(),
+      getRoleSummaries("community"),
+    ]);
 
   const campaign = campaigns.find((entry) => entry._id === id);
   if (!campaign) notFound();
@@ -173,6 +237,68 @@ export default async function CampaignDashboard({
   const notYet = onCampaign
     .filter((row) => row.donationCount === 0)
     .sort((a, b) => a.name.localeCompare(b.name));
+
+  /*
+   * Where the campaign's support came from, four ways.
+   *
+   * Each is the same set of donations sliced by a different fact about them —
+   * two about the donation, two about the sponsor who gave it — so the four
+   * add up to the same whole and can be read against each other.
+   */
+  const sponsorOf = (donation: (typeof mine)[number]) =>
+    sponsors.find((entry) => entry._id === donation.sponsorId);
+
+  const breakdowns = [
+    {
+      title: "Category",
+      help: "What kind of donation it was, from the categories on the donation itself.",
+      rows: breakdown(
+        mine,
+        (donation) =>
+          donation.categoryIds
+            .map(
+              (id) => categories.find((entry) => entry._id === id)?.name ?? ""
+            )
+            .filter(Boolean),
+        "No category"
+      ),
+    },
+    {
+      title: "Industry",
+      help: "The trade the sponsor is in.",
+      rows: breakdown(
+        mine,
+        (donation) => {
+          const industry = sponsorOf(donation)?.industry;
+          return industry ? [industry] : [];
+        },
+        "Not recorded"
+      ),
+    },
+    {
+      title: "Membership",
+      help: "The recognition level the sponsor is currently held at.",
+      rows: breakdown(
+        mine,
+        (donation) => {
+          const level = levels.find(
+            (entry) => entry._id === sponsorOf(donation)?.recognitionLevelId
+          );
+          return level ? [level.name] : [];
+        },
+        "Not recognised"
+      ),
+    },
+    {
+      title: "Monetary and in-kind",
+      help: "Money raised against goods and services given.",
+      rows: breakdown(
+        mine,
+        (donation) => [DONATION_KIND_LABELS[donation.kind]],
+        "Not recorded"
+      ),
+    },
+  ];
 
   // The same question the dashboard asks of every running campaign, asked of
   // this one alone.
@@ -492,6 +618,35 @@ export default async function CampaignDashboard({
         ) : null}
       </section>
 
+      <section className="member-card manager-card">
+        <h2 className="member-card-title">Breakdowns</h2>
+        <p className="help-text">
+          The same donations sliced four ways. Money and goods are kept apart in
+          the figures, as they are everywhere — a lent hall is not a cheque —
+          but a line is measured against the others on the two together, since
+          what is being asked is where the support came from.
+        </p>
+
+        <div className="breakdown-grid">
+          {breakdowns.map((entry) => (
+            <Breakdown
+              key={entry.title}
+              title={entry.title}
+              help={entry.help}
+              rows={entry.rows}
+            />
+          ))}
+        </div>
+      </section>
+
+      <Leaderboard
+        entries={leaderboard}
+        members={members}
+        levels={boardLevels}
+        currentUserId={session!.userId}
+        caption="On this campaign. A donation credited to more than one member is split evenly between them, so the shares add up to the whole."
+      />
+
       <SponsorList
         title="Sponsors donating on this campaign"
         emptyText="Nothing has come in yet."
@@ -529,14 +684,15 @@ export default async function CampaignDashboard({
           canEditSponsors: access.canEditSponsors,
           canEditCampaigns: access.canEditCampaigns,
         }}
-      />
-
-      <Leaderboard
-        entries={leaderboard}
-        members={members}
-        levels={boardLevels}
-        currentUserId={session!.userId}
-        caption="On this campaign. A donation credited to more than one member is split evenly between them, so the shares add up to the whole."
+        action={
+          access.canEditCampaigns ? (
+            <AddSponsorButton
+              campaignId={campaign._id}
+              available={availableSponsors}
+              canCreate={access.canEditSponsors}
+            />
+          ) : null
+        }
       />
 
       <ToneLegend />

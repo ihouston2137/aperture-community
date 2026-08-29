@@ -7376,10 +7376,15 @@ html:has(.admin-shell) body::-webkit-scrollbar {
 }
 
 /* The filter sits in the card head beside the title, not above the rows. */
+/* A row of memberships rather than one select, so several can be picked —
+   the same control the member directory uses for the same question. On a
+   narrow screen it wraps under the title rather than squeezing the buttons. */
 .leaderboard-filter {
   flex-direction: row;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
+  margin-left: auto;
 }
 
 .leaderboard-filter select {
@@ -8205,6 +8210,86 @@ html:has(.admin-shell) body::-webkit-scrollbar {
 }
 
 /* ------------------------------------------------- Sponsors on a campaign */
+
+/* ----------------------------------------------------- Campaign breakdowns
+
+   The same donations sliced four ways, two boxes abreast where there is room
+   and one where there is not. */
+.breakdown-grid {
+  display: grid;
+  /* Two on a desktop or a tablet; the minimum is what forces the drop to one
+     column on a phone, rather than a breakpoint that has to guess at widths. */
+  grid-template-columns: repeat(auto-fit, minmax(min(22rem, 100%), 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.breakdown {
+  padding: 0.9rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(128, 128, 128, 0.28);
+  background: rgba(128, 128, 128, 0.05);
+}
+
+.breakdown .member-card-subtitle {
+  margin-top: 0;
+}
+
+.breakdown .help-text {
+  margin-top: 0.6rem;
+}
+
+.breakdown-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* Label and figure on one line, the bar under them across the full width —
+   a bar squeezed into the space left over says less the more lines there are. */
+.breakdown-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.15rem 0.75rem;
+  font-size: 0.9375rem;
+}
+
+.breakdown-label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.breakdown-figure {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.breakdown-figure .help-text {
+  display: block;
+  margin: 0;
+  font-size: 0.75rem;
+}
+
+.breakdown-bar {
+  grid-column: 1 / -1;
+  display: block;
+  height: 0.3rem;
+  border-radius: 999px;
+  background: rgba(128, 128, 128, 0.18);
+  overflow: hidden;
+}
+
+.breakdown-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.45;
+}
 
 /* ------------------------------------------------- Campaign sponsor lists
 

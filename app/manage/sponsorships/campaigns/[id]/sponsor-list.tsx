@@ -59,7 +59,6 @@ export function SponsorList({
   members,
   access,
   action,
-  startOpen = true,
 }: {
   title: string;
   emptyText: string;
@@ -70,10 +69,17 @@ export function SponsorList({
   access: ListAccess;
   /** The "add sponsor" control, passed in because only the page may build it. */
   action?: React.ReactNode;
-  startOpen?: boolean;
 }) {
-  const [open, setOpen] = useState(startOpen);
-  const [view, setView] = useState<"cards" | "rows">("cards");
+  /*
+   * Shut, and as rows when opened.
+   *
+   * The page carries two of these under everything else it says, and a
+   * campaign with forty sponsors would otherwise bury the progress figures
+   * under two screens of cards. Rows because somebody opening a list of forty
+   * is working down it.
+   */
+  const [open, setOpen] = useState(false);
+  const [view, setView] = useState<"cards" | "rows">("rows");
 
   const bodyId = `sponsor-list-${title.replace(/\W+/g, "-").toLowerCase()}`;
 

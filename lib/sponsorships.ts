@@ -500,3 +500,64 @@ export function recognitionReport(
     latestCount,
   };
 }
+
+/* ------------------------------------------------------------- Breakdowns */
+
+/**
+ * One line of a breakdown: a slice of what a campaign has taken.
+ *
+ * Money and in-kind are held apart, as they are everywhere else — a donated
+ * venue is not a cheque — but the lines are ranked on the two together, since
+ * the question a breakdown answers is "where did the support come from" and a
+ * lent hall is support.
+ */
+export type BreakdownRow = {
+  label: string;
+  monetaryCents: number;
+  inKindCents: number;
+  /** The two added, for ordering and for the width of a line's bar only. */
+  rankCents: number;
+  count: number;
+};
+
+/**
+ * Splits a campaign's donations by whatever the caller names them.
+ *
+ * The labeller returns as many labels as the donation belongs under, which is
+ * what lets a donation carrying two categories count under both. Returning
+ * none puts it under the fallback, because a breakdown that quietly dropped
+ * the uncategorised would not add up to what the campaign raised.
+ */
+export function breakdown(
+  donations: DonationSummary[],
+  labeller: (donation: DonationSummary) => string[],
+  fallback: string
+): BreakdownRow[] {
+  const rows = new Map<string, BreakdownRow>();
+
+  for (const donation of donations) {
+    // Cancelled never happened, here as everywhere.
+    if (!countsTowardTotals(donation.status)) continue;
+
+    const labels = labeller(donation);
+    for (const label of labels.length > 0 ? labels : [fallback]) {
+      const row = rows.get(label) ?? {
+        label,
+        monetaryCents: 0,
+        inKindCents: 0,
+        rankCents: 0,
+        count: 0,
+      };
+
+      if (donation.kind === "in-kind") row.inKindCents += donation.valueCents;
+      else row.monetaryCents += donation.valueCents;
+      row.rankCents += donation.valueCents;
+      row.count += 1;
+      rows.set(label, row);
+    }
+  }
+
+  return [...rows.values()].sort(
+    (a, b) => b.rankCents - a.rankCents || a.label.localeCompare(b.label)
+  );
+}

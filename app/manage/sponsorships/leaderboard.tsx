@@ -40,7 +40,7 @@ export function Leaderboard({
   currentUserId: string;
   caption: string;
 }) {
-  const [levelId, setLevelId] = useState("");
+  const [chosen, setChosen] = useState<string[]>([]);
 
   const byId = useMemo(() => {
     const map = new Map<string, BoardMember>();
@@ -49,11 +49,21 @@ export function Leaderboard({
   }, [members]);
 
   const shown = useMemo(() => {
-    if (!levelId) return entries;
+    if (chosen.length === 0) return entries;
+    // Any of the memberships picked, not all of them: somebody holding one of
+    // them is who the reader is narrowing to.
     return entries.filter((entry) =>
-      byId.get(entry.memberId)?.levelIds.includes(levelId)
+      byId.get(entry.memberId)?.levelIds.some((id) => chosen.includes(id))
     );
-  }, [entries, levelId, byId]);
+  }, [entries, chosen, byId]);
+
+  function toggle(id: string) {
+    setChosen((current) =>
+      current.includes(id)
+        ? current.filter((held) => held !== id)
+        : [...current, id]
+    );
+  }
 
   if (entries.length === 0) return null;
 
@@ -62,21 +72,38 @@ export function Leaderboard({
       <div className="manager-card-head">
         <h2 className="member-card-title">Leaderboard</h2>
 
+        {/* The same control as the member directory's, because it is the same
+            question asked of the same memberships — several may be picked, and
+            picking none is everybody. */}
         {levels.length > 0 ? (
           <div className="field leaderboard-filter">
-            <label htmlFor="leaderboard-level">Membership</label>
-            <select
-              id="leaderboard-level"
-              value={levelId}
-              onChange={(event) => setLevelId(event.target.value)}
+            <span className="field-label">Membership</span>
+            <div
+              className="level-toggles"
+              role="group"
+              aria-label="Narrow the board to a membership"
             >
-              <option value="">Everyone</option>
               {levels.map((level) => (
-                <option key={level._id} value={level._id}>
+                <button
+                  key={level._id}
+                  type="button"
+                  className="btn btn-sm"
+                  aria-pressed={chosen.includes(level._id)}
+                  onClick={() => toggle(level._id)}
+                >
                   {level.name}
-                </option>
+                </button>
               ))}
-            </select>
+              {chosen.length > 0 ? (
+                <button
+                  type="button"
+                  className="btn btn-sm btn-ghost"
+                  onClick={() => setChosen([])}
+                >
+                  Everyone
+                </button>
+              ) : null}
+            </div>
           </div>
         ) : null}
       </div>
@@ -85,7 +112,8 @@ export function Leaderboard({
 
       {shown.length === 0 ? (
         <p className="member-note">
-          Nobody with that membership has brought anything in.
+          Nobody with{chosen.length === 1 ? " that membership" : " those memberships"}{" "}
+          has brought anything in.
         </p>
       ) : (
         <ol className="leaderboard">
