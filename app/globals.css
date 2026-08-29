@@ -8206,6 +8206,130 @@ html:has(.admin-shell) body::-webkit-scrollbar {
 
 /* ------------------------------------------------- Sponsors on a campaign */
 
+/* ------------------------------------------------- Campaign sponsor lists
+
+   Open and closed, and the two ways of looking at them. */
+
+/* The state of the conversation with a sponsor, which is a different axis from
+   the state of a donation — so deliberately not the donation tones, which mean
+   "arrived" and "fell through" and would be read as such on the same card.
+   Blue is a conversation still running, red one that has finished. */
+:root {
+  --assignment-open: #4f8ff7;
+  --assignment-closed: #d9636b;
+}
+
+.sponsor-card.is-open,
+.sponsor-line.is-open {
+  border-left: 3px solid var(--assignment-open);
+}
+
+.sponsor-card.is-closed,
+.sponsor-line.is-closed {
+  border-left: 3px solid var(--assignment-closed);
+}
+
+.badge.assignment-open {
+  border-color: var(--assignment-open);
+  color: var(--assignment-open);
+}
+
+.badge.assignment-closed {
+  border-color: var(--assignment-closed);
+  color: var(--assignment-closed);
+}
+
+/* The whole title is the control that opens and closes the box, so the target
+   is the words rather than a caret somebody has to aim at. */
+.collapse-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.collapse-toggle .member-card-title {
+  margin: 0;
+}
+
+.collapse-caret {
+  font-size: 0.75rem;
+  opacity: 0.6;
+}
+
+/* Cards or rows, chosen where the list is. */
+.view-toggle {
+  margin-left: auto;
+}
+
+.view-toggle .icon-btn[aria-pressed="true"] {
+  border-color: var(--admin-accent);
+  color: var(--admin-accent);
+}
+
+/* The same sponsors, a line each: for working down them rather than looking
+   them over. Everything the card shows is still here, laid along the line. */
+.sponsor-lines {
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.sponsor-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(128, 128, 128, 0.22);
+  background: rgba(128, 128, 128, 0.04);
+  font-size: 0.9375rem;
+}
+
+.sponsor-line .sponsor-card-head {
+  flex: 1 1 14rem;
+  gap: 0.6rem;
+}
+
+/* The logo comes down to the height of a line. */
+.sponsor-line .sponsor-card-logo {
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0.15rem;
+}
+
+.sponsor-line .sponsor-card-level {
+  flex: 0 1 auto;
+  padding-left: 0;
+  margin-top: 0;
+}
+
+.sponsor-line .sponsor-card-given {
+  flex: 0 0 auto;
+  margin-top: 0;
+  font-size: 1rem;
+}
+
+.sponsor-line .sponsor-card-chips {
+  flex: 0 1 auto;
+}
+
+.sponsor-line .sponsor-card-foot {
+  flex: 0 1 auto;
+  margin-left: auto;
+  padding-top: 0;
+  border-top: 0;
+}
+
 /* The sponsors on a campaign, as cards rather than as rows.
    Ordered by what each has given, so the grid reads down the page from the
    largest — which is the question being asked of this list most of the time. */
@@ -8280,11 +8404,31 @@ html:has(.admin-shell) body::-webkit-scrollbar {
   overflow-wrap: anywhere;
 }
 
-/* The level control, under the name it changes rather than in the row of
-   controls at the foot of the card. */
+/* The level and the pencil that changes it, on one line under the name.
+   Indented past the logo so it lines up with the name rather than with the
+   picture — the indent is the logo's width and the gap beside it, stated the
+   same way both are. */
 .sponsor-card-level {
   display: flex;
-  margin-top: -0.25rem;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+  margin-top: -0.35rem;
+  padding-left: calc(8rem + 0.75rem);
+}
+
+.sponsor-card-level .help-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* Where the card is narrow the indent costs more than the alignment is
+   worth, and the line runs the full width instead. */
+@media (max-width: 30rem) {
+  .sponsor-card-level {
+    padding-left: 0;
+    margin-top: 0;
+  }
 }
 
 /* What they have given, at the size of a figure worth reading. */

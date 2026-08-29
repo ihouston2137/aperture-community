@@ -9,6 +9,7 @@ import { User } from "@/lib/models";
 import { getSession } from "@/lib/session";
 import { sponsorshipAccess } from "@/lib/sponsorship-access";
 import {
+  ASSIGNMENT_STATUS_LABELS,
   DONATION_KIND_LABELS,
   DONATION_STATUS_LABELS,
   SPONSOR_TYPE_LABELS,
@@ -196,6 +197,17 @@ export default async function CampaignSponsorDashboard({
             ) : null}
           </dd>
 
+          <dt>On this campaign</dt>
+          <dd className="sponsor-row-value">
+            {assignment ? (
+              <span className={`badge assignment-${assignment.status}`}>
+                {ASSIGNMENT_STATUS_LABELS[assignment.status]}
+              </span>
+            ) : (
+              <em>not on it</em>
+            )}
+          </dd>
+
           <dt>Looked after by</dt>
           <dd className="sponsor-row-value">
             <em>
@@ -210,6 +222,7 @@ export default async function CampaignSponsorDashboard({
                 sponsorName={sponsor.name}
                 members={members}
                 assigned={assignment.memberIds}
+                status={assignment.status}
                 icon
               />
             ) : null}

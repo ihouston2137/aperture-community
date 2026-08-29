@@ -7,7 +7,11 @@ import { BioPicker } from "@/components/bio-picker";
 import { ModalPortal } from "@/components/modal-portal";
 import { protectedMediaUrl } from "@/lib/protected-media-url";
 import {
+  ASSIGNMENT_STATUSES,
+  ASSIGNMENT_STATUS_LABELS,
+  assignmentStatus,
   formatDollars,
+  type AssignmentStatus,
   type RecognitionLevelSummary,
   type SponsorLogo,
 } from "@/lib/sponsorship-types";
@@ -778,6 +782,7 @@ export function ChangeAssignedButton({
   sponsorName,
   members,
   assigned,
+  status: currentStatus = "open",
   takesAssignment = true,
   icon = false,
 }: {
@@ -786,6 +791,8 @@ export function ChangeAssignedButton({
   sponsorName: string;
   members: Option[];
   assigned: string[];
+  /** Whether the conversation with them is still being worked. */
+  status?: AssignmentStatus;
   /** False for a sponsor nobody is put down as looking after. The dialog then
       only offers to take them off the campaign. */
   takesAssignment?: boolean;
@@ -795,6 +802,7 @@ export function ChangeAssignedButton({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [memberIds, setMemberIds] = useState<string[]>(assigned);
+  const [status, setStatus] = useState<AssignmentStatus>(currentStatus);
   const [confirmingRemove, setConfirmingRemove] = useState(false);
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
@@ -808,6 +816,7 @@ export function ChangeAssignedButton({
     setError("");
     setConfirmingRemove(false);
     setMemberIds(assigned);
+    setStatus(currentStatus);
   }
 
   function save() {
@@ -816,6 +825,7 @@ export function ChangeAssignedButton({
       const formData = new FormData();
       formData.set("campaignId", campaignId);
       formData.set("sponsorId", sponsorId);
+      formData.set("status", status);
       for (const id of memberIds) formData.append("memberIds", id);
 
       const result = await setCampaignAssignedAction(formData);
@@ -922,6 +932,30 @@ export function ChangeAssignedButton({
             </>
           }
         >
+          <div className="field" style={{ marginBottom: "0.875rem" }}>
+            <label htmlFor={`assignment-status-${sponsorId}`}>
+              On this campaign
+            </label>
+            <select
+              id={`assignment-status-${sponsorId}`}
+              value={status}
+              disabled={pending}
+              onChange={(event) => setStatus(assignmentStatus(event.target.value))}
+            >
+              {ASSIGNMENT_STATUSES.map((entry) => (
+                <option key={entry} value={entry}>
+                  {ASSIGNMENT_STATUS_LABELS[entry]}
+                </option>
+              ))}
+            </select>
+            <span className="help-text">
+              Whether the conversation is still being worked. Not whether they
+              have given — a sponsor who said no is closed having given
+              nothing, and one who has paid stays open while there is a second
+              ask outstanding.
+            </span>
+          </div>
+
           {!takesAssignment ? (
             <p className="help-text">
               Nobody looks after {sponsorName} — they are set to take no

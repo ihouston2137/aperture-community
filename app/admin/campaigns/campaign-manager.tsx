@@ -7,6 +7,9 @@ import { Panel } from "@/components/admin-ui";
 import { BioPicker } from "@/components/bio-picker";
 import { ModalPortal } from "@/components/modal-portal";
 import {
+  ASSIGNMENT_STATUSES,
+  ASSIGNMENT_STATUS_LABELS,
+  assignmentStatus,
   CAMPAIGN_STATUSES,
   CAMPAIGN_STATUS_LABELS,
   centsToDollarInput,
@@ -623,6 +626,37 @@ export function CampaignDialog({
                 <div key={assignment.sponsorId} className="assignment-row">
                   <div className="assignment-head">
                     <strong>{nameOf(sponsors, assignment.sponsorId)}</strong>
+
+                    {/* Whether the conversation is still being worked. Not
+                        whether they have given: a sponsor who said no is
+                        closed having given nothing. */}
+                    <select
+                      aria-label={`State of ${nameOf(
+                        sponsors,
+                        assignment.sponsorId
+                      )} on this campaign`}
+                      value={assignment.status}
+                      disabled={pending}
+                      onChange={(event) =>
+                        setAssignments((current) =>
+                          current.map((entry) =>
+                            entry.sponsorId === assignment.sponsorId
+                              ? {
+                                  ...entry,
+                                  status: assignmentStatus(event.target.value),
+                                }
+                              : entry
+                          )
+                        )
+                      }
+                    >
+                      {ASSIGNMENT_STATUSES.map((status) => (
+                        <option key={status} value={status}>
+                          {ASSIGNMENT_STATUS_LABELS[status]}
+                        </option>
+                      ))}
+                    </select>
+
                     <button
                       type="button"
                       className="btn btn-danger btn-sm"
@@ -713,7 +747,9 @@ export function CampaignDialog({
                     if (!sponsorId) return;
                     setAssignments((current) => [
                       ...current,
-                      { sponsorId, memberIds: [] },
+                      // A sponsor just put on a campaign is one somebody is
+                      // about to talk to.
+                      { sponsorId, memberIds: [], status: "open" },
                     ]);
                   }}
                   emptyLabel="—"

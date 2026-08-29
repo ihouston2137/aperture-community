@@ -31,12 +31,9 @@ import {
 import { Leaderboard } from "../../leaderboard";
 import { CampaignButton } from "../../record-buttons";
 import { ToneLegend } from "../../tone-legend";
-import {
-  AddSponsorButton,
-  ChangeAssignedButton,
-  ChangeLevelButton,
-  RemoveSponsorButton,
-} from "../../sponsor-controls";
+import { AddSponsorButton } from "../../sponsor-controls";
+
+import { SponsorList, type CampaignSponsorRow } from "./sponsor-list";
 
 /**
  * One campaign, in full: where it has got to, and who is on it.
@@ -133,7 +130,7 @@ export default async function CampaignDashboard({
    * who sent a small cheque. Cancelled donations never happened, so they order
    * nobody; sponsors who have given nothing yet fall to the back, by name.
    */
-  const onCampaign = campaign.assignments
+  const onCampaign: CampaignSponsorRow[] = campaign.assignments
     .map((assignment) => {
       const sponsor = sponsors.find((entry) => entry._id === assignment.sponsorId);
       const given = mine.filter(
@@ -142,20 +139,40 @@ export default async function CampaignDashboard({
       const givenCents = given
         .filter((donation) => countsTowardTotals(donation.status))
         .reduce((sum, donation) => sum + donation.valueCents, 0);
+      const level = levels.find(
+        (entry) => entry._id === sponsor?.recognitionLevelId
+      );
 
       return {
-        assignment,
-        sponsor,
-        chips: sponsorChips(given),
-        donationCount: given.length,
+        sponsorId: assignment.sponsorId,
+        name: sponsor?.name ?? "a sponsor that has gone",
+        logoSrc: sponsor ? sponsorLogoSrc(primaryLogo(sponsor.logos)) : "",
+        levelId: sponsor?.recognitionLevelId ?? "",
+        levelName: level?.name ?? "",
+        isUnassignable: Boolean(sponsor?.isUnassignable),
+        assignedIds: assignment.memberIds,
+        assignedNames: assignment.memberIds.map(memberName).join(", "),
+        status: assignment.status,
         givenCents,
+        donationCount: given.length,
+        chips: sponsorChips(given),
       };
     })
     .sort(
-      (a, b) =>
-        b.givenCents - a.givenCents ||
-        (a.sponsor?.name ?? "").localeCompare(b.sponsor?.name ?? "")
+      (a, b) => b.givenCents - a.givenCents || a.name.localeCompare(b.name)
     );
+
+  /*
+   * Split by whether anything has come in.
+   *
+   * The two lists are worked in different ways — one is what the campaign has
+   * raised and who to thank for it, the other is who is still to be asked —
+   * and reading them apart is most of why anybody opens this page.
+   */
+  const donating = onCampaign.filter((row) => row.donationCount > 0);
+  const notYet = onCampaign
+    .filter((row) => row.donationCount === 0)
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   // The same question the dashboard asks of every running campaign, asked of
   // this one alone.
@@ -475,150 +492,44 @@ export default async function CampaignDashboard({
         ) : null}
       </section>
 
-      <section className="member-card manager-card">
-        <div className="manager-card-head">
-          <h2 className="member-card-title">
-            Sponsors on this campaign ({onCampaign.length})
-          </h2>
-          {access.canEditCampaigns ? (
+      <SponsorList
+        title="Sponsors donating on this campaign"
+        emptyText="Nothing has come in yet."
+        rows={donating}
+        campaignId={campaign._id}
+        levels={levels}
+        members={members}
+        access={{
+          canEditSponsors: access.canEditSponsors,
+          canEditCampaigns: access.canEditCampaigns,
+        }}
+        action={
+          access.canEditCampaigns ? (
             <AddSponsorButton
               campaignId={campaign._id}
               available={availableSponsors}
               canCreate={access.canEditSponsors}
             />
-          ) : null}
-        </div>
+          ) : null
+        }
+      />
 
-        {onCampaign.length === 0 ? (
-          <p className="member-note">
-            None yet.{" "}
-            {access.canEditCampaigns
-              ? "Add the first with the button above."
-              : ""}
-          </p>
-        ) : (
-          <ul className="sponsor-cards">
-            {onCampaign.map(
-              ({ assignment, sponsor, chips, donationCount, givenCents }) => {
-                const level = levels.find(
-                  (entry) => entry._id === sponsor?.recognitionLevelId
-                );
-                const logoSrc = sponsor
-                  ? sponsorLogoSrc(primaryLogo(sponsor.logos))
-                  : "";
-
-                return (
-                  <li key={assignment.sponsorId} className="sponsor-card">
-                    <Link
-                      href={`/manage/sponsorships/campaigns/${campaign._id}/sponsors/${assignment.sponsorId}`}
-                      className="sponsor-card-head"
-                    >
-                      {logoSrc ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={logoSrc} alt="" className="sponsor-card-logo" />
-                      ) : (
-                        <span
-                          className="sponsor-card-logo is-empty"
-                          aria-hidden="true"
-                        />
-                      )}
-                      <span className="sponsor-card-name">
-                        <strong>
-                          {sponsor?.name ?? "a sponsor that has gone"}
-                        </strong>
-                        <span className="help-text">
-                          {level?.name ?? "no level"}
-                        </span>
-                      </span>
-                    </Link>
-
-                    {/* Beside the level it changes, rather than in a row of
-                        controls at the foot of the card. It cannot sit inside
-                        the link above, which would make one control open two
-                        things. */}
-                    {access.canEditSponsors && sponsor ? (
-                      <span className="sponsor-card-level">
-                        <ChangeLevelButton
-                          sponsorId={sponsor._id}
-                          levels={levels}
-                          current={sponsor.recognitionLevelId}
-                          label={level ? "Change level" : "Set a level"}
-                        />
-                      </span>
-                    ) : null}
-
-                    {/* The figure the cards are ordered by, said out loud —
-                        an order nobody can see is not an order. */}
-                    <div className="sponsor-card-given">
-                      <strong>
-                        {givenCents > 0
-                          ? formatDollars(givenCents)
-                          : "Nothing yet"}
-                      </strong>
-                      {donationCount > 0 ? (
-                        <span className="help-text">
-                          {donationCount} donation{donationCount === 1 ? "" : "s"}
-                        </span>
-                      ) : null}
-                    </div>
-
-                    {chips.length > 0 ? (
-                      <div className="sponsor-card-chips">
-                        {chips.map((chip) => (
-                          <span
-                            key={chip.key}
-                            className={`tone-chip ${chip.tone}`}
-                            title={chip.label}
-                          >
-                            <span className="tone-dot" aria-hidden="true" />
-                            {/* The colour says which this is — the legend at the
-                                foot of the page reads for the whole of it. The
-                                word is kept for anyone not reading the colour. */}
-                            <span className="visually-hidden">{chip.label}</span>
-                            {formatDollars(chip.cents)}
-                          </span>
-                        ))}
-                      </div>
-                    ) : null}
-
-                    <div className="sponsor-card-foot">
-                      <span className="sponsor-card-assigned">
-                        {sponsor?.isUnassignable
-                          ? "nobody, by arrangement"
-                          : assignment.memberIds.length === 0
-                            ? "nobody assigned"
-                            : assignment.memberIds.map(memberName).join(", ")}
-                      </span>
-
-                      <span className="sponsor-card-actions">
-                        {access.canEditCampaigns ? (
-                          <>
-                            <ChangeAssignedButton
-                              campaignId={campaign._id}
-                              sponsorId={assignment.sponsorId}
-                              sponsorName={sponsor?.name ?? "this sponsor"}
-                              members={members}
-                              assigned={assignment.memberIds}
-                              takesAssignment={!sponsor?.isUnassignable}
-                              icon
-                            />
-                            <RemoveSponsorButton
-                              campaignId={campaign._id}
-                              sponsorId={assignment.sponsorId}
-                              sponsorName={sponsor?.name ?? "this sponsor"}
-                              donationCount={donationCount}
-                            />
-                          </>
-                        ) : null}
-                      </span>
-                    </div>
-                  </li>
-                );
-              }
-            )}
-          </ul>
-        )}
-      </section>
+      <SponsorList
+        title="Sponsors not yet donating on this campaign"
+        emptyText={
+          onCampaign.length === 0
+            ? "No sponsors on this campaign yet."
+            : "Everybody on this campaign has given something."
+        }
+        rows={notYet}
+        campaignId={campaign._id}
+        levels={levels}
+        members={members}
+        access={{
+          canEditSponsors: access.canEditSponsors,
+          canEditCampaigns: access.canEditCampaigns,
+        }}
+      />
 
       <Leaderboard
         entries={leaderboard}

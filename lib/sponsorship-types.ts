@@ -284,9 +284,34 @@ export function campaignStatus(value: unknown): CampaignStatus {
  * Held on the campaign rather than on the sponsor: the same sponsor can be
  * looked after by different people from one year's campaign to the next.
  */
+/**
+ * Whether this sponsor is still being worked on this campaign.
+ *
+ * Not the same as the campaign's own status, and not the same as whether they
+ * have given: a sponsor can have paid in full and still be open because there
+ * is a second ask outstanding, and can be closed having given nothing at all
+ * because they said no. It is the state of the conversation.
+ */
+export const ASSIGNMENT_STATUSES = ["open", "closed"] as const;
+
+export type AssignmentStatus = (typeof ASSIGNMENT_STATUSES)[number];
+
+export const ASSIGNMENT_STATUS_LABELS: Record<AssignmentStatus, string> = {
+  open: "Open",
+  closed: "Closed",
+};
+
+export function assignmentStatus(value: unknown): AssignmentStatus {
+  // Anything unsaid is open: an assignment nobody has closed is one still
+  // being worked, and every assignment made before this existed was.
+  return value === "closed" ? "closed" : "open";
+}
+
 export type CampaignAssignment = {
   sponsorId: string;
   memberIds: string[];
+  /** Whether the conversation with them is still being worked. */
+  status: AssignmentStatus;
 };
 
 /**
@@ -1004,9 +1029,16 @@ export function normalizeAssignments(value: unknown): CampaignAssignment[] {
     const memberIds = uniqueIds(
       Array.isArray((entry as any)?.memberIds) ? (entry as any).memberIds : []
     );
+    const status = assignmentStatus((entry as any)?.status);
     const existing = bySponsor.get(sponsorId);
-    if (existing) existing.memberIds = uniqueIds([...existing.memberIds, ...memberIds]);
-    else bySponsor.set(sponsorId, { sponsorId, memberIds });
+    if (existing) {
+      existing.memberIds = uniqueIds([...existing.memberIds, ...memberIds]);
+      // Two rows for one sponsor disagreeing about the state of it: open
+      // wins, because a conversation somebody says is still running is.
+      if (status === "open") existing.status = "open";
+    } else {
+      bySponsor.set(sponsorId, { sponsorId, memberIds, status });
+    }
   }
 
   return [...bySponsor.values()];

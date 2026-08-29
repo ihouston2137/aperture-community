@@ -988,6 +988,15 @@ const SponsorshipCampaignSchema = new Schema<any>(
         _id: false,
         sponsorId: { type: String, required: true },
         memberIds: [{ type: String }],
+        /*
+         * Whether the conversation with this sponsor is still being worked.
+         *
+         * Not whether they have given, and not the campaign's own status: a
+         * sponsor can be closed having given nothing, because they said no.
+         * Anything unsaid is open, which is what every assignment made before
+         * this existed was.
+         */
+        status: { type: String, default: "open" },
       },
     ],
   },

@@ -16,6 +16,7 @@ import { generateThumbnail, storeUpload } from "@/lib/media-upload";
 import { requireSession } from "@/lib/session";
 import { sponsorshipAccess } from "@/lib/sponsorship-access";
 import {
+  assignmentStatus,
   normalizeContacts,
   normalizeLogos,
   uniqueIds,
@@ -70,7 +71,7 @@ export async function addCampaignSponsorAction(
 
   campaign.assignments = [
     ...(campaign.assignments ?? []),
-    { sponsorId, memberIds: [] },
+    { sponsorId, memberIds: [], status: "open" },
   ];
   await campaign.save();
 
@@ -121,7 +122,7 @@ export async function createCampaignSponsorAction(
   const created = await Sponsor.create({ name });
   campaign.assignments = [
     ...(campaign.assignments ?? []),
-    { sponsorId: String(created._id), memberIds: [] },
+    { sponsorId: String(created._id), memberIds: [], status: "open" },
   ];
   await campaign.save();
 
@@ -184,10 +185,16 @@ export async function setCampaignAssignedAction(
     }
   }
 
+  const status = assignmentStatus(formData.get("status"));
+
   const assignments = (campaign.assignments ?? []).map((entry: any) =>
     String(entry.sponsorId) === sponsorId
-      ? { sponsorId, memberIds }
-      : { sponsorId: String(entry.sponsorId), memberIds: (entry.memberIds ?? []).map(String) }
+      ? { sponsorId, memberIds, status }
+      : {
+          sponsorId: String(entry.sponsorId),
+          memberIds: (entry.memberIds ?? []).map(String),
+          status: assignmentStatus(entry.status),
+        }
   );
   campaign.assignments = assignments;
   await campaign.save();
