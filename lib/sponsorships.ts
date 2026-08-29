@@ -521,26 +521,56 @@ export type BreakdownRow = {
 };
 
 /**
+ * Divides an amount between however many lines it belongs to.
+ *
+ * Whole cents, with the remainder going to the first. Three lines sharing a
+ * dollar get 34, 33 and 33 rather than 33 each and a cent lost from the total
+ * — the same rule `splitCreditByMember` uses, and for the same reason: the
+ * parts of a breakdown have to come to the whole.
+ */
+function evenShares(cents: number, parts: number): number[] {
+  if (parts <= 1) return [cents];
+  const share = Math.floor(cents / parts);
+  const remainder = cents - share * parts;
+  return Array.from({ length: parts }, (_, index) =>
+    index < remainder ? share + 1 : share
+  );
+}
+
+/**
  * Splits a campaign's donations by whatever the caller names them.
  *
- * The labeller returns as many labels as the donation belongs under, which is
- * what lets a donation carrying two categories count under both. Returning
+ * The labeller returns as many labels as the donation belongs under. Returning
  * none puts it under the fallback, because a breakdown that quietly dropped
  * the uncategorised would not add up to what the campaign raised.
+ *
+ * What happens when a donation belongs under several is the caller's to
+ * decide, and the two answers are different questions. **Counted in full**
+ * asks "how much passed through this line" — a donation carrying two
+ * categories is wholly in both, and the lines deliberately over-total.
+ * **Split evenly** asks "how do these lines compare", which only means
+ * anything if the parts come to the whole.
  */
 export function breakdown(
   donations: DonationSummary[],
   labeller: (donation: DonationSummary) => string[],
-  fallback: string
+  fallback: string,
+  options: { split?: boolean } = {}
 ): BreakdownRow[] {
   const rows = new Map<string, BreakdownRow>();
 
   for (const donation of donations) {
-    // Cancelled never happened, here as everywhere.
+    // Cancelled and never received are nothings, here as everywhere.
     if (!countsTowardTotals(donation.status)) continue;
 
-    const labels = labeller(donation);
-    for (const label of labels.length > 0 ? labels : [fallback]) {
+    const named = labeller(donation);
+    const labels = named.length > 0 ? named : [fallback];
+    const shares = options.split
+      ? evenShares(donation.valueCents, labels.length)
+      : labels.map(() => donation.valueCents);
+
+    for (const [index, label] of labels.entries()) {
+      const cents = shares[index];
       const row = rows.get(label) ?? {
         label,
         monetaryCents: 0,
@@ -549,9 +579,11 @@ export function breakdown(
         count: 0,
       };
 
-      if (donation.kind === "in-kind") row.inKindCents += donation.valueCents;
-      else row.monetaryCents += donation.valueCents;
-      row.rankCents += donation.valueCents;
+      if (donation.kind === "in-kind") row.inKindCents += cents;
+      else row.monetaryCents += cents;
+      row.rankCents += cents;
+      // The donation touched this line whether or not the whole of it landed
+      // here, so the count is of donations rather than of shares.
       row.count += 1;
       rows.set(label, row);
     }

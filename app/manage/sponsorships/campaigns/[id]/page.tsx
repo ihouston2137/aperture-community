@@ -336,7 +336,7 @@ export default async function CampaignDashboard({
       ),
     },
     {
-      title: "Membership",
+      title: "Recognition",
       help: "The recognition level the sponsor is currently held at.",
       rows: breakdown(
         mine,
@@ -347,6 +347,32 @@ export default async function CampaignDashboard({
           return level ? [level.name] : [];
         },
         "Not recognised"
+      ),
+    },
+    {
+      title: "Membership",
+      help: "The membership levels held by the members credited with bringing each donation in. A donation credited across two levels is split evenly between them, so these lines come to the same whole as the others.",
+      rows: breakdown(
+        mine,
+        (donation) => {
+          if (donation.memberIds.length === 0) return ["Nobody credited"];
+
+          // Distinct levels, not one per member: two members of the same
+          // level who brought one donation in together are one line, not two.
+          const held = new Set<string>();
+          for (const memberId of donation.memberIds) {
+            const member = members.find((entry) => entry._id === memberId);
+            for (const levelId of member?.levelIds ?? []) {
+              const role = boardLevels.find((entry) => entry._id === levelId);
+              if (role) held.add(role.name);
+            }
+          }
+          return held.size > 0 ? [...held] : ["No membership level"];
+        },
+        "Nobody credited",
+        // Split, so the levels can be compared against each other and against
+        // the four breakdowns beside them.
+        { split: true }
       ),
     },
     {
