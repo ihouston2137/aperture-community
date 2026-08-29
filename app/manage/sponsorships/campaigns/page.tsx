@@ -45,8 +45,17 @@ export default async function ManagerCampaignsPage() {
     getCampaigns(),
     getSponsors(),
     getDonations(),
-    User.find({ isActive: { $ne: false } })
-      .select("_id firstName lastName name email roleIds")
+    /*
+     * Inactive accounts included.
+     *
+     * A campaign is a record of who looked after whom, and last year's
+     * campaign does not stop having had its people because they have since
+     * left. Filtering them out did two things wrong at once: an assignment
+     * already on file read as "somebody who has gone", and nobody could put a
+     * past member back on a past campaign to correct it.
+     */
+    User.find()
+      .select("_id firstName lastName name email roleIds isActive")
       .sort({ lastName: 1, firstName: 1, email: 1 })
       .lean<any[]>(),
     getRoleSummaries("community"),
@@ -64,7 +73,13 @@ export default async function ManagerCampaignsPage() {
       }
       return roles.some((role) => (user.roleIds ?? []).map(String).includes(role._id));
     })
-    .map((user) => ({ _id: String(user._id), name: fullName(user) }));
+    .map((user) => ({
+      _id: String(user._id),
+      name: fullName(user),
+      // Said in the picker, because naming somebody who has left is usually
+      // deliberate and occasionally a mistake.
+      title: user.isActive === false ? "inactive" : undefined,
+    }));
 
   const totals: CampaignTotalsMap = {};
   for (const [campaignId, entry] of totalsByCampaign(donations)) {
