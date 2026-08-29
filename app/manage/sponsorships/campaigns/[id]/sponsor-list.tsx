@@ -31,6 +31,14 @@ export type CampaignSponsorRow = {
   status: AssignmentStatus;
   givenCents: number;
   donationCount: number;
+  /**
+   * Why there is nothing to show, when there is nothing to show.
+   *
+   * A sponsor with no figure is not all one thing: one has not been asked yet,
+   * one said no, and one promised and never sent it. The list says which,
+   * because those three call for three different next moves.
+   */
+  nothingLabel: string;
   chips: SponsorChip[];
 };
 
@@ -187,7 +195,7 @@ export function SponsorList({
                     <strong>
                       {row.givenCents > 0
                         ? formatDollars(row.givenCents)
-                        : "Nothing yet"}
+                        : row.nothingLabel}
                     </strong>
                     {row.donationCount > 0 ? (
                       <span className="help-text">

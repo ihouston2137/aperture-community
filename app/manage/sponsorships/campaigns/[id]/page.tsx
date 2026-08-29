@@ -23,6 +23,7 @@ import {
 } from "@/lib/sponsorship-types";
 import {
   breakdown,
+  foldTail,
   getCampaigns,
   getDonations,
   getRecognitionLevels,
@@ -47,11 +48,17 @@ import { SponsorList, type CampaignSponsorRow } from "./sponsor-list";
  * hundred rows of donations and no way to see the shape of it.
  */
 /**
- * One slice of a campaign, as a short list.
+ * One slice of a campaign, as a share bar and the legend that names it.
  *
- * A bar per line, measured against the largest line rather than against a
- * target — there is no target here, and the bar says only "this one is bigger
- * than that one", which is the whole question a breakdown answers.
+ * A stacked bar because the question is part-to-whole — how the support this
+ * campaign has had divides up — and a bar answers that at a glance in a way a
+ * column of figures does not. Never a pie: the slices here are frequently a
+ * near-tie, and two arcs of similar size cannot be told apart by eye.
+ *
+ * The legend is not decoration. Several of the hues sit below three-to-one
+ * against this surface, which is allowed only where the reader is never asked
+ * to identify a slice by colour alone — so every slice is named and figured in
+ * ordinary text, and the colour only ties the line to the bar.
  */
 function Breakdown({
   title,
@@ -62,41 +69,64 @@ function Breakdown({
   help: string;
   rows: BreakdownRow[];
 }) {
-  const largest = rows.reduce((most, row) => Math.max(most, row.rankCents), 0);
+  // Six is where the colours stop being reliably distinguishable; the rest is
+  // added into one line rather than dropped.
+  const slices = foldTail(rows, 6);
+  const whole = slices.reduce((sum, row) => sum + row.rankCents, 0);
+  const share = (row: BreakdownRow) =>
+    whole > 0 ? Math.round((row.rankCents / whole) * 100) : 0;
 
   return (
     <section className="breakdown">
       <h3 className="member-card-subtitle">{title}</h3>
 
-      {rows.length === 0 ? (
+      {slices.length === 0 ? (
         <p className="help-text">Nothing recorded yet.</p>
       ) : (
-        <ul className="breakdown-rows">
-          {rows.map((row) => (
-            <li key={row.label} className="breakdown-row">
-              <span className="breakdown-label">{row.label}</span>
+        <>
+          <div
+            className="breakdown-bar"
+            role="img"
+            aria-label={slices
+              .map((row) => `${row.label}, ${share(row)} percent`)
+              .join("; ")}
+          >
+            {slices.map((row, index) => (
+              <span
+                key={row.label}
+                className="breakdown-slice"
+                style={{
+                  width: `${whole > 0 ? (row.rankCents / whole) * 100 : 0}%`,
+                  // In the order the slices are ranked, never cycled: a line's
+                  // colour is its place in this box and nothing else.
+                  background: `var(--series-${Math.min(index + 1, 6)})`,
+                }}
+              />
+            ))}
+          </div>
 
-              <span className="breakdown-figure">
-                {row.monetaryCents > 0 ? formatDollars(row.monetaryCents) : "—"}
-                {row.inKindCents > 0 ? (
-                  <span className="help-text">
-                    and {formatDollars(row.inKindCents)} in kind
-                  </span>
-                ) : null}
-              </span>
-
-              <span className="breakdown-bar" aria-hidden="true">
+          <ul className="breakdown-legend">
+            {slices.map((row, index) => (
+              <li key={row.label} className="breakdown-line">
                 <span
-                  style={{
-                    width: largest
-                      ? `${(row.rankCents / largest) * 100}%`
-                      : "0%",
-                  }}
+                  className="breakdown-swatch"
+                  style={{ background: `var(--series-${Math.min(index + 1, 6)})` }}
+                  aria-hidden="true"
                 />
-              </span>
-            </li>
-          ))}
-        </ul>
+                <span className="breakdown-name">{row.label}</span>
+                <span className="breakdown-value">
+                  {row.monetaryCents > 0 ? formatDollars(row.monetaryCents) : "—"}
+                  {row.inKindCents > 0 ? (
+                    <span className="help-text">
+                      and {formatDollars(row.inKindCents)} in kind
+                    </span>
+                  ) : null}
+                </span>
+                <span className="breakdown-share">{share(row)}%</span>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
 
       <p className="help-text">{help}</p>
@@ -200,12 +230,34 @@ export default async function CampaignDashboard({
       const given = mine.filter(
         (donation) => donation.sponsorId === assignment.sponsorId
       );
-      const givenCents = given
-        .filter((donation) => countsTowardTotals(donation.status))
-        .reduce((sum, donation) => sum + donation.valueCents, 0);
+      const counted = given.filter((donation) =>
+        countsTowardTotals(donation.status)
+      );
+      const givenCents = counted.reduce(
+        (sum, donation) => sum + donation.valueCents,
+        0
+      );
       const level = levels.find(
         (entry) => entry._id === sponsor?.recognitionLevelId
       );
+
+      /*
+       * What to say where a figure would go, when there is none.
+       *
+       * The most recent donation's status if there is one — "Cancelled" and
+       * "Never received" are facts worth reading off the list, and they are
+       * more particular than anything the assignment can say. Failing that,
+       * a closed assignment means they were asked and said no. Failing both,
+       * nobody has got to them yet.
+       */
+      const latest = [...given].sort((a, b) =>
+        b.date.localeCompare(a.date)
+      )[0];
+      const nothingLabel = latest
+        ? DONATION_STATUS_LABELS[latest.status]
+        : assignment.status === "closed"
+          ? "Declined"
+          : "Nothing yet";
 
       return {
         sponsorId: assignment.sponsorId,
@@ -218,7 +270,8 @@ export default async function CampaignDashboard({
         assignedNames: assignment.memberIds.map(memberName).join(", "),
         status: assignment.status,
         givenCents,
-        donationCount: given.length,
+        donationCount: counted.length,
+        nothingLabel,
         chips: sponsorChips(given),
       };
     })
@@ -232,6 +285,13 @@ export default async function CampaignDashboard({
    * The two lists are worked in different ways — one is what the campaign has
    * raised and who to thank for it, the other is who is still to be asked —
    * and reading them apart is most of why anybody opens this page.
+   */
+  /*
+   * Split on whether anything counted, not on whether anything was recorded.
+   *
+   * A donation cancelled or never received is a nothing, so the sponsor it
+   * belongs to is still to give — and putting them among the donors would
+   * show a line reading nought under a heading that says they gave.
    */
   const donating = onCampaign.filter((row) => row.donationCount > 0);
   const notYet = onCampaign
@@ -621,10 +681,11 @@ export default async function CampaignDashboard({
       <section className="member-card manager-card">
         <h2 className="member-card-title">Breakdowns</h2>
         <p className="help-text">
-          The same donations sliced four ways. Money and goods are kept apart in
-          the figures, as they are everywhere — a lent hall is not a cheque —
-          but a line is measured against the others on the two together, since
-          what is being asked is where the support came from.
+          The same donations sliced four ways, so the four come to the same
+          whole. Money and goods are kept apart in the figures, as they are
+          everywhere — a lent hall is not a cheque — while the bars measure the
+          two together, since what is being asked is where the support came
+          from.
         </p>
 
         <div className="breakdown-grid">

@@ -561,3 +561,29 @@ export function breakdown(
     (a, b) => b.rankCents - a.rankCents || a.label.localeCompare(b.label)
   );
 }
+
+/**
+ * Keeps a breakdown to a readable number of lines.
+ *
+ * Past a handful, more slices stop telling anybody anything: the colours run
+ * out of separation and the tail is a row of slivers. The ones that did not
+ * make the cut are added into one line rather than dropped, so the parts still
+ * come to the whole.
+ */
+export function foldTail(rows: BreakdownRow[], keep: number): BreakdownRow[] {
+  if (rows.length <= keep) return rows;
+
+  const head = rows.slice(0, keep - 1);
+  const tail = rows.slice(keep - 1);
+
+  return [
+    ...head,
+    {
+      label: `${tail.length} more`,
+      monetaryCents: tail.reduce((sum, row) => sum + row.monetaryCents, 0),
+      inKindCents: tail.reduce((sum, row) => sum + row.inKindCents, 0),
+      rankCents: tail.reduce((sum, row) => sum + row.rankCents, 0),
+      count: tail.reduce((sum, row) => sum + row.count, 0),
+    },
+  ];
+}

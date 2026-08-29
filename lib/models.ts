@@ -1020,7 +1020,7 @@ const DonationSchema = new Schema<any>(
     campaignId: { type: String, required: true, index: true },
     sponsorId: { type: String, required: true, index: true },
     kind: { type: String, default: "monetary" },
-    /** proposed, in-progress, complete or cancelled. */
+    /** proposed, in-progress, complete, cancelled or never-received. */
     status: { type: String, default: "proposed" },
     date: { type: String, default: "" },
     valueCents: { type: Number, default: 0 },

@@ -7419,6 +7419,14 @@ html:has(.admin-shell) body::-webkit-scrollbar {
   --tone: #e2585d;
 }
 
+/* Promised and never came. A nothing like a cancellation, and told apart from
+   it because whose doing it was is the difference: one was called off, the
+   other simply never arrived. Duller than the red beside it, since it is the
+   quieter failure. */
+.tone-never-received {
+  --tone: #a85a63;
+}
+
 /* An in-kind donation is not money and never becomes money, so it is read only as
    arrived or not — grey rather than a colour that would put it on the same
    footing as a cheque. */
@@ -8213,20 +8221,40 @@ html:has(.admin-shell) body::-webkit-scrollbar {
 
 /* ----------------------------------------------------- Campaign breakdowns
 
-   The same donations sliced four ways, two boxes abreast where there is room
-   and one where there is not. */
+   Four part-to-whole readings of the same donations: a share bar and the
+   legend that names it. */
+
+/*
+ * The categorical slots, in fixed order and never cycled.
+ *
+ * Identity only — slot three means nothing but "the third largest line in this
+ * box", and a line's colour must never carry a meaning the status tones carry.
+ * Validated as a set against this surface: adjacent pairs clear the
+ * colour-blind separation floor, and the four that fall below three-to-one
+ * contrast are legal only because every slice is also named and figured in
+ * text beside the bar.
+ */
+:root {
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+  --series-5: #e87ba4;
+  --series-6: #008300;
+}
+
 .breakdown-grid {
   display: grid;
-  /* Two on a desktop or a tablet; the minimum is what forces the drop to one
-     column on a phone, rather than a breakpoint that has to guess at widths. */
-  grid-template-columns: repeat(auto-fit, minmax(min(22rem, 100%), 1fr));
+  /* Two abreast on a desktop or a tablet; the minimum is what drops it to one
+     column on a phone, rather than a breakpoint guessing at widths. */
+  grid-template-columns: repeat(auto-fit, minmax(min(20rem, 100%), 1fr));
   gap: 1rem;
   margin-top: 1rem;
 }
 
 .breakdown {
-  padding: 0.9rem;
-  border-radius: 0.5rem;
+  padding: 1rem;
+  border-radius: 0.75rem;
   border: 1px solid rgba(128, 128, 128, 0.28);
   background: rgba(128, 128, 128, 0.05);
 }
@@ -8235,60 +8263,84 @@ html:has(.admin-shell) body::-webkit-scrollbar {
   margin-top: 0;
 }
 
-.breakdown .help-text {
-  margin-top: 0.6rem;
+/* The bar. Its two outer ends are the data ends and are rounded; the joins
+   between slices are separated by a gap of the surface rather than by a
+   stroke, which would add ink that is not data. */
+.breakdown-bar {
+  display: flex;
+  gap: 2px;
+  height: 0.875rem;
+  margin-bottom: 0.9rem;
+  border-radius: 4px;
 }
 
-.breakdown-rows {
+.breakdown-slice {
+  display: block;
+  min-width: 2px;
+}
+
+.breakdown-slice:first-child {
+  border-radius: 4px 0 0 4px;
+}
+
+.breakdown-slice:last-child {
+  border-radius: 0 4px 4px 0;
+}
+
+.breakdown-slice:only-child {
+  border-radius: 4px;
+}
+
+/* The legend, which is also the table: every slice named and figured, so the
+   bar is never the only way to read one. */
+.breakdown-legend {
   list-style: none;
   margin: 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-}
-
-/* Label and figure on one line, the bar under them across the full width —
-   a bar squeezed into the space left over says less the more lines there are. */
-.breakdown-row {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 0.15rem 0.75rem;
+  gap: 0.4rem;
   font-size: 0.9375rem;
 }
 
-.breakdown-label {
+.breakdown-line {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  align-items: baseline;
+  gap: 0.5rem 0.6rem;
+}
+
+.breakdown-swatch {
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: 2px;
+  align-self: center;
+}
+
+.breakdown-name {
   min-width: 0;
   overflow-wrap: anywhere;
 }
 
-.breakdown-figure {
+/* The figures wear the text colour, never the slice colour — the swatch beside
+   them is what carries identity. */
+.breakdown-value {
   text-align: right;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
-.breakdown-figure .help-text {
+.breakdown-value .help-text {
   display: block;
   margin: 0;
   font-size: 0.75rem;
 }
 
-.breakdown-bar {
-  grid-column: 1 / -1;
-  display: block;
-  height: 0.3rem;
-  border-radius: 999px;
-  background: rgba(128, 128, 128, 0.18);
-  overflow: hidden;
-}
-
-.breakdown-bar > span {
-  display: block;
-  height: 100%;
-  border-radius: 999px;
-  background: currentColor;
-  opacity: 0.45;
+.breakdown-share {
+  min-width: 2.5rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.7;
 }
 
 /* ------------------------------------------------- Campaign sponsor lists

@@ -393,6 +393,7 @@ export const DONATION_STATUSES = [
   "in-progress",
   "complete",
   "cancelled",
+  "never-received",
 ] as const;
 
 export type DonationStatus = (typeof DONATION_STATUSES)[number];
@@ -402,6 +403,7 @@ export const DONATION_STATUS_LABELS: Record<DonationStatus, string> = {
   "in-progress": "In progress",
   complete: "Complete",
   cancelled: "Cancelled",
+  "never-received": "Never received",
 };
 
 export function donationStatus(value: unknown): DonationStatus {
@@ -410,9 +412,17 @@ export function donationStatus(value: unknown): DonationStatus {
     : "proposed";
 }
 
-/** A cancelled donation never happened, so it is left out of every total. */
+/**
+ * Whether a donation happened at all.
+ *
+ * Cancelled and never received are both nothings, told apart by whose doing it
+ * was: a cancelled donation was called off, and one never received was
+ * promised and simply never came. Both are left out of every total, and the
+ * distinction is kept because the second is a fact about a sponsor that the
+ * first is not.
+ */
 export function countsTowardTotals(status: DonationStatus): boolean {
-  return status !== "cancelled";
+  return status !== "cancelled" && status !== "never-received";
 }
 
 /** Money in hand, as opposed to a donation still being worked on. */
@@ -445,6 +455,7 @@ export const DONATION_STATUS_ORDER: DonationStatus[] = [
   "in-progress",
   "proposed",
   "cancelled",
+  "never-received",
 ];
 
 /** The class the colour hangs off. The status is the name; CSS holds the value. */
@@ -497,7 +508,7 @@ export function donationBreakdown(
  * Money is read by status, because the difference between a cheque banked and a
  * cheque promised is the whole question. An in-kind donation is not money and never
  * will be, so it is read only as arrived or not: dark for what has come, light
- * for what is still coming. A cancelled donation stays red either way.
+ * for what is still coming. One that did not happen stays red either way.
  */
 export type SponsorChip = {
   key: string;
@@ -513,7 +524,7 @@ export function sponsorChips(
   const monetary = new Map<DonationStatus, number>();
   let inKindComplete = 0;
   let inKindPending = 0;
-  let inKindCancelled = 0;
+  let inKindMissing = 0;
 
   for (const donation of donations) {
     if (!donation.valueCents) continue;
@@ -525,8 +536,8 @@ export function sponsorChips(
       );
     } else if (donation.status === "complete") {
       inKindComplete += donation.valueCents;
-    } else if (donation.status === "cancelled") {
-      inKindCancelled += donation.valueCents;
+    } else if (!countsTowardTotals(donation.status)) {
+      inKindMissing += donation.valueCents;
     } else {
       // Proposed and in progress are one thing here: both mean not yet given.
       inKindPending += donation.valueCents;
@@ -563,12 +574,14 @@ export function sponsorChips(
       cents: inKindPending,
     });
   }
-  if (inKindCancelled > 0) {
+  if (inKindMissing > 0) {
     chips.push({
-      key: "in-kind-cancelled",
+      key: "in-kind-missing",
       tone: statusTone("cancelled"),
-      label: "In-kind cancelled",
-      cents: inKindCancelled,
+      // Cancelled and never received are one line here: an in-kind donation is
+      // read only as arrived or not, and neither of these arrived.
+      label: "In-kind, not given",
+      cents: inKindMissing,
     });
   }
 
@@ -599,7 +612,7 @@ export function contributionsByCampaign(
   const byCampaign = new Map<string, typeof donations>();
 
   for (const donation of donations) {
-    if (donation.status === "cancelled" || !donation.valueCents) continue;
+    if (!countsTowardTotals(donation.status) || !donation.valueCents) continue;
     const held = byCampaign.get(donation.campaignId) ?? [];
     held.push(donation);
     byCampaign.set(donation.campaignId, held);
@@ -744,7 +757,7 @@ export function monetaryProgress(
 
   for (const donation of donations) {
     if (donation.kind !== "monetary") continue;
-    if (donation.status === "cancelled") continue;
+    if (!countsTowardTotals(donation.status)) continue;
     // Recorded, and deliberately left out of the goal: see `isCounted`. Older
     // records predate the flag and are counted, as they always were.
     if (donation.isCounted === false) {
@@ -778,7 +791,7 @@ export function monetaryProgress(
   let totalCents = 0;
 
   for (const status of DONATION_STATUS_ORDER) {
-    if (status === "cancelled") continue;
+    if (!countsTowardTotals(status)) continue;
     const cents = byStatus.get(status) ?? 0;
     if (cents <= 0) continue;
 
@@ -907,7 +920,7 @@ export function inKindTotals(
 
   for (const donation of donations) {
     if (donation.kind !== "in-kind") continue;
-    if (donation.status === "cancelled") continue;
+    if (!countsTowardTotals(donation.status)) continue;
 
     if (donation.status === "complete") completeCents += donation.valueCents;
     else pendingCents += donation.valueCents;

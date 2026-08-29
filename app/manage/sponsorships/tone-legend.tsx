@@ -48,7 +48,7 @@ export function ToneLegend() {
           </li>
           <li className="tone-cancelled">
             <span className="tone-dot" aria-hidden="true" />
-            Cancelled
+            Not given
           </li>
         </ul>
       </div>
