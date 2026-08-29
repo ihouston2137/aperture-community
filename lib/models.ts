@@ -989,12 +989,15 @@ const SponsorshipCampaignSchema = new Schema<any>(
         sponsorId: { type: String, required: true },
         memberIds: [{ type: String }],
         /*
-         * Whether the conversation with this sponsor is still being worked.
+         * Whether the conversation with this sponsor is still being worked,
+         * and how it finished when it has: `open`, `closed-no-response`,
+         * `closed-declined` or `closed-incomplete`.
          *
          * Not whether they have given, and not the campaign's own status: a
          * sponsor can be closed having given nothing, because they said no.
          * Anything unsaid is open, which is what every assignment made before
-         * this existed was.
+         * this existed was; a bare `closed` predates the reasons and reads as
+         * declined, which is the word those screens showed for it.
          */
         status: { type: String, default: "open" },
       },

@@ -6,6 +6,7 @@ import { useState } from "react";
 import {
   ASSIGNMENT_STATUS_LABELS,
   formatDollars,
+  isClosedAssignment,
   type AssignmentStatus,
   type RecognitionLevelSummary,
   type SponsorChip,
@@ -152,9 +153,11 @@ export function SponsorList({
               {rows.map((row) => (
                 <li
                   key={row.sponsorId}
+                  /* The colour says open or finished; the badge beside the
+                     figure says how it finished. */
                   className={`${
                     view === "cards" ? "sponsor-card" : "sponsor-line"
-                  } is-${row.status}`}
+                  } ${isClosedAssignment(row.status) ? "is-closed" : "is-open"}`}
                 >
                   <Link
                     href={`/manage/sponsorships/campaigns/${campaignId}/sponsors/${row.sponsorId}`}
@@ -203,7 +206,11 @@ export function SponsorList({
                         {row.donationCount === 1 ? "" : "s"}
                       </span>
                     ) : null}
-                    <span className={`badge assignment-${row.status}`}>
+                    <span
+                      className={`badge assignment-${
+                        isClosedAssignment(row.status) ? "closed" : "open"
+                      }`}
+                    >
                       {ASSIGNMENT_STATUS_LABELS[row.status]}
                     </span>
                   </div>

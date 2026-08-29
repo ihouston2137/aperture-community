@@ -11,6 +11,7 @@ import { sponsorshipAccess } from "@/lib/sponsorship-access";
 import {
   ASSIGNMENT_STATUS_LABELS,
   DONATION_KIND_LABELS,
+  isClosedAssignment,
   DONATION_STATUS_LABELS,
   SPONSOR_TYPE_LABELS,
   contributionsByCampaign,
@@ -30,7 +31,10 @@ import {
 } from "@/lib/sponsorships";
 
 import { ContactButton, DeleteContactButton } from "../../../../contact-controls";
-import { DonationButton } from "../../../../record-buttons";
+import {
+  DonationButton,
+  SponsorRecordButton,
+} from "../../../../record-buttons";
 import { ToneLegend } from "../../../../tone-legend";
 import {
   ChangeAssignedButton,
@@ -177,6 +181,16 @@ export default async function CampaignSponsorDashboard({
             logos={sponsor.logos}
             canEdit={access.canEditSponsors}
           />
+
+          {/* The whole record, for somebody trusted with the programme rather
+              than with this campaign. */}
+          {access.canManageSetup ? (
+            <SponsorRecordButton
+              sponsor={sponsor}
+              levels={levels}
+              categories={categories}
+            />
+          ) : null}
         </span>
       </header>
 
@@ -200,7 +214,11 @@ export default async function CampaignSponsorDashboard({
           <dt>On this campaign</dt>
           <dd className="sponsor-row-value">
             {assignment ? (
-              <span className={`badge assignment-${assignment.status}`}>
+              <span
+                className={`badge assignment-${
+                  isClosedAssignment(assignment.status) ? "closed" : "open"
+                }`}
+              >
                 {ASSIGNMENT_STATUS_LABELS[assignment.status]}
               </span>
             ) : (

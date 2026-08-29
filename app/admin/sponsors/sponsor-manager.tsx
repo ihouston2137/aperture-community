@@ -266,8 +266,14 @@ export function SponsorManager({
   );
 }
 
-/** Add, edit or delete one sponsor. */
-function SponsorDialog({
+/**
+ * Add, edit or delete one sponsor.
+ *
+ * Exported so a sponsor's own page can open it against that sponsor without a
+ * second editor being written for the purpose — the same arrangement the
+ * campaign and donation dialogs are under.
+ */
+export function SponsorDialog({
   sponsor,
   levels,
   categories,

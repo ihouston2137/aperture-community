@@ -12,10 +12,13 @@ import {
   DonationDialog,
   type CampaignOption,
 } from "@/app/admin/donations/donation-manager";
+import { SponsorDialog } from "@/app/admin/sponsors/sponsor-manager";
 import type {
   CampaignSummary,
   DonationSummary,
+  RecognitionLevelSummary,
   SponsorCategorySummary,
+  SponsorSummary,
 } from "@/lib/sponsorship-types";
 
 import { IconButton } from "./sponsor-controls";
@@ -124,6 +127,53 @@ export function DonationButton({
           categories={categories}
           defaultSponsorId={defaultSponsorId}
           defaultCampaignId={defaultCampaignId}
+          onClose={() => setOpen(false)}
+          onSaved={() => {
+            setOpen(false);
+            router.refresh();
+          }}
+        />
+      ) : null}
+    </>
+  );
+}
+
+/**
+ * The whole of a sponsor's record, from the sponsor's own page.
+ *
+ * Everything else on that page changes one thing — the level, who looks after
+ * them, their logos — because that is what somebody working a campaign does.
+ * Changing the record itself is a different job, and the editor for it already
+ * exists; this only puts a door to it where the record is being read.
+ *
+ * Offered on the whole-programme permission rather than on the one that edits
+ * sponsors, because that is what the action behind the dialog asks for: a
+ * button that opened onto a refusal would be worse than no button.
+ */
+export function SponsorRecordButton({
+  sponsor,
+  levels,
+  categories,
+}: {
+  sponsor: SponsorSummary;
+  levels: RecognitionLevelSummary[];
+  categories: SponsorCategorySummary[];
+}) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      <IconButton
+        label={`Edit ${sponsor.name}'s record`}
+        onClick={() => setOpen(true)}
+      />
+
+      {open ? (
+        <SponsorDialog
+          sponsor={sponsor}
+          levels={levels}
+          categories={categories}
           onClose={() => setOpen(false)}
           onSaved={() => {
             setOpen(false);

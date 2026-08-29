@@ -292,19 +292,52 @@ export function campaignStatus(value: unknown): CampaignStatus {
  * is a second ask outstanding, and can be closed having given nothing at all
  * because they said no. It is the state of the conversation.
  */
-export const ASSIGNMENT_STATUSES = ["open", "closed"] as const;
+export const ASSIGNMENT_STATUSES = [
+  "open",
+  "closed-no-response",
+  "closed-declined",
+  "closed-incomplete",
+] as const;
 
 export type AssignmentStatus = (typeof ASSIGNMENT_STATUSES)[number];
 
 export const ASSIGNMENT_STATUS_LABELS: Record<AssignmentStatus, string> = {
   open: "Open",
-  closed: "Closed",
+  "closed-no-response": "Closed - No Response",
+  "closed-declined": "Closed - Declined",
+  "closed-incomplete": "Closed - Incomplete",
+};
+
+/**
+ * How a closed assignment reads where the word "closed" is already implied.
+ *
+ * On a list of sponsors who have given nothing, every line is closed or still
+ * open — repeating "Closed" on each of them says nothing and crowds out the
+ * part that does.
+ */
+export const ASSIGNMENT_REASON_LABELS: Record<AssignmentStatus, string> = {
+  open: "",
+  "closed-no-response": "No response",
+  "closed-declined": "Declined",
+  "closed-incomplete": "Incomplete",
 };
 
 export function assignmentStatus(value: unknown): AssignmentStatus {
-  // Anything unsaid is open: an assignment nobody has closed is one still
-  // being worked, and every assignment made before this existed was.
-  return value === "closed" ? "closed" : "open";
+  // Assignments closed before the reasons existed said only "closed", and the
+  // one word the screens then showed for them was "Declined" — so that is
+  // what they still mean rather than a reason nobody chose.
+  if (value === "closed") return "closed-declined";
+
+  return ASSIGNMENT_STATUSES.includes(value as AssignmentStatus)
+    ? (value as AssignmentStatus)
+    // Anything unsaid is open: an assignment nobody has closed is one still
+    // being worked, and every assignment made before this existed was.
+    : "open";
+}
+
+/** Finished, whatever the reason. What the colour on a row is decided by. */
+export function isClosedAssignment(status: AssignmentStatus): boolean {
+  return status !== "open";
 }
 
 export type CampaignAssignment = {

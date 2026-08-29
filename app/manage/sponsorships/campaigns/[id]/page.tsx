@@ -9,8 +9,10 @@ import { User } from "@/lib/models";
 import { getSession } from "@/lib/session";
 import { sponsorshipAccess } from "@/lib/sponsorship-access";
 import {
+  ASSIGNMENT_REASON_LABELS,
   DONATION_KIND_LABELS,
   DONATION_STATUS_LABELS,
+  isClosedAssignment,
   dateRangeLabel,
   countsTowardTotals,
   formatDollars,
@@ -245,9 +247,9 @@ export default async function CampaignDashboard({
        * What to say where a figure would go, when there is none.
        *
        * The most recent donation's status if there is one — "Cancelled" and
-       * "Never received" are facts worth reading off the list, and they are
-       * more particular than anything the assignment can say. Failing that,
-       * a closed assignment means they were asked and said no. Failing both,
+       * "Never received" are facts about the money, and they say more than the
+       * state of the conversation can. Failing that, why the conversation was
+       * closed: no response, declined, or left incomplete. Failing both,
        * nobody has got to them yet.
        */
       const latest = [...given].sort((a, b) =>
@@ -255,8 +257,8 @@ export default async function CampaignDashboard({
       )[0];
       const nothingLabel = latest
         ? DONATION_STATUS_LABELS[latest.status]
-        : assignment.status === "closed"
-          ? "Declined"
+        : isClosedAssignment(assignment.status)
+          ? ASSIGNMENT_REASON_LABELS[assignment.status]
           : "Nothing yet";
 
       return {

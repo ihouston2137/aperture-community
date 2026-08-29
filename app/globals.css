@@ -8243,13 +8243,27 @@ html:has(.admin-shell) body::-webkit-scrollbar {
   --series-6: #008300;
 }
 
+/* One column on a phone, two everywhere else — stated rather than left to
+   `auto-fit`, which fitted three across a wide desktop and made each bar too
+   short to read. `minmax(0, ...)` so a long category name cannot push a
+   column past its share. */
 .breakdown-grid {
   display: grid;
-  /* Two abreast on a desktop or a tablet; the minimum is what drops it to one
-     column on a phone, rather than a breakpoint guessing at widths. */
-  grid-template-columns: repeat(auto-fit, minmax(min(20rem, 100%), 1fr));
+  grid-template-columns: 1fr;
   gap: 1rem;
   margin-top: 1rem;
+}
+
+@media (min-width: 40rem) {
+  .breakdown-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* An odd number of boxes leaves the last one alone on its row; it takes the
+     whole width rather than sitting beside a hole. */
+  .breakdown-grid > :last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
 }
 
 .breakdown {
