@@ -32,8 +32,10 @@ import {
   type FormBlock,
   type FormBlockType,
   type FormSettings,
+  type OptionLayout,
 } from "@/lib/form-layout";
 import { NEW_CONTAINER_PADDING, type PageBlock, type PageRow } from "@/lib/page-layout";
+import type { StyleValues } from "@/lib/style-values";
 import {
   CONTENT_WIDTHS,
   CONTENT_WIDTH_LABELS,
@@ -93,7 +95,7 @@ const PALETTE: PaletteItem[] = FORM_BLOCK_TYPES.map((type) => ({
   group: isFieldBlock(type) ? "Form fields" : "Page blocks",
 }));
 
-/** The form-wide style slots, all edited through the same popup. */
+/** The form-wide style slots, all edited in the settings column. */
 type GlobalStyleKey =
   | "formStyle"
   | "successStyle"
@@ -103,34 +105,38 @@ type GlobalStyleKey =
   | "helpStyle";
 
 const GLOBAL_STYLE_TITLES: Record<GlobalStyleKey, string> = {
-  formStyle: "Form container style",
-  successStyle: "Thank-you message style",
-  labelStyle: "Label style",
-  fieldStyle: "Field style",
-  placeholderStyle: "Placeholder style",
-  helpStyle: "Help text style",
+  formStyle: "Form container",
+  successStyle: "Thank-you message",
+  labelStyle: "Labels",
+  fieldStyle: "Fields",
+  placeholderStyle: "Placeholder text",
+  helpStyle: "Help text",
 };
-
-/**
- * Which blocks carry a label and a control to dress apart.
- *
- * A submit button is a field block by type only: it has no label of its own,
- * and its one style is the button. A hidden field draws nothing at all.
- */
-function dressesLabelAndField(type: FormBlockType): boolean {
-  return isFieldBlock(type) && type !== "submit" && type !== "hidden";
-}
 
 /**
  * One folded set of style controls.
  *
- * `details` needs no state to fold, and both sets closed by default keeps the
- * settings below them reachable without scrolling past two full panels.
+ * A full panel of controls per slot, and six slots, so they fold — all six
+ * open would be several screens deep and the canvas would be off the bottom of
+ * the page, which is the one thing these settings need to be read against.
+ * `details` folds without state.
  */
-function StyleFold({ title, children }: { title: string; children: React.ReactNode }) {
+function StyleFold({
+  title,
+  summary,
+  children,
+}: {
+  title: string;
+  /** What the slot is set to now, so a fold says something while closed. */
+  summary: string;
+  children: React.ReactNode;
+}) {
   return (
     <details className="inspector-fold is-top">
-      <summary>{title}</summary>
+      <summary>
+        {title}
+        <span className="help-text">{summary}</span>
+      </summary>
       <div className="inspector-fold-body">{children}</div>
     </details>
   );
@@ -192,24 +198,55 @@ export function FormBuilder({
   const [slug, setSlug] = useState(form.slug);
   const [status, setStatus] = useState(form.status);
   const [settings, setSettings] = useState<FormSettings>(form.settings);
-  /**
-   * The form's own label and field styles, edited through the same popup a
-   * block uses. Held apart from `styleTarget` because these write to the form's
-   * settings rather than to a block.
-   */
-  const [globalTarget, setGlobalTarget] = useState<GlobalStyleKey | null>(null);
-  const globalSlot = globalTarget ? settings[globalTarget] : null;
+  const [styleTarget, setStyleTarget] = useState<FormBlock | null>(null);
+  const [applyStyle, setApplyStyle] = useState<((patch: Partial<PageBlock>) => void) | null>(
+    null
+  );
+
   const formStyled = styleSlotProps(settings.formStyle);
 
-  /** A named style, or the local values, for one of the form-wide slots. */
-  const globalButton = (target: GlobalStyleKey, label: string) => (
-    <div className="styled-toggle">
-      <span style={{ flex: 1 }}>{label}</span>
-      <button type="button" className="btn btn-sm" onClick={() => setGlobalTarget(target)}>
-        {settings[target].styleSlug ? `Style: ${settings[target].styleSlug}` : "Style…"}
-      </button>
-    </div>
-  );
+  /**
+   * One of the form's own style slots, edited in the settings column.
+   *
+   * In the column rather than a popup because these dress the whole form at
+   * once: a label colour is a decision about every label on the canvas, and
+   * judging it means seeing them all change as the value does. A popup covers
+   * the thing being judged.
+   */
+  const globalStyle = (target: GlobalStyleKey) => {
+    const slot = settings[target];
+    const write = (styleSlug: string, style: StyleValues) =>
+      setSettings((current) => ({
+        ...current,
+        [target]: { styleSlug, style: styleSlug ? {} : style },
+      }));
+
+    return (
+      <StyleFold
+        key={target}
+        title={GLOBAL_STYLE_TITLES[target]}
+        summary={
+          slot.styleSlug
+            ? slot.styleSlug
+            : Object.keys(slot.style ?? {}).length > 0
+              ? "set"
+              : "unset"
+        }
+      >
+        <InlineStyleEditor
+          values={slot.style}
+          styleSlug={slot.styleSlug}
+          fonts={sources.fonts}
+          savedStyles={sources.styles}
+          // Placeholder text is reached through a `::placeholder` rule, which
+          // a saved style's class cannot cross into — so that one slot offers
+          // its values only, rather than a choice that would do nothing.
+          showSavedStyles={target !== "placeholderStyle"}
+          onChange={({ values, styleSlug }) => write(styleSlug, values)}
+        />
+      </StyleFold>
+    );
+  };
 
   return (
     <>
@@ -242,7 +279,7 @@ export function FormBuilder({
               }))}
               onChange={(pageWidth) => setSettings((current) => ({ ...current, pageWidth }))}
             />
-            {globalButton("formStyle", "Form container")}
+            {globalStyle("formStyle")}
 
             <h4 className="inspector-title">After sending</h4>
             <div className="field">
@@ -258,7 +295,7 @@ export function FormBuilder({
                 }
               />
             </div>
-            {globalButton("successStyle", "Message")}
+            {globalStyle("successStyle")}
             <p className="help-text" style={{ marginTop: 0 }}>
               Shown in place of the form once it has been sent. Ignored when a
               redirect is set.
@@ -269,14 +306,13 @@ export function FormBuilder({
               Applied to every field. A block&rsquo;s own style is laid over
               these, so one field can still depart from the rest.
             </p>
-            {globalButton("labelStyle", "Labels")}
-            {globalButton("fieldStyle", "Fields")}
-            {globalButton("placeholderStyle", "Placeholder text")}
-            {globalButton("helpStyle", "Help text")}
+            {globalStyle("labelStyle")}
+            {globalStyle("fieldStyle")}
+            {globalStyle("placeholderStyle")}
+            {globalStyle("helpStyle")}
             <p className="help-text">
-              Placeholder text is reached through a CSS rule rather than the
-              element itself, so a saved named style cannot drive it — set its
-              values in the popup instead.
+              Every change here shows on the canvas as you make it, across all
+              the fields at once.
             </p>
           </div>
         }
@@ -317,67 +353,19 @@ export function FormBuilder({
 
           return (
             <>
-              {formBlock.type === "hidden" ? null : (
-                <div className="inspector-section">
-                  <h4 className="inspector-title">Style</h4>
-
-                  {dressesLabelAndField(formBlock.type) ? (
-                    <>
-                      {/* Two folds rather than two stacked panels: each is a
-                          full set of style controls, and both open at once
-                          would bury the settings below them. */}
-                      <StyleFold title="Label">
-                        <InlineStyleEditor
-                          values={formBlock.labelStyle}
-                          styleSlug={formBlock.labelStyleSlug ?? ""}
-                          fonts={sources.fonts}
-                          savedStyles={sources.styles}
-                          onChange={({ values, styleSlug }) =>
-                            patch({
-                              labelStyleSlug: styleSlug,
-                              labelStyle: styleSlug ? undefined : values,
-                            })
-                          }
-                        />
-                      </StyleFold>
-
-                      <StyleFold title="Field">
-                        <InlineStyleEditor
-                          values={formBlock.fieldStyle}
-                          styleSlug={formBlock.fieldStyleSlug ?? ""}
-                          fonts={sources.fonts}
-                          savedStyles={sources.styles}
-                          onChange={({ values, styleSlug }) =>
-                            patch({
-                              fieldStyleSlug: styleSlug,
-                              fieldStyle: styleSlug ? undefined : values,
-                            })
-                          }
-                        />
-                      </StyleFold>
-
-                      <p className="help-text">
-                        Laid over the form-wide label and field styles, so this
-                        one field can depart from the rest without changing
-                        them.
-                      </p>
-                    </>
-                  ) : (
-                    <InlineStyleEditor
-                      values={formBlock.textStyle}
-                      styleSlug={formBlock.styleSlug ?? ""}
-                      fonts={sources.fonts}
-                      savedStyles={sources.styles}
-                      onChange={({ values, styleSlug }) =>
-                        patch({
-                          styleSlug,
-                          textStyle: styleSlug ? undefined : values,
-                        })
-                      }
-                    />
-                  )}
-                </div>
-              )}
+              <div className="inspector-section">
+                <h4 className="inspector-title">Style</h4>
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  onClick={() => {
+                    setStyleTarget(formBlock);
+                    setApplyStyle(() => update);
+                  }}
+                >
+                  Edit style…
+                </button>
+              </div>
 
               <div className="inspector-section">
                 <h4 className="inspector-title">Settings</h4>
@@ -489,6 +477,20 @@ export function FormBuilder({
                       value={Boolean(formBlock.required)}
                       onChange={(value) => patch({ required: value })}
                     />
+
+                    {formBlock.type === "radio" ? (
+                      <SelectField
+                        label="Options laid out"
+                        value={formBlock.optionLayout ?? "column"}
+                        options={[
+                          { value: "column", label: "Down the page" },
+                          { value: "row", label: "Along the line" },
+                        ]}
+                        onChange={(value) =>
+                          patch({ optionLayout: value as OptionLayout })
+                        }
+                      />
+                    ) : null}
 
                     {formBlock.type === "select" || formBlock.type === "radio" ? (
                       <div className="field">
@@ -603,23 +605,18 @@ export function FormBuilder({
       />
 
       <StyleEditor
-        open={Boolean(globalTarget)}
-        title={globalTarget ? GLOBAL_STYLE_TITLES[globalTarget] : "Style"}
+        open={Boolean(styleTarget)}
+        title="Block style"
         fonts={sources.fonts}
         savedStyles={sources.styles}
-        initial={{ values: globalSlot?.style, styleSlug: globalSlot?.styleSlug }}
-        onClose={() => setGlobalTarget(null)}
+        initial={{ values: styleTarget?.textStyle, styleSlug: styleTarget?.styleSlug }}
+        onClose={() => setStyleTarget(null)}
         onApply={(result) => {
-          if (globalTarget) {
-            setSettings((current) => ({
-              ...current,
-              [globalTarget]: {
-                styleSlug: result.styleSlug,
-                style: result.styleSlug ? {} : result.values,
-              },
-            }));
-          }
-          setGlobalTarget(null);
+          applyStyle?.({
+            styleSlug: result.styleSlug,
+            textStyle: result.styleSlug ? undefined : result.values,
+          });
+          setStyleTarget(null);
         }}
       />
     </>

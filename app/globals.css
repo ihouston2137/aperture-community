@@ -1217,6 +1217,24 @@ input, select, textarea {
   font-size: 0.9375rem;
 }
 
+/* A set of choices, down the page or along the line. Wrapping either way: a
+   row of six options on a phone has to go somewhere, and running off the side
+   is the one place it must not go. */
+.checkbox-rows {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1rem;
+}
+
+.checkbox-rows.is-column {
+  flex-direction: column;
+}
+
+.checkbox-rows.is-row {
+  flex-direction: row;
+  align-items: center;
+}
+
 .help-text {
   font-size: 0.75rem;
   color: var(--admin-muted);
@@ -4310,6 +4328,21 @@ ol.doc-list ol.doc-list ol.doc-list {
 
 .inspector-fold > summary:hover {
   color: var(--admin-accent);
+}
+
+/* A fold whose summary also says what the slot is set to, so a column of six
+   closed folds still reads. The caret is a ::before on the summary, so the
+   flex row starts after it and the value is pushed to the far edge. */
+.inspector-fold > summary > .help-text {
+  float: right;
+  margin: 0;
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 400;
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .inspector-fold-body {

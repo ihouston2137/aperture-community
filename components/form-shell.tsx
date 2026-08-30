@@ -198,29 +198,31 @@ export function FormFieldView({
   /*
    * The form's own label and field styles, with the block's laid over them —
    * so a form reads as one thing while a single field can still depart from it.
-   *
-   * The label and the control are dressed from separate slots at both levels:
-   * a small grey caption over a large bordered input is the ordinary case, and
-   * one style applied to both cannot say it.
    */
-  const ownLabel = styleSlotProps({
-    styleSlug: block.labelStyleSlug ?? "",
-    style: block.labelStyle ?? {},
-  });
-  const ownField = styleSlotProps({
-    styleSlug: block.fieldStyleSlug ?? "",
-    style: block.fieldStyle ?? {},
-  });
+  const own = blockTextProps(block);
   const labelStyled = styleSlotProps(settings.labelStyle);
   const fieldStyled = styleSlotProps(settings.fieldStyle);
 
-  const className = `${labelStyled.className} ${ownLabel.className}`.trim();
-  const style = { ...labelStyled.style, ...ownLabel.style };
+  const className = `${labelStyled.className} ${own.className}`.trim();
+  const style = { ...labelStyled.style, ...own.style };
 
   /** Spread onto every control, so one setting dresses them all. */
   const fieldProps = {
-    className: `input ${fieldStyled.className} ${ownField.className}`.trim(),
-    style: { ...fieldStyled.style, ...ownField.style },
+    className: `input ${fieldStyled.className}`.trim(),
+    style: fieldStyled.style,
+  };
+
+  /*
+   * The words beside a checkbox or a radio button.
+   *
+   * The same field style, without the `input` class: a tick box is a tick box
+   * and takes no dressing, so the field style has nowhere to land on one of
+   * these unless it lands on the text — which is the only part of the control
+   * that a font, a size or a colour can be seen on at all.
+   */
+  const optionTextProps = {
+    className: fieldStyled.className || undefined,
+    style: fieldStyled.style,
   };
 
   const label = (
@@ -295,19 +297,21 @@ export function FormFieldView({
             {block.label}
             {block.required ? <span aria-hidden="true"> *</span> : null}
           </legend>
-          {(block.options ?? []).map((option) => (
-            <label key={option} className="checkbox-row">
-              <input
-                type="radio"
-                name={block.name}
-                value={option}
-                checked={value === option}
-                disabled={disabled}
-                onChange={() => onChange(option)}
-              />
-              {option}
-            </label>
-          ))}
+          <div className={`checkbox-rows is-${block.optionLayout ?? "column"}`}>
+            {(block.options ?? []).map((option) => (
+              <label key={option} className="checkbox-row">
+                <input
+                  type="radio"
+                  name={block.name}
+                  value={option}
+                  checked={value === option}
+                  disabled={disabled}
+                  onChange={() => onChange(option)}
+                />
+                <span {...optionTextProps}>{option}</span>
+              </label>
+            ))}
+          </div>
           {help}
           {errorNode}
         </fieldset>
@@ -326,9 +330,9 @@ export function FormFieldView({
               required={block.required}
               onChange={(event) => onChange(event.target.checked ? "yes" : "")}
             />
-            <span className={className || undefined} style={style}>
-              {block.label}
-            </span>
+            {/* The words next to the box are the control, not a prompt above
+                it, so they follow the field style like every other control. */}
+            <span {...optionTextProps}>{block.label}</span>
           </label>
           {help}
           {errorNode}

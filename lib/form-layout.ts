@@ -41,24 +41,22 @@ export type { FormBlockType };
 export const FILE_UPLOAD_KINDS = ["image", "video", "audio", "document", "any"] as const;
 export type FileUploadKind = (typeof FILE_UPLOAD_KINDS)[number];
 
+/**
+ * Whether a set of choices stacks or runs along the line.
+ *
+ * Down the page is the safe default and the only one that survives a narrow
+ * screen with long options. Across is for the short sets — Yes / No, sizes,
+ * a rating — where a column wastes a screen of height on three words.
+ */
+export const OPTION_LAYOUTS = ["column", "row"] as const;
+export type OptionLayout = (typeof OPTION_LAYOUTS)[number];
+
 export type FormBlock = {
   id: string;
   type: FormBlockType;
 
-  /** The block's own look. On a field block this dresses nothing on its own. */
   styleSlug?: string;
   textStyle?: StyleValues;
-
-  /*
-   * A field block is two things wearing one name: the words asking for
-   * something, and the box it goes in. They are almost never dressed alike —
-   * a small grey caption over a large bordered input is the ordinary case —
-   * so they are two settings rather than one applied twice.
-   */
-  labelStyleSlug?: string;
-  labelStyle?: StyleValues;
-  fieldStyleSlug?: string;
-  fieldStyle?: StyleValues;
 
   // visual
   text?: string;
@@ -79,6 +77,8 @@ export type FormBlock = {
   helpText?: string;
   required?: boolean;
   options?: string[];
+  /** How a radio group's choices are set out. Ignored by every other block. */
+  optionLayout?: OptionLayout;
   defaultValue?: string;
   min?: number;
   max?: number;
@@ -214,25 +214,6 @@ export function normalizeFormBlock(input: unknown): FormBlock | null {
   if (raw.styleSlug) block.styleSlug = str(raw.styleSlug);
   if (raw.textStyle) block.textStyle = normalizeStyleValues(raw.textStyle);
 
-  if (raw.labelStyleSlug) block.labelStyleSlug = str(raw.labelStyleSlug);
-  if (raw.labelStyle) block.labelStyle = normalizeStyleValues(raw.labelStyle);
-  if (raw.fieldStyleSlug) block.fieldStyleSlug = str(raw.fieldStyleSlug);
-  if (raw.fieldStyle) block.fieldStyle = normalizeStyleValues(raw.fieldStyle);
-
-  /*
-   * Before the label and the control were separable, a field block's one
-   * style dressed its label and nothing else. So that is what it still means:
-   * it is read into the label slot, leaving forms already built looking as
-   * they did rather than quietly losing their styling. A submit button is a
-   * field block by type only — it has no label to dress, and keeps using the
-   * block style it always did.
-   */
-  const dressesALabel = isFieldBlock(type) && type !== "submit" && type !== "hidden";
-  if (dressesALabel && !block.labelStyleSlug && !block.labelStyle) {
-    if (block.styleSlug) block.labelStyleSlug = block.styleSlug;
-    if (block.textStyle) block.labelStyle = block.textStyle;
-  }
-
   switch (type) {
     case "headline":
       block.text = str(raw.text);
@@ -277,6 +258,11 @@ export function normalizeFormBlock(input: unknown): FormBlock | null {
         block.options = Array.isArray(raw.options)
           ? raw.options.map((option) => str(option)).filter(Boolean).slice(0, 100)
           : [];
+      }
+      if (type === "radio") {
+        block.optionLayout = OPTION_LAYOUTS.includes(raw.optionLayout as OptionLayout)
+          ? (raw.optionLayout as OptionLayout)
+          : "column";
       }
       if (type === "number") {
         block.min = num(raw.min, 0);
@@ -330,8 +316,8 @@ export function normalizeFormSettings(input: unknown): FormSettings {
   };
 }
 
-export function createFormRow(columnCount = 1, padding?: number) {
-  return createRow(columnCount, padding);
+export function createFormRow(columnCount = 1) {
+  return createRow(columnCount);
 }
 
 export { createColumn as createFormColumn };
