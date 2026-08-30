@@ -26,12 +26,12 @@ import { deleteDonationAction, saveDonationAction } from "./actions";
 export type PickerOption = { _id: string; name: string; title?: string };
 
 /**
- * A closed campaign is still offered — a donation promised while it ran can
- * arrive after it closes — but it is named as closed so nobody files one
- * against the wrong drive by accident.
+ * An archived campaign is still offered — a donation promised while it ran can
+ * arrive after it is put away — but it is named as archived so nobody files
+ * one against the wrong drive by accident.
  */
 export type CampaignOption = PickerOption & {
-  isClosed?: boolean;
+  isArchived?: boolean;
   /** So a donation can be applied to one of them. Absent where none are defined. */
   stretchGoals?: StretchGoal[];
 };
@@ -167,7 +167,7 @@ export function DonationManager({
             <option value="">Every campaign</option>
             {campaigns.map((campaign) => (
               <option key={campaign._id} value={campaign._id}>
-                {campaign.name}{campaign.isClosed ? " (closed)" : ""}
+                {campaign.name}{campaign.isArchived ? " (archived)" : ""}
               </option>
             ))}
           </select>
@@ -456,7 +456,7 @@ export function DonationDialog({
                   >
                     {campaigns.map((campaign) => (
                       <option key={campaign._id} value={campaign._id}>
-                        {campaign.name}{campaign.isClosed ? " (closed)" : ""}
+                        {campaign.name}{campaign.isArchived ? " (archived)" : ""}
                       </option>
                     ))}
                   </select>

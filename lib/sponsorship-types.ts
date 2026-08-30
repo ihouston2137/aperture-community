@@ -37,11 +37,21 @@ export function centsToDollarInput(cents: number): string {
   return (cents / 100).toFixed(2);
 }
 
+/**
+ * A money figure, as it is reported: whole dollars.
+ *
+ * Amounts are still held to the cent — a total of many donations has to add up
+ * exactly, and rounding each one as it was stored would lose a cent here and
+ * there — but a sponsorship figure is read rather than reconciled, and the
+ * cents on a five-figure campaign total are noise in every column they appear
+ * in. Rounded rather than truncated, so a figure is never reported as less
+ * than it is.
+ */
 export function formatDollars(cents: number): string {
-  return (cents / 100).toLocaleString("en-US", {
+  return Math.round(cents / 100).toLocaleString("en-US", {
     style: "currency",
     currency: "USD",
-    minimumFractionDigits: 2,
+    maximumFractionDigits: 0,
   });
 }
 
@@ -261,21 +271,25 @@ export type SponsorSummary = {
 /**
  * Whether a campaign is still being worked on.
  *
- * Closing one changes nothing about what it raised — the record stands. It
+ * Archiving one changes nothing about what it raised — the record stands. It
  * says only that nobody is chasing it any more, so it can be kept out of the
  * way without being deleted.
  */
-export const CAMPAIGN_STATUSES = ["active", "closed"] as const;
+export const CAMPAIGN_STATUSES = ["active", "archived"] as const;
 
 export type CampaignStatus = (typeof CAMPAIGN_STATUSES)[number];
 
 export const CAMPAIGN_STATUS_LABELS: Record<CampaignStatus, string> = {
   active: "Active",
-  closed: "Closed",
+  archived: "Archived",
 };
 
 export function campaignStatus(value: unknown): CampaignStatus {
-  return value === "closed" ? "closed" : "active";
+  // Campaigns put away before the word changed are stored as `closed`, and
+  // mean exactly what `archived` means now — nothing about them differs but
+  // the name, so they are read as archived rather than migrated in place.
+  if (value === "archived" || value === "closed") return "archived";
+  return "active";
 }
 
 /**

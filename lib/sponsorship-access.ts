@@ -23,7 +23,7 @@ export type SponsorshipAccess = {
    * often the sensitive part: somebody brought in to enter this year's donations
    * has no need of what every previous year raised.
    */
-  canSeeClosed: boolean;
+  canSeeArchived: boolean;
   /**
    * The whole-programme lists, as opposed to the campaigns being worked on.
    *
@@ -57,7 +57,7 @@ export function sponsorshipAccess(permissions: string[]): SponsorshipAccess {
     canEditCampaigns: all || has("sponsorships.campaigns"),
     canEditSponsors: all || has("sponsorships.sponsors"),
     canEditDonations: all || has("sponsorships.donations"),
-    canSeeClosed: all || has("sponsorships.closed"),
+    canSeeArchived: all || has("sponsorships.closed"),
     canSeeRecords: all || has("sponsorships.records"),
     canManageSetup: all,
   };

@@ -941,7 +941,9 @@ const SponsorshipCampaignSchema = new Schema<any>(
   {
     name: { type: String, required: true },
     description: { type: String, default: "" },
-    /** `active` while it is being worked on, `closed` once it is done. */
+    /** `active` while it is being worked on, `archived` once it is done.
+        Records written before the relabel say `closed`; `campaignStatus` reads
+        those as archived. */
     status: { type: String, default: "active" },
     startDate: { type: String, default: "" },
     endDate: { type: String, default: "" },

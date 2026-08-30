@@ -141,7 +141,7 @@ export function CampaignManager({
             value={status}
             onChange={(event) => setStatus(event.target.value)}
           >
-            <option value="">Active and closed</option>
+            <option value="">Active and archived</option>
             {CAMPAIGN_STATUSES.map((entry) => (
               <option key={entry} value={entry}>
                 {CAMPAIGN_STATUS_LABELS[entry]}
@@ -171,12 +171,12 @@ export function CampaignManager({
                 <div style={{ minWidth: 0 }}>
                   <h3>
                     {campaign.name}
-                    {campaign.status === "closed" ? (
+                    {campaign.status === "archived" ? (
                       <span
                         className="badge"
                         style={{ marginLeft: "0.5rem" }}
                       >
-                        closed
+                        archived
                       </span>
                     ) : null}
                   </h3>

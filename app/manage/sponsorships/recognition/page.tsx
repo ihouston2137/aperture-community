@@ -80,7 +80,10 @@ export default async function RecognitionDashboard() {
             Being recognised ({report.recognised.length})
           </h2>
           <span className="stretch-block-figure">
-            {formatDollars(report.recognisedCents)} from running campaigns
+            {formatDollars(report.recognisedCents)} across{" "}
+            {report.campaigns.length === 1
+              ? "one running campaign"
+              : `${report.campaigns.length} running campaigns`}
           </span>
         </div>
 
@@ -88,7 +91,9 @@ export default async function RecognitionDashboard() {
           <p className="member-note">
             Nobody is at a recognition level yet.
           </p>
-        ) : (
+        ) : report.campaigns.length === 0 ? (
+          // Nothing is running, so there are no columns to break anything out
+          // into and the plain list is the whole of what can be said.
           <ul className="recognition-rows">
             {report.recognised.map((row) => (
               <RecognitionLine
@@ -100,6 +105,83 @@ export default async function RecognitionDashboard() {
               />
             ))}
           </ul>
+        ) : (
+          <div className="recognition-table">
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>Sponsor</th>
+                  {report.campaigns.map((campaign) => (
+                    <th key={campaign._id} className="is-figure">
+                      {campaign.name}
+                    </th>
+                  ))}
+                  <th className="is-figure">All running</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {report.recognised.map((row) => (
+                  <tr key={row._id}>
+                    <th scope="row" className="recognition-cell">
+                      <RecognitionWho
+                        row={row}
+                        levelLabel={levelName(row.recognitionLevelId)}
+                        levels={levels}
+                        canEdit={access.canEditSponsors}
+                      />
+                    </th>
+
+                    {report.campaigns.map((campaign) => (
+                      <td key={campaign._id} className="is-figure">
+                        <Given given={row.byCampaign[campaign._id]} />
+                      </td>
+                    ))}
+
+                    <td className="is-figure is-total">
+                      <Given
+                        given={{
+                          monetaryCents: row.monetaryCents,
+                          inKindCents: row.inKindCents,
+                        }}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+
+              {/* What each campaign has drawn from recognised sponsors. The
+                  point of the breakout is comparing campaigns, and comparing
+                  columns of different lengths by eye is not something to ask
+                  of anybody. */}
+              <tfoot>
+                <tr>
+                  <th scope="row">All recognised sponsors</th>
+                  {report.campaigns.map((campaign) => (
+                    <td key={campaign._id} className="is-figure">
+                      <Given
+                        given={columnTotal(report.recognised, campaign._id)}
+                      />
+                    </td>
+                  ))}
+                  <td className="is-figure is-total">
+                    <Given
+                      given={{
+                        monetaryCents: report.recognised.reduce(
+                          (total, row) => total + row.monetaryCents,
+                          0
+                        ),
+                        inKindCents: report.recognised.reduce(
+                          (total, row) => total + row.inKindCents,
+                          0
+                        ),
+                      }}
+                    />
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
         )}
       </section>
 
@@ -144,6 +226,98 @@ export default async function RecognitionDashboard() {
         )}
       </section>
     </>
+  );
+}
+
+/** One campaign's column, added down. */
+function columnTotal(rows: RecognitionRow[], campaignId: string) {
+  return rows.reduce(
+    (total, row) => {
+      const given = row.byCampaign[campaignId];
+      if (!given) return total;
+      return {
+        monetaryCents: total.monetaryCents + given.monetaryCents,
+        inKindCents: total.inKindCents + given.inKindCents,
+      };
+    },
+    { monetaryCents: 0, inKindCents: 0 }
+  );
+}
+
+/**
+ * What one sponsor gave, in one cell.
+ *
+ * Money and goods are never added into one figure, here as everywhere in this
+ * section: a lent hall and a cheque are not the same thing to add up, and a
+ * column of sums mixing them would be a number nobody could act on.
+ */
+function Given({
+  given,
+}: {
+  given: { monetaryCents: number; inKindCents: number } | undefined;
+}) {
+  if (!given || (given.monetaryCents === 0 && given.inKindCents === 0)) {
+    return <span className="recognition-nil">&mdash;</span>;
+  }
+
+  return (
+    <>
+      {given.monetaryCents > 0 ? (
+        formatDollars(given.monetaryCents)
+      ) : (
+        <span className="recognition-nil">&mdash;</span>
+      )}
+      {given.inKindCents > 0 ? (
+        <span className="help-text">
+          {formatDollars(given.inKindCents)} in kind
+        </span>
+      ) : null}
+    </>
+  );
+}
+
+/** The sponsor down the side of the table: logo, name, level, and the control. */
+function RecognitionWho({
+  row,
+  levelLabel,
+  levels,
+  canEdit,
+}: {
+  row: RecognitionRow;
+  levelLabel: string;
+  levels: Awaited<ReturnType<typeof getRecognitionLevels>>;
+  canEdit: boolean;
+}) {
+  const logoSrc = sponsorLogoSrc(primaryLogo(row.logos));
+
+  return (
+    <span className="recognition-who-cell">
+      {logoSrc ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={logoSrc} alt="" className="recognition-logo" />
+      ) : (
+        <span className="recognition-logo is-empty" aria-hidden="true" />
+      )}
+
+      <span className="recognition-who">
+        <strong>{row.name}</strong>
+        <span className="recognition-level">
+          {levelLabel || "no level"}
+          {row.campaignCount > 0
+            ? ` · ${row.count} donation${row.count === 1 ? "" : "s"}`
+            : " · nothing from a running campaign"}
+        </span>
+      </span>
+
+      {canEdit ? (
+        <ChangeLevelButton
+          sponsorId={row._id}
+          levels={levels}
+          current={row.recognitionLevelId}
+          label="Change"
+        />
+      ) : null}
+    </span>
   );
 }
 

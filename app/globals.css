@@ -6797,7 +6797,7 @@ html:has(.admin-shell) body::-webkit-scrollbar {
   opacity: 0.7;
 }
 
-.manager-closed {
+.manager-archived {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -6807,11 +6807,11 @@ html:has(.admin-shell) body::-webkit-scrollbar {
   font-size: 0.9375rem;
 }
 
-.manager-closed a {
+.manager-archived a {
   color: inherit;
 }
 
-.manager-closed li {
+.manager-archived li {
   display: flex;
   gap: 0.75rem;
   justify-content: space-between;
@@ -8175,6 +8175,50 @@ html:has(.admin-shell) body::-webkit-scrollbar {
   gap: 0.1rem;
   margin-left: auto;
   font-variant-numeric: tabular-nums;
+}
+
+/* The same sponsors, broken out a column per running campaign.
+
+   A campaign name is a real name and not a code, so the columns are as wide as
+   the names are; the table scrolls sideways rather than squeezing them, which
+   keeps the sponsor column readable however many campaigns are open at once. */
+.recognition-table {
+  overflow-x: auto;
+  margin-top: 1rem;
+}
+
+.recognition-table .admin-table {
+  width: 100%;
+}
+
+.recognition-table th.is-figure {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.recognition-cell {
+  min-width: 18rem;
+}
+
+.recognition-who-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-weight: 400;
+}
+
+/* Smaller here than on the list: a table row is a line of figures, and a logo
+   that sets the row height taller than the numbers it belongs to would push
+   the campaign columns apart for nothing. */
+.recognition-who-cell .recognition-logo {
+  width: 2.5rem;
+  height: 2.5rem;
+}
+
+/* Nothing given, rather than nothing known. Held back from the ink the figures
+   wear so a row of dashes never reads as louder than the amounts beside it. */
+.recognition-nil {
+  opacity: 0.45;
 }
 
 /* An effort raised alongside gets a card of its own: its own target, its own

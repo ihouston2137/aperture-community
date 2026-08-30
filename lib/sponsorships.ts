@@ -368,6 +368,15 @@ export type RecognitionRow = {
   count: number;
   /** The running campaigns they have given to. */
   campaignCount: number;
+  /**
+   * What they gave to each running campaign, by campaign id.
+   *
+   * Broken out rather than only totalled, because a sponsor giving to three
+   * campaigns and a sponsor giving three times to one are the same figure and
+   * not the same sponsor — and which campaigns somebody is behind is most of
+   * what a recognition decision turns on.
+   */
+  byCampaign: Record<string, { monetaryCents: number; inKindCents: number }>;
 };
 
 /**
@@ -380,6 +389,8 @@ export type RecognitionRow = {
  * not, and it is too late to be told about it here.
  */
 export type RecognitionReport = {
+  /** The campaigns now running, in the order they are reported across. */
+  campaigns: { _id: string; name: string }[];
   /** At a level, ordered by what they have given to running campaigns. */
   recognised: RecognitionRow[];
   /** Gave to a running campaign, at no level. Ordered the same way. */
@@ -439,10 +450,22 @@ export function recognitionReport(
       rankCents: 0,
       count: 0,
       campaignCount: 0,
+      byCampaign: {},
     };
 
-    if (donation.kind === "in-kind") row.inKindCents += donation.valueCents;
-    else row.monetaryCents += donation.valueCents;
+    const here = row.byCampaign[donation.campaignId] ?? {
+      monetaryCents: 0,
+      inKindCents: 0,
+    };
+
+    if (donation.kind === "in-kind") {
+      row.inKindCents += donation.valueCents;
+      here.inKindCents += donation.valueCents;
+    } else {
+      row.monetaryCents += donation.valueCents;
+      here.monetaryCents += donation.valueCents;
+    }
+    row.byCampaign[donation.campaignId] = here;
     row.rankCents += donation.valueCents;
     row.count += 1;
     rows.set(sponsor._id, row);
@@ -478,6 +501,7 @@ export function recognitionReport(
           rankCents: 0,
           count: 0,
           campaignCount: 0,
+          byCampaign: {},
         }
     )
     .sort(byGiven);
@@ -490,6 +514,14 @@ export function recognitionReport(
     list.reduce((total, row) => total + row.rankCents, 0);
 
   return {
+    /*
+     * Newest first, so the column beside the sponsor's name is the campaign
+     * being decided about now. A campaign with no start date sorts last rather
+     * than first, on the same reasoning as `latest` above.
+     */
+    campaigns: [...active]
+      .sort((a, b) => b.startDate.localeCompare(a.startDate))
+      .map((campaign) => ({ _id: campaign._id, name: campaign.name })),
     recognised,
     unrecognised,
     recognisedCount: recognised.length,

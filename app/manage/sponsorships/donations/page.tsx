@@ -84,7 +84,7 @@ export default async function ManagerDonationsPage() {
         campaigns={campaigns.map((campaign) => ({
           _id: campaign._id,
           name: campaign.name,
-          isClosed: campaign.status === "closed",
+          isArchived: campaign.status === "archived",
           stretchGoals: campaign.stretchGoals,
         }))}
         sponsors={sponsors.map((sponsor) => ({
@@ -104,7 +104,7 @@ export default async function ManagerDonationsPage() {
             this answers what somebody brought in, not what share of the total is
             theirs.
           </p>
-          <ul className="manager-closed" style={{ marginTop: "1rem" }}>
+          <ul className="manager-archived" style={{ marginTop: "1rem" }}>
             {credit.map((entry) => (
               <li key={entry.name}>
                 <span>

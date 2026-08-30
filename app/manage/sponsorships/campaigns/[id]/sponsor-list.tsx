@@ -68,6 +68,7 @@ export function SponsorList({
   members,
   access,
   action,
+  showAssignmentState = true,
 }: {
   title: string;
   emptyText: string;
@@ -78,6 +79,16 @@ export function SponsorList({
   access: ListAccess;
   /** The "add sponsor" control, passed in because only the page may build it. */
   action?: React.ReactNode;
+  /**
+   * Whether the list says how the ask is going.
+   *
+   * Off for the sponsors who have already given: open or closed answers "is
+   * there still something to chase here", and a sponsor with a donation
+   * against their name has answered it by giving. Colouring those rows and
+   * badging them says nothing, and spends the loudest thing on the row —
+   * colour — on a distinction that no longer decides anything.
+   */
+  showAssignmentState?: boolean;
 }) {
   /*
    * Shut, and as rows when opened.
@@ -154,10 +165,17 @@ export function SponsorList({
                 <li
                   key={row.sponsorId}
                   /* The colour says open or finished; the badge beside the
-                     figure says how it finished. */
+                     figure says how it finished. Neither is drawn where the
+                     list has already answered the question by other means. */
                   className={`${
                     view === "cards" ? "sponsor-card" : "sponsor-line"
-                  } ${isClosedAssignment(row.status) ? "is-closed" : "is-open"}`}
+                  }${
+                    showAssignmentState
+                      ? isClosedAssignment(row.status)
+                        ? " is-closed"
+                        : " is-open"
+                      : ""
+                  }`}
                 >
                   <Link
                     href={`/manage/sponsorships/campaigns/${campaignId}/sponsors/${row.sponsorId}`}
@@ -206,13 +224,15 @@ export function SponsorList({
                         {row.donationCount === 1 ? "" : "s"}
                       </span>
                     ) : null}
-                    <span
-                      className={`badge assignment-${
-                        isClosedAssignment(row.status) ? "closed" : "open"
-                      }`}
-                    >
-                      {ASSIGNMENT_STATUS_LABELS[row.status]}
-                    </span>
+                    {showAssignmentState ? (
+                      <span
+                        className={`badge assignment-${
+                          isClosedAssignment(row.status) ? "closed" : "open"
+                        }`}
+                      >
+                        {ASSIGNMENT_STATUS_LABELS[row.status]}
+                      </span>
+                    ) : null}
                   </div>
 
                   {row.chips.length > 0 ? (

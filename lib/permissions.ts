@@ -122,8 +122,10 @@ export const permissionGroups: PermissionGroup[] = [
       { key: "sponsorships.sponsors", label: "Add and edit sponsors" },
       { key: "sponsorships.donations", label: "Add and edit donations" },
       {
+        // The key keeps the older word: it is stored on every role that has
+        // been granted this, and renaming it would quietly revoke them all.
         key: "sponsorships.closed",
-        label: "See closed campaigns and what they raised",
+        label: "See archived campaigns and what they raised",
       },
       {
         key: "sponsorships.records",

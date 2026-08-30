@@ -25,10 +25,10 @@ import { ToneLegend } from "../tone-legend";
 export const metadata = { title: "Campaigns" };
 
 /**
- * Every campaign on file, closed ones included.
+ * Every campaign on file, archived ones included.
  *
  * The dashboard is about what is running; this is the record of everything. A
- * closed campaign is withheld here for the same reason it is withheld there —
+ * archived campaign is withheld here for the same reason it is withheld there —
  * its final figures are their own grant.
  */
 export default async function ManagerCampaignsPage() {
@@ -61,9 +61,9 @@ export default async function ManagerCampaignsPage() {
     getRoleSummaries("community"),
   ]);
 
-  const visible = access.canSeeClosed
+  const visible = access.canSeeArchived
     ? campaigns
-    : campaigns.filter((campaign) => campaign.status !== "closed");
+    : campaigns.filter((campaign) => campaign.status !== "archived");
 
   const seedEmail = (process.env.SEED_ADMIN_EMAIL || "").trim().toLowerCase();
   const members: PickerOption[] = users

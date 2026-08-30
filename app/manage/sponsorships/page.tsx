@@ -33,7 +33,7 @@ export const metadata = { title: "Sponsorships" };
 /**
  * Where the campaigns being run have got to.
  *
- * Active campaigns are the page; opening one goes to its own dashboard. Closed
+ * Active campaigns are the page; opening one goes to its own dashboard. Archived
  * ones are listed underneath only for somebody given them, since a finished
  * campaign's final figures are often the sensitive part.
  */
@@ -97,8 +97,8 @@ export default async function SponsorshipsDashboard() {
     sponsors.find((sponsor) => sponsor._id === id)?.name ?? "a sponsor that has gone";
 
   const active = campaigns.filter((campaign) => campaign.status === "active");
-  const closed = access.canSeeClosed
-    ? campaigns.filter((campaign) => campaign.status === "closed")
+  const archived = access.canSeeArchived
+    ? campaigns.filter((campaign) => campaign.status === "archived")
     : [];
 
   // What this person is looking after, across every active campaign. It is the
@@ -124,8 +124,9 @@ export default async function SponsorshipsDashboard() {
   const memberName = (memberId: string) =>
     members.find((member) => member._id === memberId)?.name ?? "somebody who has gone";
 
-  // Closed campaigns are only part of the count for somebody who may see them.
-  const visibleCampaignCount = active.length + closed.length;
+  // Archived campaigns are only part of the count for somebody who may see
+  // them.
+  const visibleCampaignCount = active.length + archived.length;
 
   // Who is on the site, and who has paid for a campaign without being put
   // there. Worked out here as well as on its own page so the box and the page
@@ -389,11 +390,11 @@ export default async function SponsorshipsDashboard() {
         caption="Across every running campaign. A donation credited to more than one member is split evenly between them, so the shares add up to the whole."
       />
 
-      {closed.length > 0 ? (
+      {archived.length > 0 ? (
         <section className="member-card manager-card">
-          <h2 className="member-card-title">Closed</h2>
-          <ul className="manager-closed">
-            {closed.map((campaign) => (
+          <h2 className="member-card-title">Archived</h2>
+          <ul className="manager-archived">
+            {archived.map((campaign) => (
               <li key={campaign._id}>
                 <Link href={`/manage/sponsorships/campaigns/${campaign._id}`}>
                   {campaign.name}

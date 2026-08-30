@@ -174,9 +174,9 @@ export default async function CampaignDashboard({
   const campaign = campaigns.find((entry) => entry._id === id);
   if (!campaign) notFound();
 
-  // A closed campaign's figures are their own grant, so the way in is closed
+  // An archived campaign's figures are their own grant, so the way in is closed
   // too rather than only the link to it being hidden.
-  if (campaign.status === "closed" && !access.canSeeClosed) {
+  if (campaign.status === "archived" && !access.canSeeArchived) {
     redirect("/manage/sponsorships");
   }
 
@@ -418,9 +418,9 @@ export default async function CampaignDashboard({
         <div style={{ minWidth: 0 }}>
           <h1 className="member-title">
             {campaign.name}
-            {campaign.status === "closed" ? (
+            {campaign.status === "archived" ? (
               <span className="badge" style={{ marginLeft: "0.6rem" }}>
-                closed
+                archived
               </span>
             ) : null}
           </h1>
@@ -740,6 +740,8 @@ export default async function CampaignDashboard({
         title="Sponsors donating on this campaign"
         emptyText="Nothing has come in yet."
         rows={donating}
+        // They have given, so whether the ask is still open says nothing here.
+        showAssignmentState={false}
         campaignId={campaign._id}
         levels={levels}
         members={members}

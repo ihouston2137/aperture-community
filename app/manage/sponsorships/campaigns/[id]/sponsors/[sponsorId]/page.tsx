@@ -89,7 +89,7 @@ export default async function CampaignSponsorDashboard({
   const sponsor = sponsors.find((entry) => entry._id === sponsorId);
   if (!campaign || !sponsor) notFound();
 
-  if (campaign.status === "closed" && !access.canSeeClosed) {
+  if (campaign.status === "archived" && !access.canSeeArchived) {
     redirect("/manage/sponsorships");
   }
 
@@ -124,7 +124,7 @@ export default async function CampaignSponsorDashboard({
   );
   const chips = sponsorChips(here);
 
-  // What they have given, campaign by campaign. Closed campaigns are part of
+  // What they have given, campaign by campaign. Archived campaigns are part of
   // somebody's giving history whether or not this reader may open them, so the
   // figures stand either way — only the link is withheld.
   const history = contributionsByCampaign(fromThisSponsor);
@@ -139,7 +139,7 @@ export default async function CampaignSponsorDashboard({
   const campaignOptions = campaigns.map((entry) => ({
     _id: entry._id,
     name: entry.name,
-    isClosed: entry.status === "closed",
+    isArchived: entry.status === "archived",
     stretchGoals: entry.stretchGoals,
   }));
   const sponsorOptions = sponsors.map((entry) => ({
@@ -432,7 +432,7 @@ export default async function CampaignSponsorDashboard({
                 const named = campaigns.find((entry) => entry._id === row.campaignId);
                 const isHere = row.campaignId === campaign._id;
                 const reachable =
-                  named && (named.status !== "closed" || access.canSeeClosed);
+                  named && (named.status !== "archived" || access.canSeeArchived);
 
                 return (
                   <li key={row.campaignId} className="contrib-row">
