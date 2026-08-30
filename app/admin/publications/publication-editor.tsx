@@ -603,6 +603,15 @@ export function PublicationEditor({
     ? editingTemplate
     : effectiveBackground(page, pageTemplates);
 
+  /**
+   * The one way a background is changed, whichever the canvas is showing.
+   *
+   * Every background control goes through here. Three of them once wrote to
+   * the page directly, which worked while a page was being edited and quietly
+   * did the wrong thing while a layout was: the picture landed on whatever
+   * page happened to be open and the layout stayed empty, so an image
+   * background on a layout could never appear.
+   */
   function updateBackground(patch: Partial<typeof emptyBackground>) {
     if (editingTemplate) {
       setPageTemplates((current) =>
@@ -1360,7 +1369,7 @@ export function PublicationEditor({
                     value={canvasBackground.backgroundMediaUrl}
                     mediaType={canvasBackground.backgroundType === "video" ? "video" : "image"}
                     onChange={(backgroundMediaUrl) =>
-                      updatePage(pageIndex, { backgroundMediaUrl })
+                      updateBackground({ backgroundMediaUrl })
                     }
                   />
                   <SelectField
@@ -1378,14 +1387,14 @@ export function PublicationEditor({
                       label="Offset X (%)"
                       value={canvasBackground.backgroundOffsetX}
                       onChange={(backgroundOffsetX) =>
-                        updatePage(pageIndex, { backgroundOffsetX })
+                        updateBackground({ backgroundOffsetX })
                       }
                     />
                     <NumField
                       label="Offset Y (%)"
                       value={canvasBackground.backgroundOffsetY}
                       onChange={(backgroundOffsetY) =>
-                        updatePage(pageIndex, { backgroundOffsetY })
+                        updateBackground({ backgroundOffsetY })
                       }
                     />
                   </div>
