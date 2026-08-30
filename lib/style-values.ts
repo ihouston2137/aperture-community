@@ -147,7 +147,26 @@ export function normalizeStyleValues(input: unknown): StyleValues {
 }
 
 /** Convert style values into React inline-style properties. */
-export function styleValuesToCss(values: StyleValues | undefined): CSSProperties {
+/**
+ * Which shadow a set of style values casts.
+ *
+ * `box` is a shadow of the element's rectangle — right for a card, a panel, a
+ * picture with square corners. `drop` is a shadow of what is actually drawn:
+ * the letterforms of a word, the outline of a shape, the shape of a cut-out
+ * picture. They are different pictures, not two ways of drawing one, and
+ * asking for a shadow on a line of text and being handed a rectangle behind it
+ * is the wrong one.
+ *
+ * `drop` follows the element's own alpha, so a block that *does* carry a
+ * background or a border still casts the shadow of that box — one setting
+ * gives the right answer either way, without the author having to say which.
+ */
+export type ShadowMode = "box" | "drop";
+
+export function styleValuesToCss(
+  values: StyleValues | undefined,
+  shadow: ShadowMode = "box"
+): CSSProperties {
   const style: Record<string, string | number> = {};
   if (!values) return style as CSSProperties;
 
@@ -192,7 +211,11 @@ export function styleValuesToCss(values: StyleValues | undefined): CSSProperties
     const x = values.shadowX ?? 0;
     const y = values.shadowY ?? 0.25;
     const blur = values.shadowBlur ?? 0.75;
-    style.boxShadow = `${x}rem ${y}rem ${blur}rem ${values.shadowColor ?? "rgba(0,0,0,0.3)"}`;
+    const colour = values.shadowColor ?? "rgba(0,0,0,0.3)";
+    const cast = `${x}rem ${y}rem ${blur}rem ${colour}`;
+
+    if (shadow === "drop") style.filter = `drop-shadow(${cast})`;
+    else style.boxShadow = cast;
   }
 
   if (values.opacity !== undefined) style.opacity = values.opacity;
@@ -202,8 +225,11 @@ export function styleValuesToCss(values: StyleValues | undefined): CSSProperties
 }
 
 /** Same output, but as a CSS declaration block for generated stylesheets. */
-export function styleValuesToDeclarations(values: StyleValues | undefined): string {
-  const css = styleValuesToCss(values) as Record<string, string | number>;
+export function styleValuesToDeclarations(
+  values: StyleValues | undefined,
+  shadow: ShadowMode = "box"
+): string {
+  const css = styleValuesToCss(values, shadow) as Record<string, string | number>;
   return Object.entries(css)
     .map(([key, value]) => {
       const property = key.replace(/[A-Z]/g, (char) => `-${char.toLowerCase()}`);

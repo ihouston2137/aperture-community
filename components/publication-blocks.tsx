@@ -52,9 +52,19 @@ export function PublicationBlockView({
   interactive?: boolean;
   onNavigate?: (pageId: string) => void;
 }) {
+  /*
+   * A shadow here follows what is drawn, not the block's box.
+   *
+   * A publication block is a rectangle on a canvas holding a word, an icon or
+   * a picture, and the rectangle is a place rather than a thing — a shadow of
+   * it is a shadow of nothing anybody put there. `drop` follows the letters of
+   * a heading and the outline of a cut-out image, and still follows the box
+   * where the block carries a background or a border, which is the only case
+   * where the box is a thing.
+   */
   const textProps = block.styleSlug
     ? { className: customStyleClassName(block.styleSlug), style: undefined }
-    : { className: "", style: styleValuesToCss(block.textStyle) };
+    : { className: "", style: styleValuesToCss(block.textStyle, "drop") };
 
   // Blocks may carry only a media id (older documents) or an explicit url.
   const mediaUrl =
@@ -189,6 +199,26 @@ export function PublicationBlockView({
       const text = (block.text ?? "").trim();
       const above = Boolean(text) && (block.textPlacement ?? "inside") === "above";
 
+      /*
+       * The shape's own shadow, cast by its outline.
+       *
+       * A shape is drawn inside its block's box and is very often not the
+       * shape of it — a circle, a star, a speech bubble — so a shadow of the
+       * box would sit behind the shape in a rectangle nobody drew.
+       */
+      const shapeShadow = shapeStyle.shadowEnabled
+        ? (styleValuesToCss(
+            {
+              shadowEnabled: true,
+              shadowX: shapeStyle.shadowX,
+              shadowY: shapeStyle.shadowY,
+              shadowBlur: shapeStyle.shadowBlur,
+              shadowColor: shapeStyle.shadowColor,
+            },
+            "drop"
+          ) as CSSProperties)
+        : undefined;
+
       const common = {
         color: shapeStyle.backgroundColor ?? block.color ?? "#2b6cb0",
         borderWidth: shapeStyle.borderWidth ?? 0,
@@ -199,8 +229,14 @@ export function PublicationBlockView({
         // A block's box is fixed, so text above it takes its share of the
         // height rather than pushing the shape out of the bottom.
         style: above
-          ? ({ width: "100%", height: "auto", flex: "1 1 0", minHeight: 0 } as CSSProperties)
-          : undefined,
+          ? ({
+              width: "100%",
+              height: "auto",
+              flex: "1 1 0",
+              minHeight: 0,
+              ...shapeShadow,
+            } as CSSProperties)
+          : shapeShadow,
       };
 
       const shape =

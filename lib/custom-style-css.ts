@@ -27,6 +27,33 @@ export function customStyleCss(styles: CustomStyleRecord[]): string {
       .join("\n");
     blocks.push(`${selector} {\n${baseLines}\n}`);
 
+    /*
+     * The same shadow, cast by what is drawn, inside a publication.
+     *
+     * A publication block is a rectangle on a canvas holding a word or an
+     * icon, and the rectangle is a place rather than a thing — a shadow of it
+     * is a shadow of nothing anybody put there. Elsewhere the box is usually a
+     * card and a shadow of it is right, so the swap is scoped to publications
+     * rather than made everywhere: one saved style, dressing a heading on a
+     * page and a heading on a slide, should not have to choose between them.
+     *
+     * `drop-shadow` follows the element's own alpha, so a block that does
+     * carry a background or a border still casts the shadow of that box.
+     */
+    const drop = styleValuesToDeclarations(
+      normalizeStyleValues(record.style),
+      "drop"
+    )
+      .split("\n")
+      .filter((line) => line.includes("filter:"))
+      .join("\n");
+
+    if (drop) {
+      blocks.push(
+        `.pub-block ${selector},\n.pub-editor-block ${selector} {\n  box-shadow: none;\n${drop}\n}`
+      );
+    }
+
     if (record.hoverEnabled) {
       const hover = styleValuesToDeclarations(normalizeStyleValues(record.hoverStyle));
       if (hover.trim()) {

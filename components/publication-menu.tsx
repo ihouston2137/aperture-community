@@ -25,12 +25,19 @@ export function PublicationMenu({
   fileName,
   navVisible,
   onToggleNav,
+  slideshow,
+  playing,
+  onTogglePlay,
 }: {
   /** The element to fill the screen with, and the one right-clicks come from. */
   hostRef: React.RefObject<HTMLDivElement | null>;
   fileName: string;
   navVisible: boolean;
   onToggleNav: () => void;
+  /** Whether this publication advances on its own at all. */
+  slideshow: boolean;
+  playing: boolean;
+  onTogglePlay: () => void;
 }) {
   const [at, setAt] = useState<{ x: number; y: number } | null>(null);
   const [busy, setBusy] = useState("");
@@ -122,6 +129,22 @@ export function PublicationMenu({
         role="menu"
         style={{ left: `${Math.max(8, left)}px`, top: `${Math.max(8, top)}px` }}
       >
+        {/* First, because on a publication that plays it is the thing most
+            often reached for — and the menu is within reach when the bar at
+            the foot has been put away. */}
+        {slideshow ? (
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              onTogglePlay();
+              setAt(null);
+            }}
+          >
+            {playing ? "Pause" : "Play"}
+          </button>
+        ) : null}
+
         <button type="button" role="menuitem" onClick={toggleFullScreen}>
           {fullScreen ? "Leave full screen" : "Open full screen"}
         </button>

@@ -57,7 +57,9 @@ export function PublicationViewer({
 }) {
   const [index, setIndex] = useState(0);
   const [scale, setScale] = useState(1);
-  const [playing, setPlaying] = useState(slideshow.enabled);
+  // Enabled says it *can* advance on its own; autoplay says it does so
+  // without being asked.
+  const [playing, setPlaying] = useState(slideshow.enabled && slideshow.autoplay);
   /** Put away from the right-click menu, and brought back the same way. */
   const [navHidden, setNavHidden] = useState(false);
   const hostRef = useRef<HTMLDivElement>(null);
@@ -266,6 +268,9 @@ export function PublicationViewer({
           fileName={fileName}
           navVisible={!navHidden}
           onToggleNav={() => setNavHidden((current) => !current)}
+          slideshow={slideshow.enabled}
+          playing={playing}
+          onTogglePlay={() => setPlaying((current) => !current)}
         />
       ) : null}
 

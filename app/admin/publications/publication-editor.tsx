@@ -37,6 +37,9 @@ import {
   createPublicationPage,
   alignBlocks,
   ALIGNMENTS,
+  blockStyleOf,
+  withBlockStyle,
+  type BlockStyle,
   ALIGNMENT_LABELS,
   boundsOf,
   distributeBlocks,
@@ -111,6 +114,7 @@ const STYLE_PANEL_TITLES: Record<string, string> = {
   image: "Image style",
   video: "Video style",
   icon: "Icon style",
+  button: "Button style",
 };
 /** The two dressable parts of a block: its text, and — for shapes — the shape. */
 type StyleSlot = "text" | "shape";
@@ -324,6 +328,10 @@ export function PublicationEditor({
    * out would be a thing to remember rather than a thing to do.
    */
   const [openGroupId, setOpenGroupId] = useState<string | null>(null);
+  /** Where a right-click landed, and what it landed on. */
+  const [menu, setMenu] = useState<
+    { x: number; y: number; onBlock: boolean } | null
+  >(null);
   /** The marquee, in canvas units, while one is being drawn. */
   const [marquee, setMarquee] = useState<
     { x: number; y: number; width: number; height: number } | null
@@ -656,6 +664,175 @@ export function PublicationEditor({
       activeBlocks.map((block) => (block.id === blockId ? { ...block, ...patch } : block))
     );
   }
+
+  /*
+   * The editor's own clipboard.
+   *
+   * Its own, rather than the system's: reading that one is asynchronous, needs
+   * a permission the browser may refuse, and would hand back whatever text
+   * happened to be there. What is copied here is a set of blocks, and a set of
+   * blocks means nothing outside this editor.
+   *
+   * State rather than a ref, because the Paste item is drawn from it — a menu
+   * whose Paste stayed greyed out after a copy would be worse than no menu.
+   */
+  const [clipboard, setClipboard] = useState<PublicationBlock[]>([]);
+
+  /**
+   * A look on its own, kept apart from the blocks clipboard.
+   *
+   * Two clipboards rather than one, because copying a block and copying how a
+   * block is dressed are different intentions: somebody matching six captions
+   * to a seventh wants the look each time and the block never, and a single
+   * clipboard would make each copy destroy the other.
+   */
+  const [styleClipboard, setStyleClipboard] = useState<BlockStyle | null>(null);
+
+  /** What a command acts on: the selection, with any group it belongs to. */
+  function actionable(): string[] {
+    return withGroupMembers(activeBlocks, selectedIds);
+  }
+
+  function copySelection() {
+    const ids = actionable();
+    setClipboard(
+      activeBlocks
+        .filter((block) => ids.includes(block.id))
+        // A copy, so editing the original afterwards does not edit what was
+        // taken — the clipboard holds what was there when it was copied.
+        .map((block) => ({ ...block }))
+    );
+  }
+
+  /**
+   * Puts the copied blocks down, offset a little.
+   *
+   * Fresh ids throughout, and fresh group ids: a pasted arrangement is a group
+   * of its own, so moving it later does not drag the blocks it was copied
+   * from. The offset is what makes a paste visible — laid exactly on top of
+   * the originals it would look as though nothing had happened.
+   */
+  function pasteClipboard() {
+    if (clipboard.length === 0) return;
+
+    const regroup = new Map<string, string>();
+    const pasted = clipboard.map((block, index) => {
+      const groupId = block.groupId
+        ? (regroup.get(block.groupId) ??
+           (() => {
+             const next = makeTemplateId();
+             regroup.set(block.groupId!, next);
+             return next;
+           })())
+        : undefined;
+
+      return {
+        ...block,
+        id: `${block.id}-copy-${Date.now().toString(36)}-${index}`,
+        x: block.x + 24,
+        y: block.y + 24,
+        // Above what is already there, so a paste lands in view rather than
+        // behind the thing it was copied from.
+        zIndex: activeBlocks.length + index + 1,
+        groupId,
+      };
+    });
+
+    setActiveBlocks([...activeBlocks, ...pasted]);
+    setSelectedIds(pasted.map((block) => block.id));
+    setStyleSlot(null);
+  }
+
+  /** Takes the look of whatever is selected — the first, if several are. */
+  function copyStyle() {
+    const from = activeBlocks.find((block) => selectedIds.includes(block.id));
+    if (!from) return;
+    setStyleClipboard(blockStyleOf(from));
+  }
+
+  /** Dresses everything selected in the look that was taken. */
+  function pasteStyle() {
+    if (!styleClipboard) return;
+    const ids = actionable();
+    setActiveBlocks(
+      activeBlocks.map((block) =>
+        ids.includes(block.id) ? withBlockStyle(block, styleClipboard) : block
+      )
+    );
+  }
+
+  function deleteSelection() {
+    const ids = actionable();
+    if (ids.length === 0) return;
+    setActiveBlocks(activeBlocks.filter((block) => !ids.includes(block.id)));
+    setSelectedIds([]);
+    setStyleSlot(null);
+  }
+
+  /**
+   * Copy, paste and delete from the keyboard.
+   *
+   * Ignored while a field has the focus: backspace in a text box deletes a
+   * letter, and a copy there copies the words — taking those over would make
+   * the inspector unusable in order to save a trip to a menu.
+   */
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (
+        target?.closest(
+          "input, textarea, select, [contenteditable=''], [contenteditable='true']"
+        )
+      ) {
+        return;
+      }
+
+      const command = event.ctrlKey || event.metaKey;
+
+      // Shift makes it the look rather than the block: the same two letters,
+      // one modifier apart, because they are the same two intentions.
+      if (command && event.shiftKey && event.key.toLowerCase() === "c") {
+        if (selectedIds.length === 0) return;
+        event.preventDefault();
+        copyStyle();
+        return;
+      }
+
+      if (command && event.shiftKey && event.key.toLowerCase() === "v") {
+        if (!styleClipboard || selectedIds.length === 0) return;
+        event.preventDefault();
+        pasteStyle();
+        return;
+      }
+
+      if (command && event.key.toLowerCase() === "c") {
+        if (selectedIds.length === 0) return;
+        event.preventDefault();
+        copySelection();
+        return;
+      }
+
+      if (command && event.key.toLowerCase() === "v") {
+        if (clipboard.length === 0) return;
+        event.preventDefault();
+        pasteClipboard();
+        return;
+      }
+
+      if (event.key === "Delete" || event.key === "Backspace") {
+        if (selectedIds.length === 0) return;
+        // Backspace is the browser's "go back" on a page with nothing focused,
+        // which would lose the whole edit.
+        event.preventDefault();
+        deleteSelection();
+      }
+    };
+
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // Everything these read is captured on each render, which is what keeps
+    // them acting on the selection as it stands rather than as it was.
+  });
 
   /** Lines the selection up, against itself or against the page. */
   function align(alignment: (typeof ALIGNMENTS)[number], against: "each other" | "page") {
@@ -1112,6 +1289,16 @@ export function PublicationEditor({
                   value={slideshow.loop}
                   onChange={(loop) => setSlideshow({ ...slideshow, loop })}
                 />
+                <CheckField
+                  label="Start playing on its own"
+                  value={slideshow.autoplay}
+                  onChange={(autoplay) => setSlideshow({ ...slideshow, autoplay })}
+                />
+                <span className="help-text">
+                  Off, the reader presses play — from the bar at the foot, or
+                  the menu on a right-click. On, it begins the moment the page
+                  opens, which suits a screen nobody is standing at.
+                </span>
               </>
             ) : null}
 
@@ -1459,7 +1646,14 @@ export function PublicationEditor({
               startPan(event);
               return;
             }
+            // The right button opens the menu; the marquee belongs to the left.
+            if (event.button === 2) return;
+            setMenu(null);
             startMarquee(event);
+          }}
+          onContextMenu={(event) => {
+            event.preventDefault();
+            setMenu({ x: event.clientX, y: event.clientY, onBlock: false });
           }}
         >
           <div
@@ -1530,6 +1724,26 @@ export function PublicationEditor({
                 onPointerDown={
                   repeated ? undefined : (event) => startDrag(event, block, "move")
                 }
+                onContextMenu={
+                  repeated
+                    ? undefined
+                    : (event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        // A right-click on something outside the selection
+                        // takes it first, so the menu always acts on what was
+                        // pressed rather than on what happened to be chosen.
+                        if (!selectedIds.includes(block.id)) {
+                          setSelectedIds(blockSelection(block));
+                          setStyleSlot(null);
+                        }
+                        setMenu({
+                          x: event.clientX,
+                          y: event.clientY,
+                          onBlock: true,
+                        });
+                      }
+                }
                 /* Opens the group this block is in, so the next press picks
                    the block rather than the whole arrangement. */
                 onDoubleClick={
@@ -1588,6 +1802,95 @@ export function PublicationEditor({
             <div className="pub-editor-bounds" aria-hidden="true" />
           </div>
         </div>
+
+        {menu ? (
+          <>
+            {/* Transparent, over everything, and only here while the menu is
+                open: the next press anywhere closes it. */}
+            <div
+              className="pub-menu-sheet"
+              onPointerDown={() => setMenu(null)}
+              onContextMenu={(event) => {
+                event.preventDefault();
+                setMenu(null);
+              }}
+            />
+            <div
+              className="pub-menu"
+              role="menu"
+              style={{
+                // Kept inside the window, so a menu opened near an edge does
+                // not run off it.
+                left: `${Math.max(8, Math.min(menu.x, window.innerWidth - 248))}px`,
+                top: `${Math.max(8, Math.min(menu.y, window.innerHeight - 160))}px`,
+              }}
+            >
+              {menu.onBlock ? (
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    copySelection();
+                    setMenu(null);
+                  }}
+                >
+                  Copy{selectedIds.length > 1 ? ` ${selectedIds.length} blocks` : ""}
+                </button>
+              ) : null}
+
+              <button
+                type="button"
+                role="menuitem"
+                disabled={clipboard.length === 0}
+                onClick={() => {
+                  pasteClipboard();
+                  setMenu(null);
+                }}
+              >
+                Paste
+                {clipboard.length > 1 ? ` ${clipboard.length} blocks` : ""}
+              </button>
+
+              {menu.onBlock ? (
+                <>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      copyStyle();
+                      setMenu(null);
+                    }}
+                  >
+                    Copy style
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    disabled={!styleClipboard}
+                    onClick={() => {
+                      pasteStyle();
+                      setMenu(null);
+                    }}
+                  >
+                    Paste style
+                    {selectedIds.length > 1 ? ` onto ${selectedIds.length}` : ""}
+                  </button>
+
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      deleteSelection();
+                      setMenu(null);
+                    }}
+                  >
+                    Delete{selectedIds.length > 1 ? ` ${selectedIds.length} blocks` : ""}
+                  </button>
+                </>
+              ) : null}
+            </div>
+          </>
+        ) : null}
 
         <aside className="builder-inspector">
           {/*
@@ -1907,10 +2210,13 @@ export function PublicationEditor({
                       value={selected.label ?? ""}
                       onChange={(label) => updateBlock(selected.id, { label })}
                     />
-                    <TextField
-                      label="Link"
-                      value={selected.href ?? ""}
-                      onChange={(href) => updateBlock(selected.id, { href })}
+                    {/* What it does when pressed is the click action below,
+                        which every block carries — a second link field on the
+                        button alone was a second answer to one question, and
+                        the one nothing rendered. */}
+                    <StyleButton
+                      label="Button style"
+                      onOpen={() => setStyleSlot("text")}
                     />
                   </>
                 ) : null}
@@ -2063,11 +2369,18 @@ export function PublicationEditor({
                   onChange={(clickAction) => updateBlock(selected.id, { clickAction })}
                 />
                 {selected.clickAction === "link" ? (
-                  <TextField
-                    label="URL"
-                    value={selected.clickTarget ?? ""}
-                    onChange={(clickTarget) => updateBlock(selected.id, { clickTarget })}
-                  />
+                  <>
+                    <TextField
+                      label="URL"
+                      value={selected.clickTarget ?? ""}
+                      onChange={(clickTarget) => updateBlock(selected.id, { clickTarget })}
+                    />
+                    <CheckField
+                      label="Open in a new tab"
+                      value={Boolean(selected.newTab)}
+                      onChange={(newTab) => updateBlock(selected.id, { newTab })}
+                    />
+                  </>
                 ) : null}
                 {selected.clickAction === "page" ? (
                   <SelectField

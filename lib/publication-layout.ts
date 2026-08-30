@@ -104,7 +104,15 @@ export type PublicationBlock = {
   controls?: boolean;
 
   label?: string;
+  /**
+   * Superseded by `clickAction` and `clickTarget`.
+   *
+   * Kept on the type so a publication saved before the change still reads, and
+   * carried over to a click action the first time it is normalized. Never
+   * written, and never rendered.
+   */
   href?: string;
+  /** Whether a click action's link opens in a new tab. */
   newTab?: boolean;
   qrValue?: string;
   iconName?: string;
@@ -201,6 +209,15 @@ export type SlideshowSettings = {
   enabled: boolean;
   intervalMs: number;
   loop: boolean;
+  /**
+   * Whether it starts by itself.
+   *
+   * Separate from `enabled`, which only says the publication *can* advance on
+   * its own. A reader who opened a zine to look at it should not have it taken
+   * off them a few seconds later, so the pages move when they press play —
+   * unless whoever published it decided otherwise.
+   */
+  autoplay: boolean;
 };
 
 export type AudioSettings = {
@@ -214,6 +231,7 @@ export const defaultSlideshow: SlideshowSettings = {
   enabled: false,
   intervalMs: 6000,
   loop: true,
+  autoplay: false,
 };
 
 export const defaultAudio: AudioSettings = {
@@ -259,7 +277,6 @@ export function createPublicationBlock(type: PublicationBlockType): PublicationB
       break;
     case "button":
       block.label = "Open";
-      block.href = "/";
       block.height = 80;
       block.width = 240;
       break;
@@ -362,8 +379,24 @@ export function normalizePublicationBlock(input: unknown): PublicationBlock | nu
       break;
     case "button":
       block.label = str(raw.label, "Button");
-      block.href = str(raw.href, "#");
       block.newTab = Boolean(raw.newTab);
+      /*
+       * A link set on the button itself, carried over to the click action.
+       *
+       * `href` was the button's own field and nothing ever rendered it: a
+       * button block draws a label, and what a block does when it is pressed
+       * has always been the click action, which every block carries. So a
+       * button with a link stored on it was a button that did nothing. The
+       * address is moved rather than dropped, and only where nothing has been
+       * asked for already, so a click action somebody set is never overruled.
+       */
+      if (!block.clickAction || block.clickAction === "none") {
+        const legacy = str(raw.href);
+        if (legacy && legacy !== "#") {
+          block.clickAction = "link";
+          block.clickTarget = legacy;
+        }
+      }
       break;
     case "qrCode":
       block.qrValue = str(raw.qrValue);
@@ -692,6 +725,9 @@ export function normalizeSlideshow(input: unknown): SlideshowSettings {
     enabled: Boolean(raw.enabled),
     intervalMs: Math.max(500, num(raw.intervalMs, defaultSlideshow.intervalMs)),
     loop: raw.loop === undefined ? true : Boolean(raw.loop),
+    // Unsaid means no. A slideshow saved before this existed started on its
+    // own, and the point of the setting is that it should not have.
+    autoplay: Boolean(raw.autoplay),
   };
 }
 
@@ -882,4 +918,75 @@ export function withGroupMembers(
         .map((block) => block.id),
     ]),
   ];
+}
+
+/* ------------------------------------------------------- Copying a look */
+
+/**
+ * How a block is dressed, apart from what it is and where it sits.
+ *
+ * Its style, its shape's style, the slugs of any saved styles it wears, the
+ * colour an icon or a code is drawn in, and how a picture is cropped and
+ * cornered. Deliberately not its text, its media, its size or its position:
+ * copying a look onto another block should leave that block being what it is
+ * and standing where it stood.
+ */
+export type BlockStyle = Pick<
+  PublicationBlock,
+  | "styleSlug"
+  | "textStyle"
+  | "shapeSlug"
+  | "shapeStyle"
+  | "textPlacement"
+  | "color"
+  | "radius"
+  | "objectFit"
+>;
+
+const BLOCK_STYLE_KEYS = [
+  "styleSlug",
+  "textStyle",
+  "shapeSlug",
+  "shapeStyle",
+  "textPlacement",
+  "color",
+  "radius",
+  "objectFit",
+] as const;
+
+export function blockStyleOf(block: PublicationBlock): BlockStyle {
+  const style: BlockStyle = {};
+  for (const key of BLOCK_STYLE_KEYS) {
+    const value = block[key];
+    if (value !== undefined) {
+      // The cast is the price of copying a fixed set of keys off one object
+      // onto another of the same shape; every key is checked above.
+      (style as Record<string, unknown>)[key] = value;
+    }
+  }
+  return style;
+}
+
+/**
+ * Dresses a block in a look taken from another.
+ *
+ * Every style key is written, including the ones the copied block did not
+ * have: a look pasted onto a block that already had one has to be able to
+ * clear what was there, or pasting a plain style onto a decorated block would
+ * leave the decoration behind and match neither.
+ *
+ * A key the target's type does not use is dropped the next time it is read —
+ * `normalizePublicationBlock` writes only the fields each type has — so a text
+ * colour pasted onto a photograph does not linger.
+ */
+export function withBlockStyle(
+  block: PublicationBlock,
+  style: BlockStyle
+): PublicationBlock {
+  const dressed: PublicationBlock = { ...block };
+  for (const key of BLOCK_STYLE_KEYS) {
+    if (style[key] === undefined) delete (dressed as Record<string, unknown>)[key];
+    else (dressed as Record<string, unknown>)[key] = style[key];
+  }
+  return dressed;
 }
