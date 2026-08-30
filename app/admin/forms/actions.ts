@@ -8,7 +8,7 @@ import { requirePermission } from "@/lib/access";
 import { connectDB } from "@/lib/db";
 import { normalizeFormLayout, normalizeFormSettings } from "@/lib/form-layout";
 import { clearMediaUsage, syncMediaUsage } from "@/lib/media-usage-sync";
-import { FormDefinition, FormSubmission } from "@/lib/models";
+import { FormDefinition } from "@/lib/models";
 import { slugify, uniqueSlug } from "@/lib/slug";
 
 async function guard() {
@@ -85,29 +85,23 @@ export async function saveSubmissionLayoutAction(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   if (!id) return;
 
-  let submissionLayout: unknown[];
-  try {
-    const parsed = JSON.parse(String(formData.get("submissionLayout") ?? "[]"));
-    submissionLayout = Array.isArray(parsed) ? parsed.slice(0, 200) : [];
-  } catch {
-    submissionLayout = [];
-  }
+  const idList = (key: string): unknown[] => {
+    try {
+      const parsed = JSON.parse(String(formData.get(key) ?? "[]"));
+      return Array.isArray(parsed) ? parsed.slice(0, 200) : [];
+    } catch {
+      return [];
+    }
+  };
 
-  await FormDefinition.findByIdAndUpdate(id, { submissionLayout });
+  await FormDefinition.findByIdAndUpdate(id, {
+    submissionLayout: idList("submissionLayout"),
+    submissionColumns: idList("submissionColumns"),
+  });
 
   revalidatePath(`/admin/forms/${id}/submission-layout`);
   revalidatePath("/admin/forms/submissions");
+  // The columns are this form's own, so its own list has to be rebuilt.
+  revalidatePath(`/admin/forms/submissions/${id}`);
   redirect(`/admin/forms/${id}/submission-layout?saved=1`);
-}
-
-export async function updateSubmissionStatusAction(formData: FormData) {
-  await requirePermission("forms.submissions");
-  await connectDB();
-
-  const id = String(formData.get("id") ?? "");
-  const status = String(formData.get("status") ?? "read");
-  if (!id || !["new", "read", "archived"].includes(status)) return;
-
-  await FormSubmission.findByIdAndUpdate(id, { status });
-  revalidatePath("/admin/forms/submissions");
 }

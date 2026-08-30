@@ -1243,6 +1243,115 @@ input, select, textarea {
   padding-left: 1.1rem;
 }
 
+/* The submissions inbox: one scannable row per entry, the whole of it a click
+   away. Scrolls sideways rather than squeezing, so a form listing four answers
+   keeps them readable on a narrow screen. */
+.submission-rows {
+  overflow-x: auto;
+}
+
+.submission-rows .admin-table td {
+  /* A glance, not a reading — a long answer is cut off by its column rather
+     than setting the row three lines tall. */
+  max-width: 22rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-table tr.is-openable {
+  cursor: pointer;
+}
+
+.admin-table tr.is-openable:hover {
+  background: rgba(128, 128, 128, 0.1);
+}
+
+/* Not yet read. Weight rather than colour: the status column already names it,
+   and a colour here would compete with the tone colours used elsewhere for
+   things that are wrong. */
+.admin-table tr.is-unread > td {
+  font-weight: 600;
+}
+
+/* The inbox: one card per form, the count of what is waiting on each. */
+.inbox-cards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(17rem, 100%), 1fr));
+  gap: 0.875rem;
+}
+
+.inbox-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  height: 100%;
+  padding: 1rem;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--radius);
+  background: var(--admin-panel);
+  color: inherit;
+  text-decoration: none;
+  transition: border-color 150ms ease, transform 150ms ease;
+}
+
+.inbox-card:hover {
+  border-color: var(--admin-accent);
+  transform: translateY(-1px);
+}
+
+/* A form with something waiting is the reason to be on this page, so it is
+   marked on the card itself and not only in its figure. */
+.inbox-card.is-waiting {
+  border-color: var(--admin-accent);
+}
+
+.inbox-card-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  font-weight: 600;
+}
+
+.inbox-card-figure {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  margin-top: auto;
+}
+
+.inbox-card-figure strong {
+  font-size: 2rem;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.inbox-card.is-waiting .inbox-card-figure strong {
+  color: var(--admin-accent);
+}
+
+.inbox-card-foot {
+  font-size: 0.75rem;
+  color: var(--admin-muted);
+}
+
+/* Two answers per field — listed, and opened — so the ticks sit under their
+   headings rather than being pushed to the far edge like a count would be. */
+.submission-layout-table th.is-narrow,
+.submission-layout-table td.is-narrow {
+  width: 6rem;
+  text-align: center;
+  opacity: 1;
+}
+
+.submission-layout-table td.is-narrow .admin-list-actions {
+  justify-content: center;
+}
+
 .help-text {
   font-size: 0.75rem;
   color: var(--admin-muted);

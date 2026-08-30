@@ -1360,7 +1360,17 @@ const FormDefinitionSchema = new Schema<any>(
     status: { type: String, enum: ["draft", "published"], default: "draft" },
     layout: { type: [Mixed], default: [] },
     settings: { type: Mixed, default: {} },
+    /** Which fields the full entry shows, and in what order. */
     submissionLayout: { type: [Mixed], default: [] },
+    /**
+     * Which fields appear as columns in the submissions list, in order.
+     *
+     * Separate from `submissionLayout`: a row has space for two or three
+     * answers and the whole entry has space for forty, so what belongs in one
+     * is rarely what belongs in the other. Empty means unconfigured, which the
+     * list reads as "the first few fields" rather than "none".
+     */
+    submissionColumns: { type: [Mixed], default: [] },
 
     visibility: { type: ContentVisibilitySchema, default: () => ({}) },
   },
