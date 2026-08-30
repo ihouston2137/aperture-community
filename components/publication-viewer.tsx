@@ -15,6 +15,7 @@ import {
 import { protectedMediaUrl } from "@/lib/protected-media-url";
 
 import { IconView } from "./icons";
+import { PublicationMenu } from "./publication-menu";
 
 import {
   PublicationBlockView,
@@ -38,6 +39,7 @@ export function PublicationViewer({
   audio,
   sources,
   showControls = true,
+  fileName,
 }: {
   pages: PublicationPage[];
   /** Drawn on every page, underneath that page's own blocks. */
@@ -50,10 +52,14 @@ export function PublicationViewer({
   audio: AudioSettings;
   sources: PublicationSources;
   showControls?: boolean;
+  /** What a downloaded PDF is called. Absent turns the menu's download off. */
+  fileName?: string;
 }) {
   const [index, setIndex] = useState(0);
   const [scale, setScale] = useState(1);
   const [playing, setPlaying] = useState(slideshow.enabled);
+  /** Put away from the right-click menu, and brought back the same way. */
+  const [navHidden, setNavHidden] = useState(false);
   const hostRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
 
@@ -86,6 +92,40 @@ export function PublicationViewer({
     const timer = setInterval(() => goTo(index + 1), slideshow.intervalMs);
     return () => clearInterval(timer);
   }, [playing, index, pages.length, slideshow.intervalMs, goTo]);
+
+  /*
+   * The wheel turns the page.
+   *
+   * Throttled, because one flick of a wheel or one swipe on a trackpad sends a
+   * burst of events and a publication that jumped five pages at a time would be
+   * unusable. Bound with `passive: false` on the element rather than through a
+   * React prop, so the browser's own scroll can be prevented — a stage that
+   * fills the window has nothing to scroll, and the page behind it moving
+   * instead is the wrong answer.
+   */
+  useEffect(() => {
+    const host = hostRef.current;
+    if (!host || pages.length < 2) return;
+
+    let settledAt = 0;
+    const onWheel = (event: WheelEvent) => {
+      const travel = Math.abs(event.deltaY) > Math.abs(event.deltaX)
+        ? event.deltaY
+        : event.deltaX;
+      if (travel === 0) return;
+
+      event.preventDefault();
+
+      const now = Date.now();
+      if (now - settledAt < 350) return;
+      settledAt = now;
+
+      goTo(index + (travel > 0 ? 1 : -1));
+    };
+
+    host.addEventListener("wheel", onWheel, { passive: false });
+    return () => host.removeEventListener("wheel", onWheel);
+  }, [index, goTo, pages.length]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -200,7 +240,16 @@ export function PublicationViewer({
       {/* Page audio replaces the global track while that page is showing. */}
       {pageAudio ? <audio key={pageAudio} src={protectedMediaUrl(pageAudio)} autoPlay /> : null}
 
-      {showControls && pages.length > 1 ? (
+      {fileName ? (
+        <PublicationMenu
+          hostRef={hostRef}
+          fileName={fileName}
+          navVisible={!navHidden}
+          onToggleNav={() => setNavHidden((current) => !current)}
+        />
+      ) : null}
+
+      {showControls && !navHidden && pages.length > 1 ? (
         <div className="pub-controls">
           {/* Arrows rather than the ‹ › glyphs, which at this size read as
               punctuation instead of something to press. */}

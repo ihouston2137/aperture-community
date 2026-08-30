@@ -65,6 +65,14 @@ export async function PublicationScreen({
       audio={normalizeAudio(doc.audio)}
       sources={sources}
       showControls={showControls}
+      // Names the file the right-click menu downloads, and is what turns that
+      // item on: a surface with nothing to call the file cannot offer one.
+      fileName={
+        String(doc.slug || doc.title || "publication")
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/^-+|-+$/g, "") || "publication"
+      }
     />
   );
 }

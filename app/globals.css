@@ -5274,6 +5274,56 @@ ol.doc-list ol.doc-list ol.doc-list {
   animation: pub-ken-burns 18s ease-in-out infinite alternate;
 }
 
+/* --------------------------------------------------- Publication menu
+
+   The right-click menu over a published publication, and the sheet that
+   closes it. */
+
+/* Transparent and over everything, but only while the menu is open — a sheet
+   that lived here permanently would swallow every click on a block that is a
+   link. */
+.pub-menu-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+}
+
+.pub-menu {
+  position: fixed;
+  z-index: 41;
+  min-width: 15rem;
+  display: flex;
+  flex-direction: column;
+  padding: 0.25rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: #1b1f26;
+  color: #f2f4f7;
+  box-shadow: 0 0.75rem 2rem rgba(0, 0, 0, 0.5);
+}
+
+.pub-menu button {
+  appearance: none;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.375rem;
+  cursor: pointer;
+}
+
+.pub-menu button:hover:not(:disabled),
+.pub-menu button:focus-visible {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.pub-menu button:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
 .pub-controls {
   position: fixed;
   bottom: 1rem;

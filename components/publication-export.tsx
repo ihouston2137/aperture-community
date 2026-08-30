@@ -2,6 +2,96 @@
 
 import { useState } from "react";
 
+/** The authored canvas size, which is the page's own layout box. */
+function pageSizeOf(node: HTMLElement) {
+  // `offsetWidth` rather than `getBoundingClientRect`, which would report the
+  // stage's on-screen size after it has been scaled down to fit the viewport.
+  return { width: node.offsetWidth || 1920, height: node.offsetHeight || 1080 };
+}
+
+/**
+ * Every page on screen, as an image.
+ *
+ * Reads the rendered stage rather than re-rendering the publication, so what
+ * comes out is what was on the page — fonts, styles, layouts and all. Lifted
+ * out of the toolbar so the viewer's own menu can export without a second
+ * copy of the capture: the awkward parts below were learned once and should
+ * not have to be learned again.
+ */
+export async function capturePublicationPages(
+  onProgress?: (message: string) => void
+): Promise<string[]> {
+  const { toPng } = await import("html-to-image");
+  const nodes = Array.from(document.querySelectorAll<HTMLElement>(".pub-page"));
+
+  const frames: string[] = [];
+  for (const [index, node] of nodes.entries()) {
+    onProgress?.(`Rendering page ${index + 1} of ${nodes.length}…`);
+    const { width, height } = pageSizeOf(node);
+
+    frames.push(
+      await toPng(node, {
+        cacheBust: true,
+        pixelRatio: 1,
+        // Captured at the authored size, not at whatever the stage has been
+        // scaled to on screen.
+        width,
+        height,
+        /*
+         * Applied to the clone, so the live page is never touched.
+         *
+         * Every page but the current one is hidden by opacity, and by a
+         * transform when the transition slides or flips. Setting opacity on
+         * the real node started a 450ms fade that the capture did not wait
+         * for, which is why every page after the first came out blank.
+         */
+        style: {
+          opacity: "1",
+          visibility: "visible",
+          transform: "none",
+          transition: "none",
+        },
+      })
+    );
+  }
+  return frames;
+}
+
+/** The pages, as a PDF the size the publication was authored at. */
+export async function downloadPublicationPdf(
+  fileName: string,
+  onProgress?: (message: string) => void
+): Promise<void> {
+  const frames = await capturePublicationPages(onProgress);
+  if (frames.length === 0) throw new Error("There is nothing to export.");
+
+  const { jsPDF } = await import("jspdf");
+  const first = document.querySelector<HTMLElement>(".pub-page");
+  // The publication's authored dimensions, so the PDF page is the shape the
+  // editor set rather than a paper size.
+  const { width, height } = first
+    ? pageSizeOf(first)
+    : { width: 1920, height: 1080 };
+  const orientation = width >= height ? "landscape" : "portrait";
+
+  const pdf = new jsPDF({
+    orientation,
+    unit: "px",
+    format: [width, height],
+    // A PDF page is measured in points, so the canvas has to be converted: at
+    // the usual 96dpi, 1080 canvas pixels is 810pt. Without this hotfix jsPDF
+    // scales the other way and the page comes out a third too large.
+    hotfixes: ["px_scaling"],
+  });
+
+  frames.forEach((frame, index) => {
+    if (index > 0) pdf.addPage([width, height], orientation);
+    pdf.addImage(frame, "PNG", 0, 0, width, height);
+  });
+
+  pdf.save(`${fileName}.pdf`);
+}
+
 /** A file-name-safe scrap of a page or layout name. */
 function slugPart(value: string | undefined): string {
   return (value ?? "")
@@ -60,49 +150,12 @@ export function PublicationExport({
     }
   }
 
-  /** The authored canvas size, which is the page's own layout box. */
-  function pageSize(node: HTMLElement) {
-    // `offsetWidth` rather than `getBoundingClientRect`, which would report the
-    // stage's on-screen size after it has been scaled down to fit the viewport.
-    return { width: node.offsetWidth || 1920, height: node.offsetHeight || 1080 };
-  }
+  const pageSize = pageSizeOf;
 
   async function capturePages(): Promise<string[]> {
-    const { toPng } = await import("html-to-image");
-    const nodes = Array.from(document.querySelectorAll<HTMLElement>(".pub-page"));
-
-    const frames: string[] = [];
-    for (const [index, node] of nodes.entries()) {
-      setMessage(`Rendering page ${index + 1} of ${nodes.length}…`);
-      const { width, height } = pageSize(node);
-
-      frames.push(
-        await toPng(node, {
-          cacheBust: true,
-          pixelRatio: 1,
-          // Captured at the authored size, not at whatever the stage has been
-          // scaled to on screen.
-          width,
-          height,
-          /*
-           * Applied to the clone, so the live page is never touched.
-           *
-           * Every page but the current one is hidden by opacity, and by a
-           * transform when the transition slides or flips. Setting opacity on
-           * the real node started a 450ms fade that the capture did not wait
-           * for, which is why every page after the first came out blank.
-           */
-          style: {
-            opacity: "1",
-            visibility: "visible",
-            transform: "none",
-            transition: "none",
-          },
-        })
-      );
-    }
-    return frames;
+    return capturePublicationPages(setMessage);
   }
+
 
   /** The page on screen, saved on its own. */
   async function exportPng() {
@@ -178,36 +231,7 @@ export function PublicationExport({
 
   async function exportPdf() {
     await withPages(async () => {
-      const frames = await capturePages();
-      if (frames.length === 0) {
-        setError("There is nothing to export.");
-        return;
-      }
-
-      const { jsPDF } = await import("jspdf");
-      const first = document.querySelector<HTMLElement>(".pub-page");
-      // The publication's authored dimensions, so the PDF page is the shape the
-      // editor set rather than a paper size.
-      const { width, height } = first
-        ? pageSize(first)
-        : { width: 1920, height: 1080 };
-
-      const pdf = new jsPDF({
-        orientation: width >= height ? "landscape" : "portrait",
-        unit: "px",
-        format: [width, height],
-        // A PDF page is measured in points, so the canvas has to be converted:
-        // at the usual 96dpi, 1080 canvas pixels is 810pt. Without this hotfix
-        // jsPDF scales the other way and the page comes out a third too large.
-        hotfixes: ["px_scaling"],
-      });
-
-      frames.forEach((frame, index) => {
-        if (index > 0) pdf.addPage([width, height], width >= height ? "landscape" : "portrait");
-        pdf.addImage(frame, "PNG", 0, 0, width, height);
-      });
-
-      pdf.save(`${fileName}.pdf`);
+      await downloadPublicationPdf(fileName, setMessage);
       setMessage("PDF downloaded.");
     });
   }
