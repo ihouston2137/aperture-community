@@ -2164,7 +2164,10 @@ input, select, textarea {
 
 .doc-render .doc-list {
   line-height: 1.75;
-  gap: 0.5rem;
+}
+
+.doc-render .doc-list > li + li {
+  margin-top: 0.5rem;
 }
 
 /* Inline code sits inside a line, so it is tinted rather than boxed — a border
@@ -2367,12 +2370,51 @@ input, select, textarea {
   gap: 0.75rem;
 }
 
+/*
+ * Left in normal flow, deliberately.
+ *
+ * A `display: flex` list has no bullets and no numbers: making the items flex
+ * items stops them generating a marker box at all, which is why the padding
+ * below was reserving room for markers that were never drawn. Spacing between
+ * items is a margin for the same reason — `gap` is a flex and grid property
+ * and buys nothing here.
+ */
 .doc-list {
   padding-left: 1.5rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
   line-height: 1.6;
+}
+
+.doc-list > li + li {
+  margin-top: 0.35rem;
+}
+
+/* Numbers for an ordered list, bullets for the rest, stated rather than left
+   to the browser — a reset elsewhere on the page must not be able to take the
+   markers off a document's lists. */
+ol.doc-list {
+  list-style: decimal outside;
+}
+
+ul.doc-list {
+  list-style: disc outside;
+}
+
+/* Nested lists step through the usual marks, so three levels of an outline do
+   not read as three levels of the same dot. */
+ul.doc-list ul.doc-list {
+  list-style-type: circle;
+}
+
+ul.doc-list ul.doc-list ul.doc-list {
+  list-style-type: square;
+}
+
+ol.doc-list ol.doc-list {
+  list-style-type: lower-alpha;
+}
+
+ol.doc-list ol.doc-list ol.doc-list {
+  list-style-type: lower-roman;
 }
 
 /* A task list carries its own boxes, so the markers would be a second bullet. */
