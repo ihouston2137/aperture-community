@@ -490,11 +490,37 @@ export function createBlock(type: PageBlockType): PageBlock {
   return block;
 }
 
-export function createColumn(span = GRID_UNITS): PageColumn {
+/**
+ * What a row or column is born with on every side, in rem.
+ *
+ * Not zero, because a container with no padding puts its contents hard against
+ * its own edge — and the edge only becomes visible later, when somebody gives
+ * the row a background or a border and finds the text touching it. Half a rem
+ * is small enough to be invisible until it is wanted and large enough to be
+ * right when it is.
+ *
+ * Passed in at creation rather than built into `defaultSpacing`, which is also
+ * the fallback normalization reads: baking it in there would silently repad
+ * every row already saved with nothing.
+ */
+export const NEW_CONTAINER_PADDING = 0.5;
+
+function paddedSpacing(padding: number | undefined) {
+  if (padding === undefined) return defaultSpacing;
+  return {
+    ...defaultSpacing,
+    paddingTop: padding,
+    paddingRight: padding,
+    paddingBottom: padding,
+    paddingLeft: padding,
+  };
+}
+
+export function createColumn(span = GRID_UNITS, padding?: number): PageColumn {
   return {
     id: makeId("col"),
     span,
-    settings: { ...defaultColumnSettings },
+    settings: { ...defaultColumnSettings, ...paddedSpacing(padding) },
     blocks: [],
   };
 }
@@ -512,12 +538,12 @@ export function evenSpans(columnCount: number): number[] {
   });
 }
 
-export function createRow(columnCount = 1): PageRow {
+export function createRow(columnCount = 1, padding?: number): PageRow {
   const spans = evenSpans(columnCount);
   return {
     id: makeId("row"),
-    settings: { ...defaultRowSettings },
-    columns: spans.map((span) => createColumn(span)),
+    settings: { ...defaultRowSettings, ...paddedSpacing(padding) },
+    columns: spans.map((span) => createColumn(span, padding)),
   };
 }
 

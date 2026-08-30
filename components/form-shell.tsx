@@ -198,18 +198,29 @@ export function FormFieldView({
   /*
    * The form's own label and field styles, with the block's laid over them —
    * so a form reads as one thing while a single field can still depart from it.
+   *
+   * The label and the control are dressed from separate slots at both levels:
+   * a small grey caption over a large bordered input is the ordinary case, and
+   * one style applied to both cannot say it.
    */
-  const own = blockTextProps(block);
+  const ownLabel = styleSlotProps({
+    styleSlug: block.labelStyleSlug ?? "",
+    style: block.labelStyle ?? {},
+  });
+  const ownField = styleSlotProps({
+    styleSlug: block.fieldStyleSlug ?? "",
+    style: block.fieldStyle ?? {},
+  });
   const labelStyled = styleSlotProps(settings.labelStyle);
   const fieldStyled = styleSlotProps(settings.fieldStyle);
 
-  const className = `${labelStyled.className} ${own.className}`.trim();
-  const style = { ...labelStyled.style, ...own.style };
+  const className = `${labelStyled.className} ${ownLabel.className}`.trim();
+  const style = { ...labelStyled.style, ...ownLabel.style };
 
   /** Spread onto every control, so one setting dresses them all. */
   const fieldProps = {
-    className: `input ${fieldStyled.className}`.trim(),
-    style: fieldStyled.style,
+    className: `input ${fieldStyled.className} ${ownField.className}`.trim(),
+    style: { ...fieldStyled.style, ...ownField.style },
   };
 
   const label = (

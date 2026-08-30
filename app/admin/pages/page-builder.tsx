@@ -31,6 +31,7 @@ import {
 } from "@/lib/color-overrides";
 import {
   createBlock,
+  NEW_CONTAINER_PADDING,
   walkBlocks,
   type PageBlock,
   type PageLayout,
@@ -411,6 +412,7 @@ export function PageBuilder({
           await deleteSavedBlockAction(id);
           setSavedBlocks((current) => current.filter((saved) => saved._id !== id));
         }}
+        newContainerPadding={NEW_CONTAINER_PADDING}
         exitHref={exit.href}
         exitLabel={exit.label}
         topbar={

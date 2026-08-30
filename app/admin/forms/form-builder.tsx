@@ -20,7 +20,7 @@ import {
 } from "@/components/block-primitives";
 import { FormFieldView, FormPlaceholderStyle } from "@/components/form-shell";
 import { RichTextEditor } from "@/components/rich-text-editor";
-import { StyleEditor } from "@/components/style-editor";
+import { InlineStyleEditor, StyleEditor } from "@/components/style-editor";
 import type { AdminExit } from "@/lib/admin-exit";
 import type { BuilderSources } from "@/lib/builder-sources";
 import { styleSlotProps } from "@/lib/display-templates";
@@ -33,7 +33,7 @@ import {
   type FormBlockType,
   type FormSettings,
 } from "@/lib/form-layout";
-import type { PageBlock, PageRow } from "@/lib/page-layout";
+import { NEW_CONTAINER_PADDING, type PageBlock, type PageRow } from "@/lib/page-layout";
 import {
   CONTENT_WIDTHS,
   CONTENT_WIDTH_LABELS,
@@ -111,6 +111,31 @@ const GLOBAL_STYLE_TITLES: Record<GlobalStyleKey, string> = {
   helpStyle: "Help text style",
 };
 
+/**
+ * Which blocks carry a label and a control to dress apart.
+ *
+ * A submit button is a field block by type only: it has no label of its own,
+ * and its one style is the button. A hidden field draws nothing at all.
+ */
+function dressesLabelAndField(type: FormBlockType): boolean {
+  return isFieldBlock(type) && type !== "submit" && type !== "hidden";
+}
+
+/**
+ * One folded set of style controls.
+ *
+ * `details` needs no state to fold, and both sets closed by default keeps the
+ * settings below them reachable without scrolling past two full panels.
+ */
+function StyleFold({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <details className="inspector-fold is-top">
+      <summary>{title}</summary>
+      <div className="inspector-fold-body">{children}</div>
+    </details>
+  );
+}
+
 export type FormRecord = {
   _id?: string;
   title: string;
@@ -167,11 +192,6 @@ export function FormBuilder({
   const [slug, setSlug] = useState(form.slug);
   const [status, setStatus] = useState(form.status);
   const [settings, setSettings] = useState<FormSettings>(form.settings);
-  const [styleTarget, setStyleTarget] = useState<FormBlock | null>(null);
-  const [applyStyle, setApplyStyle] = useState<((patch: Partial<PageBlock>) => void) | null>(
-    null
-  );
-
   /**
    * The form's own label and field styles, edited through the same popup a
    * block uses. Held apart from `styleTarget` because these write to the form's
@@ -297,19 +317,67 @@ export function FormBuilder({
 
           return (
             <>
-              <div className="inspector-section">
-                <h4 className="inspector-title">Style</h4>
-                <button
-                  type="button"
-                  className="btn btn-sm"
-                  onClick={() => {
-                    setStyleTarget(formBlock);
-                    setApplyStyle(() => update);
-                  }}
-                >
-                  Edit style…
-                </button>
-              </div>
+              {formBlock.type === "hidden" ? null : (
+                <div className="inspector-section">
+                  <h4 className="inspector-title">Style</h4>
+
+                  {dressesLabelAndField(formBlock.type) ? (
+                    <>
+                      {/* Two folds rather than two stacked panels: each is a
+                          full set of style controls, and both open at once
+                          would bury the settings below them. */}
+                      <StyleFold title="Label">
+                        <InlineStyleEditor
+                          values={formBlock.labelStyle}
+                          styleSlug={formBlock.labelStyleSlug ?? ""}
+                          fonts={sources.fonts}
+                          savedStyles={sources.styles}
+                          onChange={({ values, styleSlug }) =>
+                            patch({
+                              labelStyleSlug: styleSlug,
+                              labelStyle: styleSlug ? undefined : values,
+                            })
+                          }
+                        />
+                      </StyleFold>
+
+                      <StyleFold title="Field">
+                        <InlineStyleEditor
+                          values={formBlock.fieldStyle}
+                          styleSlug={formBlock.fieldStyleSlug ?? ""}
+                          fonts={sources.fonts}
+                          savedStyles={sources.styles}
+                          onChange={({ values, styleSlug }) =>
+                            patch({
+                              fieldStyleSlug: styleSlug,
+                              fieldStyle: styleSlug ? undefined : values,
+                            })
+                          }
+                        />
+                      </StyleFold>
+
+                      <p className="help-text">
+                        Laid over the form-wide label and field styles, so this
+                        one field can depart from the rest without changing
+                        them.
+                      </p>
+                    </>
+                  ) : (
+                    <InlineStyleEditor
+                      values={formBlock.textStyle}
+                      styleSlug={formBlock.styleSlug ?? ""}
+                      fonts={sources.fonts}
+                      savedStyles={sources.styles}
+                      onChange={({ values, styleSlug }) =>
+                        patch({
+                          styleSlug,
+                          textStyle: styleSlug ? undefined : values,
+                        })
+                      }
+                    />
+                  )}
+                </div>
+              )}
 
               <div className="inspector-section">
                 <h4 className="inspector-title">Settings</h4>
@@ -484,6 +552,7 @@ export function FormBuilder({
             </>
           );
         }}
+        newContainerPadding={NEW_CONTAINER_PADDING}
         exitHref={exit.href}
         exitLabel={exit.label}
         topbar={
@@ -531,22 +600,6 @@ export function FormBuilder({
             </button>
           </>
         }
-      />
-
-      <StyleEditor
-        open={Boolean(styleTarget)}
-        title="Block style"
-        fonts={sources.fonts}
-        savedStyles={sources.styles}
-        initial={{ values: styleTarget?.textStyle, styleSlug: styleTarget?.styleSlug }}
-        onClose={() => setStyleTarget(null)}
-        onApply={(result) => {
-          applyStyle?.({
-            styleSlug: result.styleSlug,
-            textStyle: result.styleSlug ? undefined : result.values,
-          });
-          setStyleTarget(null);
-        }}
       />
 
       <StyleEditor

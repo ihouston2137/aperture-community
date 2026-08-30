@@ -1,7 +1,7 @@
 import { requirePermission } from "@/lib/access";
 import { loadBuilderSources } from "@/lib/builder-sources";
 import { emptyColorOverrides } from "@/lib/color-overrides";
-import { createRow } from "@/lib/page-layout";
+import { createRow, NEW_CONTAINER_PADDING } from "@/lib/page-layout";
 import { loadPageSources } from "@/lib/page-sources";
 import { getAppearance, getSiteContent } from "@/lib/site-settings";
 
@@ -21,7 +21,7 @@ export default async function NewPagePage() {
 
   return (
     <PageBuilder
-      page={{ title: "", slug: "", status: "draft", isHome: false, layout: [createRow(1)], colors: emptyColorOverrides }}
+      page={{ title: "", slug: "", status: "draft", isHome: false, layout: [createRow(1, NEW_CONTAINER_PADDING)], colors: emptyColorOverrides }}
       sources={sources}
       previewSources={previewSources}
       chrome={{ appearance, content }}

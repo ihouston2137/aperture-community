@@ -126,6 +126,15 @@ export type LayoutBuilderProps = {
    * is selected, which is otherwise dead space.
    */
   documentSettings?: ReactNode;
+  /**
+   * The padding a newly added row or column starts with, in rem.
+   *
+   * A builder's own choice rather than one rule for all of them: a page and a
+   * form are boxes somebody dresses, and want a little room by default, while
+   * a template that renders into a fixed slot is measured to fit and would be
+   * thrown out by padding it did not ask for. Unset means none, as before.
+   */
+  newContainerPadding?: number;
 };
 
 export type Viewport = "desktop" | "tablet" | "mobile";
@@ -206,6 +215,7 @@ export function LayoutBuilder({
   canvasContentStyle,
   documentSettings,
   boundBackgroundMedia,
+  newContainerPadding,
 }: LayoutBuilderProps) {
   const [selection, setSelection] = useState<Selection>(null);
   const [tab, setTab] = useState<"outline" | "blocks">("outline");
@@ -568,6 +578,7 @@ export function LayoutBuilder({
               select={select}
               clearSelection={() => setSelection(null)}
               blockLabel={blockLabel}
+              newContainerPadding={newContainerPadding}
             />
           )}
         </aside>
@@ -776,6 +787,7 @@ function OutlineTree({
   select,
   clearSelection,
   blockLabel,
+  newContainerPadding,
 }: {
   layout: PageRow[];
   onChange: (layout: PageRow[]) => void;
@@ -783,6 +795,8 @@ function OutlineTree({
   select: (next: Selection) => void;
   clearSelection: () => void;
   blockLabel: (block: PageBlock) => string;
+  /** What a row or column added here starts with on every side, in rem. */
+  newContainerPadding?: number;
 }) {
   const [drag, setDrag] = useState<BlockSlot | null>(null);
   const [over, setOver] = useState<BlockSlot | null>(null);
@@ -1012,7 +1026,10 @@ function OutlineTree({
                         onChange(
                           updateRow(layout, rowIndex, {
                             ...row,
-                            columns: rebalanceColumns([...row.columns, createColumn()]),
+                            columns: rebalanceColumns([
+                              ...row.columns,
+                              createColumn(undefined, newContainerPadding),
+                            ]),
                           })
                         )
                       }
@@ -1029,7 +1046,9 @@ function OutlineTree({
                     key={count}
                     type="button"
                     className="btn btn-sm"
-                    onClick={() => onChange([...layout, createRow(count)])}
+                    onClick={() =>
+                      onChange([...layout, createRow(count, newContainerPadding)])
+                    }
                   >
                     + {count} col
                   </button>

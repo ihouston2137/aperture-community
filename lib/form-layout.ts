@@ -45,8 +45,20 @@ export type FormBlock = {
   id: string;
   type: FormBlockType;
 
+  /** The block's own look. On a field block this dresses nothing on its own. */
   styleSlug?: string;
   textStyle?: StyleValues;
+
+  /*
+   * A field block is two things wearing one name: the words asking for
+   * something, and the box it goes in. They are almost never dressed alike —
+   * a small grey caption over a large bordered input is the ordinary case —
+   * so they are two settings rather than one applied twice.
+   */
+  labelStyleSlug?: string;
+  labelStyle?: StyleValues;
+  fieldStyleSlug?: string;
+  fieldStyle?: StyleValues;
 
   // visual
   text?: string;
@@ -202,6 +214,25 @@ export function normalizeFormBlock(input: unknown): FormBlock | null {
   if (raw.styleSlug) block.styleSlug = str(raw.styleSlug);
   if (raw.textStyle) block.textStyle = normalizeStyleValues(raw.textStyle);
 
+  if (raw.labelStyleSlug) block.labelStyleSlug = str(raw.labelStyleSlug);
+  if (raw.labelStyle) block.labelStyle = normalizeStyleValues(raw.labelStyle);
+  if (raw.fieldStyleSlug) block.fieldStyleSlug = str(raw.fieldStyleSlug);
+  if (raw.fieldStyle) block.fieldStyle = normalizeStyleValues(raw.fieldStyle);
+
+  /*
+   * Before the label and the control were separable, a field block's one
+   * style dressed its label and nothing else. So that is what it still means:
+   * it is read into the label slot, leaving forms already built looking as
+   * they did rather than quietly losing their styling. A submit button is a
+   * field block by type only — it has no label to dress, and keeps using the
+   * block style it always did.
+   */
+  const dressesALabel = isFieldBlock(type) && type !== "submit" && type !== "hidden";
+  if (dressesALabel && !block.labelStyleSlug && !block.labelStyle) {
+    if (block.styleSlug) block.labelStyleSlug = block.styleSlug;
+    if (block.textStyle) block.labelStyle = block.textStyle;
+  }
+
   switch (type) {
     case "headline":
       block.text = str(raw.text);
@@ -299,8 +330,8 @@ export function normalizeFormSettings(input: unknown): FormSettings {
   };
 }
 
-export function createFormRow(columnCount = 1) {
-  return createRow(columnCount);
+export function createFormRow(columnCount = 1, padding?: number) {
+  return createRow(columnCount, padding);
 }
 
 export { createColumn as createFormColumn };
