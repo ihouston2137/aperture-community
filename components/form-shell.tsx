@@ -175,19 +175,24 @@ export function FormFieldView({
   settings,
   value = "",
   files = [],
+  chosen = [],
   error,
   disabled = false,
   onChange = () => {},
   onUpload = () => {},
+  onToggle = () => {},
 }: {
   block: FormBlock;
   settings: FormSettings;
   value?: string;
   files?: UploadedFile[];
+  /** A checkbox group's ticked options. Empty for every other field. */
+  chosen?: string[];
   error?: string;
   disabled?: boolean;
   onChange?: (value: string) => void;
   onUpload?: (fileList: FileList | null) => void;
+  onToggle?: (option: string, ticked: boolean) => void;
 }) {
   const inputId = `field-${block.id}`;
 
@@ -317,6 +322,33 @@ export function FormFieldView({
         </fieldset>
       );
 
+    case "checkboxGroup":
+      return (
+        <fieldset className="field" style={{ border: 0, padding: 0, margin: 0 }}>
+          <legend className={className || undefined} style={style}>
+            {block.label}
+            {block.required ? <span aria-hidden="true"> *</span> : null}
+          </legend>
+          <div className={`checkbox-rows is-${block.optionLayout ?? "column"}`}>
+            {(block.options ?? []).map((option) => (
+              <label key={option} className="checkbox-row">
+                <input
+                  type="checkbox"
+                  name={block.name}
+                  value={option}
+                  checked={chosen.includes(option)}
+                  disabled={disabled}
+                  onChange={(event) => onToggle(option, event.target.checked)}
+                />
+                <span {...optionTextProps}>{option}</span>
+              </label>
+            ))}
+          </div>
+          {help}
+          {errorNode}
+        </fieldset>
+      );
+
     case "checkbox":
       return (
         <div className="field">
@@ -414,6 +446,12 @@ export function FormShell({
   const fields = useMemo(() => collectFormFields(layout), [layout]);
 
   const [values, setValues] = useState<Record<string, string>>({});
+  /*
+   * A checkbox group's answer is several answers, so it is kept apart from the
+   * one-value fields rather than squeezed into a delimited string — an option
+   * reading "Cheese, crackers" would break any delimiter chosen for it.
+   */
+  const [chosen, setChosen] = useState<Record<string, string[]>>({});
   const [uploads, setUploads] = useState<Record<string, UploadedFile[]>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
@@ -467,7 +505,13 @@ export function FormShell({
       const value =
         field.type === "file"
           ? (uploads[field.id] ?? []).map((file) => file.url)
-          : values[field.id] ?? field.defaultValue ?? "";
+          : field.type === "checkboxGroup"
+            ? // In the order they are set out, not the order they were ticked:
+              // a submission should read the way the form did.
+              (field.options ?? []).filter((option) =>
+                (chosen[field.id] ?? []).includes(option)
+              )
+            : values[field.id] ?? field.defaultValue ?? "";
       data[field.name ?? field.id] = value;
       return {
         id: field.id,
@@ -550,10 +594,22 @@ export function FormShell({
         block={block}
         settings={settings}
         value={values[block.id] ?? block.defaultValue ?? ""}
+        chosen={chosen[block.id] ?? []}
         files={uploads[block.id] ?? []}
         error={errors[block.id]}
         disabled={disabled}
         onChange={(value) => setValues((current) => ({ ...current, [block.id]: value }))}
+        onToggle={(option, ticked) =>
+          setChosen((current) => {
+            const now = current[block.id] ?? [];
+            return {
+              ...current,
+              [block.id]: ticked
+                ? [...now, option]
+                : now.filter((entry) => entry !== option),
+            };
+          })
+        }
         onUpload={(fileList) => handleUpload(block, fileList)}
       />
     );

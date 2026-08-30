@@ -181,6 +181,10 @@ export function createFormBlock(type: FormBlockType): FormBlock {
       block.label = "Choose one";
       block.options = ["Option one", "Option two"];
       break;
+    case "checkboxGroup":
+      block.label = "Choose any";
+      block.options = ["Option one", "Option two"];
+      break;
     case "checkbox":
       block.label = "I agree";
       break;
@@ -254,12 +258,12 @@ export function normalizeFormBlock(input: unknown): FormBlock | null {
       block.required = Boolean(raw.required);
       block.defaultValue = str(raw.defaultValue);
 
-      if (type === "select" || type === "radio") {
+      if (type === "select" || type === "radio" || type === "checkboxGroup") {
         block.options = Array.isArray(raw.options)
           ? raw.options.map((option) => str(option)).filter(Boolean).slice(0, 100)
           : [];
       }
-      if (type === "radio") {
+      if (type === "radio" || type === "checkboxGroup") {
         block.optionLayout = OPTION_LAYOUTS.includes(raw.optionLayout as OptionLayout)
           ? (raw.optionLayout as OptionLayout)
           : "column";

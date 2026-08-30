@@ -56,6 +56,7 @@ const LABELS: Record<string, string> = {
   longText: "Long text",
   select: "Dropdown",
   checkbox: "Checkbox",
+  checkboxGroup: "Checkbox group",
   radio: "Radio group",
   date: "Date",
   number: "Number",
@@ -76,6 +77,7 @@ const BLOCK_ICONS: Record<string, string> = {
   longText: "AlignLeft",
   select: "ListChecks",
   checkbox: "SquareCheck",
+  checkboxGroup: "ListTodo",
   radio: "CircleDot",
   date: "Calendar",
   number: "Hash",
@@ -478,7 +480,8 @@ export function FormBuilder({
                       onChange={(value) => patch({ required: value })}
                     />
 
-                    {formBlock.type === "radio" ? (
+                    {formBlock.type === "radio" ||
+                    formBlock.type === "checkboxGroup" ? (
                       <SelectField
                         label="Options laid out"
                         value={formBlock.optionLayout ?? "column"}
@@ -492,7 +495,9 @@ export function FormBuilder({
                       />
                     ) : null}
 
-                    {formBlock.type === "select" || formBlock.type === "radio" ? (
+                    {formBlock.type === "select" ||
+                    formBlock.type === "radio" ||
+                    formBlock.type === "checkboxGroup" ? (
                       <div className="field">
                         <label>Options (one per line)</label>
                         <textarea

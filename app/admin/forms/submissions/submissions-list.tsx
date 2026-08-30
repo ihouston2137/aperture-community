@@ -16,8 +16,22 @@ export type SubmissionRecord = {
   layoutOrder: string[];
 };
 
-function renderValue(value: unknown) {
-  // An array is a file field: the URLs of whatever was attached.
+function renderValue(value: unknown, type?: string) {
+  // A checkbox group also answers with a list, so which kind of list this is
+  // comes from the field's type rather than from the value's shape.
+  if (Array.isArray(value) && type === "checkboxGroup") {
+    return value.length === 0 ? (
+      <span className="help-text">nothing ticked</span>
+    ) : (
+      <ul className="submission-choices">
+        {value.map((item) => (
+          <li key={String(item)}>{String(item)}</li>
+        ))}
+      </ul>
+    );
+  }
+
+  // Otherwise an array is a file field: the URLs of whatever was attached.
   if (Array.isArray(value)) {
     return (
       <ul className="submission-files">
@@ -145,7 +159,7 @@ export function SubmissionsList({
                 {ordered.map((field) => (
                   <tr key={field.id}>
                     <th style={{ width: "14rem" }}>{field.label || field.name}</th>
-                    <td>{renderValue(field.value)}</td>
+                    <td>{renderValue(field.value, field.type)}</td>
                   </tr>
                 ))}
               </tbody>

@@ -22,6 +22,7 @@ export const FORM_FIELD_BLOCK_TYPES = [
   "longText",
   "select",
   "checkbox",
+  "checkboxGroup",
   "radio",
   "date",
   "number",
