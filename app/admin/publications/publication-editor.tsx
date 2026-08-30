@@ -30,6 +30,7 @@ import {
   createPublicationPage,
   effectiveBackground,
   emptyBackground,
+  withLayoutBackground,
   inheritedBlocks,
   withTemplateApplied,
   POST_VIEW_PRESETS,
@@ -478,6 +479,18 @@ export function PublicationEditor({
           item.id === editingTemplate.id ? { ...item, ...patch } : item
         )
       );
+
+      /*
+       * Giving a layout a background stands its pages aside.
+       *
+       * A page is created with a background of its own and a page's own wins,
+       * so without this the colour set here would show on the canvas and on no
+       * page using the layout — which is the same rule `withTemplateApplied`
+       * follows when a layout is applied, reaching the other order of work.
+       */
+      if (patch.backgroundType && patch.backgroundType !== "none") {
+        setPages((current) => withLayoutBackground(current, editingTemplate.id));
+      }
       return;
     }
     updatePage(pageIndex, patch);
@@ -1076,6 +1089,13 @@ export function PublicationEditor({
                 ]}
                 onChange={(backgroundType) => updateBackground({ backgroundType })}
               />
+
+              {editingTemplate ? (
+                <span className="help-text">
+                  Pages built on this layout show it, unless a page sets a
+                  background of its own afterwards.
+                </span>
+              ) : null}
 
               {canvasBackground.backgroundType === "color" ? (
                 <ColorField

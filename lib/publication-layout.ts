@@ -636,6 +636,27 @@ export function templateStarterBlocks(
     }));
 }
 
+/**
+ * Stands the pages using a layout aside, so the layout's background shows.
+ *
+ * Every page is created carrying a background of its own, and a page's own
+ * background wins — which is right, but it meant a background given to a
+ * layout after the layout had been applied could never appear: each page was
+ * still claiming the colour it was born with. Applying a layout already does
+ * exactly this; doing it when the background arrives is the same rule reaching
+ * the other order of work.
+ *
+ * A page that wants its own back only has to set one, as before.
+ */
+export function withLayoutBackground(
+  pages: PublicationPage[],
+  templateId: string
+): PublicationPage[] {
+  return pages.map((page) =>
+    page.templateId === templateId ? { ...page, backgroundType: "none" } : page
+  );
+}
+
 /** Applies a layout to a page: fresh copies in, previous layout's copies out. */
 export function withTemplateApplied(
   page: PublicationPage,
