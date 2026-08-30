@@ -167,13 +167,33 @@ export function PublicationViewer({
           return (
           <div
             key={page.id}
-            className={`pub-page${pageIndex === index ? "" : " is-hidden"}`}
+            className={`pub-page${pageIndex === index ? "" : " is-hidden"}${
+              // Under the page being turned and the one it uncovers: covered
+              // rather than turned, and hidden so a page with a transparent
+              // background does not show the whole pile through it.
+              transition === "flip" && pageIndex > index + 1 ? " is-buried" : ""
+            }`}
             data-transition={transition}
             style={
               transition === "slide"
                 ? { transform: `translateX(${(pageIndex - index) * 100}%)` }
                 : transition === "flip"
-                  ? { transform: `rotateY(${(pageIndex - index) * 90}deg)` }
+                  ? {
+                      /*
+                       * Read, or turned over. A page ahead of the reader lies
+                       * flat on the pile; one behind them has been turned the
+                       * whole way, which is what carries it out of sight —
+                       * ninety degrees only ever stood it on its edge.
+                       */
+                      transform: `rotateY(${pageIndex < index ? -180 : 0}deg)`,
+                      /*
+                       * Earlier pages sit above later ones, always. The page
+                       * being turned is therefore above the one it uncovers
+                       * for the whole of the turn, and the turned ones above
+                       * it are invisible anyway — their backs are to us.
+                       */
+                      zIndex: pages.length - pageIndex,
+                    }
                   : undefined
             }
             aria-hidden={pageIndex !== index}

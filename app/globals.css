@@ -5231,9 +5231,57 @@ ol.doc-list ol.doc-list ol.doc-list {
   transition: transform 450ms ease, opacity 450ms ease;
 }
 
+/* ------------------------------------------------------------ Page turn
+
+   A leaf of a book, not a card on a spindle.
+
+   Three things were making it read as a squash rather than a turn: nothing
+   established a viewing distance, so the rotation was drawn flat; the page
+   pivoted about its own middle, where a book pivots about its spine; and the
+   pages faded while they turned, which is neither one thing nor the other. */
+
+/* The distance the reader is standing at. Without it a `rotateY` is an
+   orthographic squeeze — the page narrows and never turns. Roughly a page and
+   a half away, which is close enough to see the turn and far enough that the
+   near edge does not balloon. */
+.pub-stage:has(.pub-page[data-transition="flip"]) {
+  perspective: 2400px;
+  perspective-origin: center center;
+  transform-style: preserve-3d;
+  /*
+   * A turning page swings out past the spine, as a real one does. The stage
+   * would otherwise clip it at the moment the turn is most visible; each page
+   * still clips its own content, so nothing else escapes.
+   */
+  overflow: visible;
+}
+
 .pub-page[data-transition="flip"] {
-  transition: transform 550ms ease, opacity 300ms ease;
+  /* The spine. */
+  transform-origin: left center;
+  /* Slow to lift, quick through the middle, settling as it lands — the weight
+     of paper rather than a constant sweep. */
+  transition: transform 720ms cubic-bezier(0.42, 0, 0.28, 1);
+  /* Past ninety degrees the reader is looking at the back of the sheet, and
+     the back of a sheet is not its own contents mirrored. Hiding it turns the
+     page out of sight exactly as it passes the upright. */
   backface-visibility: hidden;
+  /* The sheet's own shadow, so it sits above the one it is uncovering. */
+  box-shadow: 0 0 2rem rgba(0, 0, 0, 0.45);
+}
+
+/*
+ * A turned page is hidden by its own back, not by fading, so the fade is taken
+ * off it — a page that dissolves as it turns reads as neither.
+ */
+.pub-page[data-transition="flip"].is-hidden {
+  opacity: 1;
+}
+
+/* Except the ones further down the pile, which are covered rather than turned
+   and would otherwise show through a page with no background of its own. */
+.pub-page[data-transition="flip"].is-buried {
+  opacity: 0;
 }
 
 .pub-page.is-hidden {
