@@ -1,7 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import { MediaField } from "@/app/admin/media/media-picker";
 import {
@@ -28,8 +35,14 @@ import { protectedMediaUrl } from "@/lib/protected-media-url";
 import {
   createPublicationBlock,
   createPublicationPage,
+  alignBlocks,
+  ALIGNMENTS,
+  ALIGNMENT_LABELS,
+  boundsOf,
+  distributeBlocks,
   effectiveBackground,
   emptyBackground,
+  withGroupMembers,
   withLayoutBackground,
   inheritedBlocks,
   withTemplateApplied,
@@ -293,7 +306,34 @@ export function PublicationEditor({
   const [coverMediaId, setCoverMediaId] = useState(publication.coverMediaId);
 
   const [pageIndex, setPageIndex] = useState(0);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  /*
+   * What is selected, and what "one of them" means.
+   *
+   * A list rather than an id, because everything that acts on a selection —
+   * moving it, lining it up, grouping it — acts on however many are in it. The
+   * inspector still asks about one block, so `selectedId` stays as the single
+   * selection and is simply empty while several are chosen: a panel of one
+   * block's settings would be lying about the other four.
+   */
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  /**
+   * A group somebody has opened, by double-clicking a block inside it.
+   *
+   * While a group is open its blocks are picked one at a time, as if they were
+   * loose. Pressing anything outside closes it again — otherwise the way back
+   * out would be a thing to remember rather than a thing to do.
+   */
+  const [openGroupId, setOpenGroupId] = useState<string | null>(null);
+  /** The marquee, in canvas units, while one is being drawn. */
+  const [marquee, setMarquee] = useState<
+    { x: number; y: number; width: number; height: number } | null
+  >(null);
+
+  const selectedId = selectedIds.length === 1 ? selectedIds[0] : null;
+  const setSelectedId = (id: string | null) => {
+    setSelectedIds(id ? [id] : []);
+    if (!id) setOpenGroupId(null);
+  };
   /**
    * Which of the selected block's styles the right column is editing, or null
    * for the block's own settings. Held as a key rather than a closure over the
@@ -361,6 +401,10 @@ export function PublicationEditor({
    */
   const activeBlocks = editingTemplate ? editingTemplate.blocks : page.blocks;
   const selected = activeBlocks.find((block) => block.id === selectedId) ?? null;
+  /** Whether anything chosen is in a group, which is what "Ungroup" acts on. */
+  const groupedSelection = activeBlocks.some(
+    (block) => selectedIds.includes(block.id) && block.groupId
+  );
 
   /**
    * What this page shows but does not own: the publication's repeated blocks
@@ -419,6 +463,93 @@ export function PublicationEditor({
     }
 
     setZoom(clamped);
+  }
+
+  /**
+   * Held down to pan instead of selecting.
+   *
+   * A ref rather than state: it is read inside a pointer handler and changing
+   * it should not redraw a canvas of a hundred blocks.
+   */
+  const canvasRef = useRef<HTMLDivElement | null>(null);
+  const spaceDown = useRef(false);
+  useEffect(() => {
+    const down = (event: KeyboardEvent) => {
+      if (event.code === "Space") spaceDown.current = true;
+    };
+    const up = (event: KeyboardEvent) => {
+      if (event.code === "Space") spaceDown.current = false;
+    };
+    window.addEventListener("keydown", down);
+    window.addEventListener("keyup", up);
+    return () => {
+      window.removeEventListener("keydown", down);
+      window.removeEventListener("keyup", up);
+    };
+  }, []);
+
+  /**
+   * Drags a rectangle over the canvas and takes everything it touches.
+   *
+   * Touches rather than encloses: dragging a box that has to swallow a block
+   * whole means starting outside the page for anything near its edge, and the
+   * blocks nearest an edge are the ones most often being tidied.
+   */
+  function startMarquee(event: React.PointerEvent) {
+    const surface = canvasRef.current;
+    if (!surface) return;
+
+    const box = surface.getBoundingClientRect();
+    const at = (clientX: number, clientY: number) => ({
+      x: (clientX - box.left) / zoom,
+      y: (clientY - box.top) / zoom,
+    });
+
+    const from = at(event.clientX, event.clientY);
+    const additive = event.ctrlKey || event.metaKey || event.shiftKey;
+    const held = additive ? selectedIds : [];
+    if (!additive) setSelectedIds([]);
+
+    let moved = false;
+
+    const onMove = (moveEvent: PointerEvent) => {
+      const to = at(moveEvent.clientX, moveEvent.clientY);
+      const rect = {
+        x: Math.min(from.x, to.x),
+        y: Math.min(from.y, to.y),
+        width: Math.abs(to.x - from.x),
+        height: Math.abs(to.y - from.y),
+      };
+      // A press that has not travelled is a click on the background, not a
+      // marquee, and should not paint a rectangle over the page.
+      if (!moved && rect.width < 3 && rect.height < 3) return;
+      moved = true;
+      setMarquee(rect);
+
+      const caught = activeBlocks
+        .filter(
+          (block) =>
+            block.x < rect.x + rect.width &&
+            block.x + block.width > rect.x &&
+            block.y < rect.y + rect.height &&
+            block.y + block.height > rect.y
+        )
+        .map((block) => block.id);
+
+      // A block in a group brings its group: the marquee selects things, and
+      // a group is one of the things it can select.
+      setSelectedIds(withGroupMembers(activeBlocks, [...held, ...caught]));
+    };
+
+    const onUp = () => {
+      if (!moved) setSelectedIds(held);
+      setMarquee(null);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
   }
 
   /** Drags the surface under the window; the canvas itself does not move. */
@@ -517,6 +648,53 @@ export function PublicationEditor({
     );
   }
 
+  /** Lines the selection up, against itself or against the page. */
+  function align(alignment: (typeof ALIGNMENTS)[number], against: "each other" | "page") {
+    const chosen = activeBlocks.filter((block) => selectedIds.includes(block.id));
+    if (chosen.length === 0) return;
+
+    setActiveBlocks(
+      alignBlocks(
+        activeBlocks,
+        selectedIds,
+        alignment,
+        against === "page"
+          ? { x: 0, y: 0, width: activeCanvas.width, height: activeCanvas.height }
+          : boundsOf(chosen)
+      )
+    );
+  }
+
+  function distribute(axis: "horizontal" | "vertical") {
+    setActiveBlocks(distributeBlocks(activeBlocks, selectedIds, axis));
+  }
+
+  /**
+   * Ties the selection together, or unties it.
+   *
+   * One id shared by the members. Grouping a selection that already contains a
+   * group swallows it — a group inside a group would need a way to open only
+   * the inner one, and nothing here has asked for that.
+   */
+  function groupSelection() {
+    const groupId = makeTemplateId();
+    setActiveBlocks(
+      activeBlocks.map((block) =>
+        selectedIds.includes(block.id) ? { ...block, groupId } : block
+      )
+    );
+    setOpenGroupId(null);
+  }
+
+  function ungroupSelection() {
+    setActiveBlocks(
+      activeBlocks.map((block) =>
+        selectedIds.includes(block.id) ? { ...block, groupId: undefined } : block
+      )
+    );
+    setOpenGroupId(null);
+  }
+
   function addBlock(type: PublicationBlockType) {
     const block = createPublicationBlock(type);
     block.zIndex = activeBlocks.length + 1;
@@ -524,31 +702,100 @@ export function PublicationEditor({
     setSelectedId(block.id);
   }
 
+  /**
+   * What pressing this block selects.
+   *
+   * A block in a closed group stands for the whole group: that is what makes a
+   * group a thing rather than a label. A block in the group somebody has
+   * opened stands for itself.
+   */
+  function blockSelection(block: PublicationBlock): string[] {
+    if (!block.groupId || block.groupId === openGroupId) return [block.id];
+    return activeBlocks
+      .filter((entry) => entry.groupId === block.groupId)
+      .map((entry) => entry.id);
+  }
+
+  /** Press on a block: select it, add it to the selection, or take it out. */
+  function selectBlock(event: React.PointerEvent, block: PublicationBlock) {
+    const wanted = blockSelection(block);
+    // Control on Windows and Linux, command on a Mac; shift as well, because
+    // every other canvas in the world accepts it for the same thing.
+    const adding = event.ctrlKey || event.metaKey || event.shiftKey;
+
+    if (!adding) {
+      if (!selectedIds.includes(block.id)) {
+        setSelectedIds(wanted);
+        setStyleSlot(null);
+      }
+      return;
+    }
+
+    setSelectedIds((current) => {
+      const held = new Set(current);
+      const alreadyIn = wanted.every((id) => held.has(id));
+      for (const id of wanted) {
+        if (alreadyIn) held.delete(id);
+        else held.add(id);
+      }
+      return [...held];
+    });
+    setStyleSlot(null);
+  }
+
   /** Drag a block around the canvas; pointer deltas are divided by the zoom. */
   function startDrag(event: React.PointerEvent, block: PublicationBlock, mode: "move" | "resize") {
     event.stopPropagation();
     event.preventDefault();
-    setSelectedId(block.id);
-    // A different block means a different style; do not keep the panel open
-    // over something the editor did not ask about.
-    if (block.id !== selectedId) setStyleSlot(null);
+
+    if (mode === "move") selectBlock(event, block);
+    else setSelectedIds([block.id]);
 
     const startX = event.clientX;
     const startY = event.clientY;
-    const origin = { x: block.x, y: block.y, width: block.width, height: block.height };
+
+    /*
+     * Everything that moves with it, and where each of them started.
+     *
+     * Taken once, before the first move: reading the blocks again on every
+     * pointer event would compound each rounding, and a selection dragged
+     * across the page would drift apart.
+     */
+    const moving =
+      mode === "move"
+        ? (selectedIds.includes(block.id)
+            ? withGroupMembers(activeBlocks, selectedIds)
+            : blockSelection(block))
+        : [block.id];
+    const origins = new Map(
+      activeBlocks
+        .filter((entry) => moving.includes(entry.id))
+        .map((entry) => [entry.id, { x: entry.x, y: entry.y }])
+    );
+    const origin = { width: block.width, height: block.height };
 
     const onMove = (moveEvent: PointerEvent) => {
       const deltaX = (moveEvent.clientX - startX) / zoom;
       const deltaY = (moveEvent.clientY - startY) / zoom;
 
-      updateBlock(
-        block.id,
-        mode === "move"
-          ? { x: Math.round(origin.x + deltaX), y: Math.round(origin.y + deltaY) }
-          : {
-              width: Math.max(16, Math.round(origin.width + deltaX)),
-              height: Math.max(16, Math.round(origin.height + deltaY)),
-            }
+      if (mode === "resize") {
+        updateBlock(block.id, {
+          width: Math.max(16, Math.round(origin.width + deltaX)),
+          height: Math.max(16, Math.round(origin.height + deltaY)),
+        });
+        return;
+      }
+
+      setActiveBlocks(
+        activeBlocks.map((entry) => {
+          const from = origins.get(entry.id);
+          if (!from) return entry;
+          return {
+            ...entry,
+            x: Math.round(from.x + deltaX),
+            y: Math.round(from.y + deltaY),
+          };
+        })
       );
     };
 
@@ -1186,13 +1433,29 @@ export function PublicationEditor({
           // and start panning. Blocks stop the event, so a click on one keeps
           // its selection until something outside it is pressed.
           onPointerDown={(event) => {
-            setSelectedId(null);
             setStyleSlot(null);
-            startPan(event);
+            setOpenGroupId(null);
+
+            /*
+             * Plain drag draws a marquee; holding space, or the middle button,
+             * pans as it always did.
+             *
+             * Selecting is what somebody does on a canvas fifty times an hour
+             * and panning is what they do occasionally, so the plain gesture
+             * belongs to the common one. The modifier is announced under the
+             * zoom control rather than left to be discovered.
+             */
+            if (event.button === 1 || spaceDown.current) {
+              setSelectedId(null);
+              startPan(event);
+              return;
+            }
+            startMarquee(event);
           }}
         >
           <div
             className="pub-editor-canvas"
+            ref={canvasRef}
             style={{
               width: `${activeCanvas.width}px`,
               height: `${activeCanvas.height}px`,
@@ -1239,7 +1502,11 @@ export function PublicationEditor({
             ].map(({ block, repeated }) => (
               <div
                 key={`${repeated ? "r" : "p"}-${block.id}`}
-                className={`pub-editor-block${block.id === selectedId ? " is-selected" : ""}`}
+                className={`pub-editor-block${
+                  selectedIds.includes(block.id) ? " is-selected" : ""
+                }${
+                  block.groupId && block.groupId === openGroupId ? " is-in-group" : ""
+                }`}
                 style={{
                   ...publicationBlockStyle(block),
                   /*
@@ -1254,6 +1521,17 @@ export function PublicationEditor({
                 onPointerDown={
                   repeated ? undefined : (event) => startDrag(event, block, "move")
                 }
+                /* Opens the group this block is in, so the next press picks
+                   the block rather than the whole arrangement. */
+                onDoubleClick={
+                  repeated || !block.groupId
+                    ? undefined
+                    : (event) => {
+                        event.stopPropagation();
+                        setOpenGroupId(block.groupId ?? null);
+                        setSelectedIds([block.id]);
+                      }
+                }
               >
                 {/* Blocks are non-interactive here so clicks select instead. */}
                 <PublicationBlockView
@@ -1261,7 +1539,7 @@ export function PublicationEditor({
                   sources={canvasSources}
                   interactive={false}
                 />
-                {!repeated && block.id === selectedId ? (
+                {!repeated && selectedId === block.id ? (
                   <>
                     <span
                       className="pub-editor-handle"
@@ -1281,6 +1559,19 @@ export function PublicationEditor({
               </div>
             ))}
 
+            {marquee ? (
+              <div
+                className="pub-editor-marquee"
+                aria-hidden="true"
+                style={{
+                  left: `${marquee.x}px`,
+                  top: `${marquee.y}px`,
+                  width: `${marquee.width}px`,
+                  height: `${marquee.height}px`,
+                }}
+              />
+            ) : null}
+
             {/* Drawn over the blocks, not under them: the edge of the page is
                 exactly what an editor needs to see when something overhangs
                 it, and content below the outline would hide the very thing
@@ -1290,6 +1581,106 @@ export function PublicationEditor({
         </div>
 
         <aside className="builder-inspector">
+          {/*
+            * Arranging comes first, and appears the moment anything is chosen.
+            *
+            * Lining one block up against the page is as much a thing somebody
+            * wants as lining six up against each other, so the panel is not
+            * held back until there are several — only the parts that need
+            * several are.
+            */}
+          {selectedIds.length > 0 && !styleSlot ? (
+            <div className="inspector-section">
+              <h4 className="inspector-title">
+                Arrange
+                {selectedIds.length > 1 ? ` (${selectedIds.length})` : ""}
+              </h4>
+
+              <span className="field-label">On the page</span>
+              <div className="arrange-row">
+                {ALIGNMENTS.map((alignment) => (
+                  <button
+                    key={alignment}
+                    type="button"
+                    className="btn btn-sm"
+                    onClick={() => align(alignment, "page")}
+                  >
+                    {ALIGNMENT_LABELS[alignment]}
+                  </button>
+                ))}
+              </div>
+
+              {selectedIds.length > 1 ? (
+                <>
+                  <span className="field-label" style={{ marginTop: "0.6rem" }}>
+                    Against each other
+                  </span>
+                  <div className="arrange-row">
+                    {ALIGNMENTS.map((alignment) => (
+                      <button
+                        key={alignment}
+                        type="button"
+                        className="btn btn-sm"
+                        onClick={() => align(alignment, "each other")}
+                      >
+                        {ALIGNMENT_LABELS[alignment]}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              ) : null}
+
+              {selectedIds.length > 2 ? (
+                <>
+                  <span className="field-label" style={{ marginTop: "0.6rem" }}>
+                    Space evenly
+                  </span>
+                  <div className="arrange-row">
+                    <button
+                      type="button"
+                      className="btn btn-sm"
+                      onClick={() => distribute("horizontal")}
+                    >
+                      Across
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-sm"
+                      onClick={() => distribute("vertical")}
+                    >
+                      Down
+                    </button>
+                  </div>
+                  <span className="help-text">
+                    The two at the ends stay where they are; the gaps between
+                    the rest are made equal.
+                  </span>
+                </>
+              ) : null}
+
+              {selectedIds.length > 1 || groupedSelection ? (
+                <div className="arrange-row" style={{ marginTop: "0.6rem" }}>
+                  {selectedIds.length > 1 ? (
+                    <button type="button" className="btn btn-sm" onClick={groupSelection}>
+                      Group
+                    </button>
+                  ) : null}
+                  {groupedSelection ? (
+                    <button type="button" className="btn btn-sm" onClick={ungroupSelection}>
+                      Ungroup
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
+
+              <span className="help-text">
+                Drag on the page to select several; hold ctrl, ⌘ or shift to add
+                one. Hold space to pan instead. Double-click a block in a group
+                to pick it out on its own.
+              </span>
+            </div>
+          ) : null}
+
           {selected && styleSlot ? (
             // The style panel takes over the column while it is open, and hands
             // it back — the block's other settings are not useful underneath a

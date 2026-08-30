@@ -5340,6 +5340,31 @@ ol.doc-list ol.doc-list ol.doc-list {
 
 /* The page edge, over the top of everything on it. A block that overhangs
    stays visible past the line, which is how the overhang is spotted. */
+/* The rectangle drawn while several blocks are being picked out. Over the
+   page like the bounds outline, since what it touches is what matters. */
+.pub-editor-marquee {
+  position: absolute;
+  z-index: 60;
+  border: 1px solid var(--admin-accent);
+  background: color-mix(in srgb, var(--admin-accent) 12%, transparent);
+  pointer-events: none;
+}
+
+/* A block whose group is open: picked one at a time until something outside
+   is pressed, and marked so that state is visible rather than remembered. */
+.pub-editor-block.is-in-group {
+  outline: 1px dashed color-mix(in srgb, var(--admin-accent) 55%, transparent);
+  outline-offset: 2px;
+}
+
+/* A row of arrange buttons, wrapping rather than squeezing. */
+.arrange-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.3rem;
+}
+
 .pub-editor-bounds {
   position: absolute;
   inset: 0;

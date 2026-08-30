@@ -60,6 +60,15 @@ export type PublicationBlock = {
   rotation: number;
   zIndex: number;
 
+  /**
+   * Blocks arranged together, moved and selected as one.
+   *
+   * Held on each block rather than as a list on the page: a block carries its
+   * own membership, so copying, deleting or reordering one cannot leave a
+   * group naming something that is no longer there.
+   */
+  groupId?: string;
+
   styleSlug?: string;
   textStyle?: StyleValues;
 
@@ -323,6 +332,7 @@ export function normalizePublicationBlock(input: unknown): PublicationBlock | nu
     clickTarget: str(raw.clickTarget),
   };
 
+  if (raw.groupId) block.groupId = str(raw.groupId);
   if (raw.styleSlug) block.styleSlug = str(raw.styleSlug);
   // Absent means locked: a layout block belongs to the layout unless it has
   // been deliberately opened up.
@@ -708,4 +718,168 @@ export function publicationHref(kind: PublicationKind, slug: string): string {
   if (kind === "presentation") return `/present/${slug}`;
   if (kind === "post") return `/post/${slug}`;
   return `/zines/${slug}`;
+}
+
+/* ------------------------------------------------------------- Arranging */
+
+/**
+ * Lining several blocks up, and spacing them out.
+ *
+ * Pure, and kept here rather than in the editor, because "align these left"
+ * has exactly one right answer and it is arithmetic — the editor should be
+ * able to hand over a selection and get the same result every time, and a
+ * reader should be able to check the rule without reading a component.
+ *
+ * Rotation is deliberately ignored: a block's `x`, `y`, `width` and `height`
+ * describe its unrotated box, which is what its handles and its stored
+ * position both mean. Aligning by the corners of a turned block would move a
+ * block that already looked aligned.
+ */
+
+export const ALIGNMENTS = [
+  "left",
+  "centre",
+  "right",
+  "top",
+  "middle",
+  "bottom",
+] as const;
+
+export type Alignment = (typeof ALIGNMENTS)[number];
+
+export const ALIGNMENT_LABELS: Record<Alignment, string> = {
+  left: "Left",
+  centre: "Centre",
+  right: "Right",
+  top: "Top",
+  middle: "Middle",
+  bottom: "Bottom",
+};
+
+/** The box a set of blocks occupies together. */
+export function boundsOf(blocks: PublicationBlock[]): {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+} {
+  if (blocks.length === 0) return { x: 0, y: 0, width: 0, height: 0 };
+
+  const left = Math.min(...blocks.map((block) => block.x));
+  const top = Math.min(...blocks.map((block) => block.y));
+  const right = Math.max(...blocks.map((block) => block.x + block.width));
+  const bottom = Math.max(...blocks.map((block) => block.y + block.height));
+
+  return { x: left, y: top, width: right - left, height: bottom - top };
+}
+
+/**
+ * Lines the chosen blocks up against each other, or against the page.
+ *
+ * Against each other, the edge they meet at is the outermost one already in
+ * use — aligning left moves everything to the leftmost block rather than to
+ * some new place, so one block stays where it was and the arrangement is
+ * recognisably the same arrangement.
+ */
+export function alignBlocks(
+  blocks: PublicationBlock[],
+  ids: string[],
+  alignment: Alignment,
+  against: { x: number; y: number; width: number; height: number }
+): PublicationBlock[] {
+  const chosen = new Set(ids);
+
+  return blocks.map((block) => {
+    if (!chosen.has(block.id)) return block;
+
+    switch (alignment) {
+      case "left":
+        return { ...block, x: Math.round(against.x) };
+      case "centre":
+        return {
+          ...block,
+          x: Math.round(against.x + (against.width - block.width) / 2),
+        };
+      case "right":
+        return { ...block, x: Math.round(against.x + against.width - block.width) };
+      case "top":
+        return { ...block, y: Math.round(against.y) };
+      case "middle":
+        return {
+          ...block,
+          y: Math.round(against.y + (against.height - block.height) / 2),
+        };
+      case "bottom":
+        return { ...block, y: Math.round(against.y + against.height - block.height) };
+    }
+  });
+}
+
+/**
+ * Spreads the chosen blocks evenly between the two at the ends.
+ *
+ * The outermost two do not move — they are what "between" means — and the
+ * gaps between the rest are made equal. Gaps rather than centres, so blocks of
+ * different sizes end up evenly *spaced* rather than evenly *pitched*, which
+ * is what somebody spacing things out is looking at.
+ *
+ * Fewer than three blocks has no middle to move, so nothing happens.
+ */
+export function distributeBlocks(
+  blocks: PublicationBlock[],
+  ids: string[],
+  axis: "horizontal" | "vertical"
+): PublicationBlock[] {
+  const chosen = blocks.filter((block) => ids.includes(block.id));
+  if (chosen.length < 3) return blocks;
+
+  const size = (block: PublicationBlock) =>
+    axis === "horizontal" ? block.width : block.height;
+  const start = (block: PublicationBlock) =>
+    axis === "horizontal" ? block.x : block.y;
+
+  const ordered = [...chosen].sort((a, b) => start(a) - start(b));
+  const first = ordered[0];
+  const last = ordered[ordered.length - 1];
+
+  const span = start(last) + size(last) - start(first);
+  const filled = ordered.reduce((total, block) => total + size(block), 0);
+  // A negative gap means they overlap; spreading them is still the right
+  // answer, and the overlap is simply shared out evenly.
+  const gap = (span - filled) / (ordered.length - 1);
+
+  const placed = new Map<string, number>();
+  let cursor = start(first);
+  for (const block of ordered) {
+    placed.set(block.id, Math.round(cursor));
+    cursor += size(block) + gap;
+  }
+
+  return blocks.map((block) => {
+    const at = placed.get(block.id);
+    if (at === undefined) return block;
+    return axis === "horizontal" ? { ...block, x: at } : { ...block, y: at };
+  });
+}
+
+/** Every block that moves when one of these does: the selection, plus groups. */
+export function withGroupMembers(
+  blocks: PublicationBlock[],
+  ids: string[]
+): string[] {
+  const groups = new Set(
+    blocks
+      .filter((block) => ids.includes(block.id) && block.groupId)
+      .map((block) => block.groupId)
+  );
+  if (groups.size === 0) return [...new Set(ids)];
+
+  return [
+    ...new Set([
+      ...ids,
+      ...blocks
+        .filter((block) => block.groupId && groups.has(block.groupId))
+        .map((block) => block.id),
+    ]),
+  ];
 }
