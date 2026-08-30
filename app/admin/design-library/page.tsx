@@ -3,8 +3,17 @@ import { requirePermission } from "@/lib/access";
 import { connectDB } from "@/lib/db";
 import { CustomShape, CustomStyle, FontFamily } from "@/lib/models";
 
-import { deleteFontAction, deleteShapeAction, deleteStyleAction, saveShapeAction } from "./actions";
+import { normalizeSiteFont } from "@/lib/site-fonts";
+
+import {
+  deleteFontAction,
+  deleteFontFaceAction,
+  deleteShapeAction,
+  deleteStyleAction,
+  saveShapeAction,
+} from "./actions";
 import { FontSearch } from "./font-search";
+import { FontUpload } from "./font-upload";
 import { StyleForm } from "./style-form";
 
 export const metadata = { title: "Design library" };
@@ -20,6 +29,10 @@ export default async function DesignLibraryPage() {
   ]);
 
   const fontNames = fonts.map((font) => font.family as string);
+  const fontRows = fonts.map((font) => ({
+    _id: String(font._id),
+    ...normalizeSiteFont(font),
+  }));
   const serializedStyles = styles.map((style) => ({
     _id: String(style._id),
     name: style.name,
@@ -39,17 +52,55 @@ export default async function DesignLibraryPage() {
 
       <Panel title="Fonts">
         <ul className="admin-list" style={{ marginBottom: "1.25rem" }}>
-          {fonts.map((font) => (
-            <li key={String(font._id)} className="admin-list-item">
-              <div>
-                <h3 style={{ fontFamily: `"${font.family}", system-ui` }}>{font.family}</h3>
+          {fontRows.map((font) => (
+            <li key={font._id} className="admin-list-item">
+              <div style={{ minWidth: 0 }}>
+                <h3 style={{ fontFamily: `"${font.family}", system-ui` }}>
+                  {font.family}
+                  {font.source === "file" ? (
+                    <span className="badge" style={{ marginLeft: "0.5rem" }}>
+                      uploaded
+                    </span>
+                  ) : null}
+                </h3>
                 <div className="admin-list-meta">
-                  {font.category} · {(font.variants ?? []).join(", ")}
+                  {font.category} · {font.variants.join(", ")}
                 </div>
+
+                {/* The files behind an uploaded family, each removable on its
+                    own: a bold that came out wrong is replaced by uploading
+                    another, and dropped by removing this one. */}
+                {font.faces.length > 0 ? (
+                  <ul className="font-faces">
+                    {font.faces.map((face) => (
+                      <li key={face.url}>
+                        <span
+                          style={{
+                            fontFamily: `"${font.family}", system-ui`,
+                            fontWeight: face.weight,
+                            fontStyle: face.style,
+                          }}
+                        >
+                          {font.family} {face.weight}
+                          {face.style === "italic" ? " italic" : ""}
+                        </span>
+                        <code className="help-text">{face.originalName}</code>
+                        <form action={deleteFontFaceAction}>
+                          <input type="hidden" name="id" value={font._id} />
+                          <input type="hidden" name="url" value={face.url} />
+                          <button type="submit" className="btn btn-danger btn-sm">
+                            Remove file
+                          </button>
+                        </form>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
               </div>
+
               <div className="admin-list-actions">
                 <form action={deleteFontAction}>
-                  <input type="hidden" name="id" value={String(font._id)} />
+                  <input type="hidden" name="id" value={font._id} />
                   <button type="submit" className="btn btn-danger btn-sm">
                     Remove
                   </button>
@@ -61,6 +112,15 @@ export default async function DesignLibraryPage() {
         </ul>
 
         <FontSearch />
+      </Panel>
+
+      <Panel title="Upload a font">
+        <p className="help-text">
+          A font file added here becomes a family like any other: it appears in
+          the appearance editor, in named styles, and in every builder&rsquo;s font
+          picker, and is served to the site from your own server.
+        </p>
+        <FontUpload families={fontNames} />
       </Panel>
 
       <Panel title="Named styles">

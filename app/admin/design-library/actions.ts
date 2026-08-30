@@ -6,7 +6,14 @@ import { requirePermission } from "@/lib/access";
 import { sanitizeSvgShape } from "@/lib/custom-shapes";
 import { connectDB } from "@/lib/db";
 import { googleFontCssUrl } from "@/lib/google-fonts";
+import { FONT_UPLOAD_MIME_TYPES, storeUpload } from "@/lib/media-upload";
 import { CustomShape, CustomStyle, FontFamily } from "@/lib/models";
+import {
+  FONT_FILE_FORMATS,
+  fontFormatForExtension,
+  normalizeFontStyle,
+  normalizeFontWeight,
+} from "@/lib/site-fonts";
 import { slugify, uniqueSlug } from "@/lib/slug";
 import { normalizeStyleValues, type StyleValues } from "@/lib/style-values";
 
@@ -40,6 +47,105 @@ export async function saveFontAction(formData: FormData) {
     { family, category, variants: variants.length ? variants : ["400"], cssUrl },
     { upsert: true, returnDocument: "after" }
   );
+
+  revalidateDesign();
+}
+
+/**
+ * Add a font file to a family, creating the family if it is new.
+ *
+ * The family name is typed rather than read out of the file. A TrueType file
+ * carries a name table, and reading it would mean parsing the font here — for
+ * a name that is often not the one anybody wants in a picker ("Whitney A" for
+ * a face somebody thinks of as Whitney). Typing it also lets several files be
+ * gathered under one family, which is the point: a browser handed only a 400
+ * fakes the bold by smearing it.
+ */
+export async function uploadFontFileAction(formData: FormData) {
+  await guard();
+
+  const family = String(formData.get("family") ?? "").trim();
+  const file = formData.get("file");
+  if (!family || !(file instanceof File) || file.size === 0) return;
+
+  // The extension decides, not the browser's MIME guess: a `.ttf` is reported
+  // as `font/ttf`, `application/x-font-ttf` or `application/octet-stream`
+  // depending on the platform, and the last of those cannot be trusted on its
+  // own. An unrecognised extension is refused outright.
+  const extension = file.name.slice(file.name.lastIndexOf(".")).toLowerCase();
+  if (!FONT_FILE_FORMATS[extension]) return;
+
+  const mimeType = file.type || "application/octet-stream";
+  const stored = await storeUpload(file, "fonts", {
+    ...FONT_UPLOAD_MIME_TYPES,
+    [mimeType]: extension,
+  });
+
+  const weight = normalizeFontWeight(formData.get("weight"));
+  const style = normalizeFontStyle(formData.get("style"));
+  const category = String(formData.get("category") ?? "sans-serif");
+
+  const existing = await FontFamily.findOne({ family });
+  const faces = (existing?.faces ?? []).filter(
+    // One file per weight and slant: uploading a second 700 replaces the
+    // first rather than stacking two rules the browser resolves by order.
+    (face: any) => !(face.weight === weight && face.style === style)
+  );
+
+  faces.push({
+    url: stored.url,
+    weight,
+    style,
+    format: fontFormatForExtension(extension),
+    originalName: stored.originalName,
+  });
+
+  const variants = [...new Set(faces.map((face: any) => String(face.weight)))].sort(
+    (a, b) => Number(a) - Number(b)
+  );
+
+  await FontFamily.findOneAndUpdate(
+    { family },
+    {
+      family,
+      category: existing?.category || category,
+      variants,
+      // An uploaded family is served from its own files, so a stylesheet URL
+      // left over from a Google family of the same name would fight them.
+      cssUrl: "",
+      faces,
+    },
+    { upsert: true, returnDocument: "after" }
+  );
+
+  revalidateDesign();
+}
+
+/** Remove one uploaded file from a family, and the family once it is empty. */
+export async function deleteFontFaceAction(formData: FormData) {
+  await guard();
+
+  const id = String(formData.get("id") ?? "");
+  const url = String(formData.get("url") ?? "");
+  if (!id || !url) return;
+
+  const font = await FontFamily.findById(id);
+  if (!font) return;
+
+  const faces = (font.faces ?? []).filter((face: any) => face.url !== url);
+
+  // A family with no files left is a name that resolves to nothing, which is
+  // worse than an absent one: it stays in every picker and quietly does
+  // nothing wherever it is chosen.
+  if (faces.length === 0) {
+    await FontFamily.findByIdAndDelete(id);
+  } else {
+    font.faces = faces;
+    font.variants = [...new Set(faces.map((face: any) => String(face.weight)))].sort(
+      (a, b) => Number(a) - Number(b)
+    );
+    await font.save();
+  }
 
   revalidateDesign();
 }

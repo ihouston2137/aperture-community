@@ -1429,7 +1429,28 @@ const FontFamilySchema = new Schema<any>(
     family: { type: String, required: true, unique: true },
     category: { type: String, default: "sans-serif" },
     variants: { type: [String], default: ["400"] },
+    /** The hosted stylesheet, for a Google family. Empty for an uploaded one. */
     cssUrl: { type: String, default: "" },
+    /**
+     * Uploaded files, one per weight and slant.
+     *
+     * A family with any of these is served from `@font-face` rules built in
+     * `lib/site-fonts.ts` rather than from `cssUrl`; families added before
+     * uploads existed have none and are unaffected.
+     */
+    faces: {
+      type: [
+        {
+          _id: false,
+          url: { type: String, default: "" },
+          weight: { type: String, default: "400" },
+          style: { type: String, default: "normal" },
+          format: { type: String, default: "" },
+          originalName: { type: String, default: "" },
+        },
+      ],
+      default: [],
+    },
   },
   { timestamps: true }
 );

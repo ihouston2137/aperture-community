@@ -35,6 +35,12 @@ const MIME_TYPES: Record<string, string> = {
   ".pdf": "application/pdf",
   ".txt": "text/plain",
   ".csv": "text/csv",
+  // Design-library fonts. Served from here like everything else under
+  // `/uploads`, so the path checks and cache headers are the same ones.
+  ".ttf": "font/ttf",
+  ".otf": "font/otf",
+  ".woff": "font/woff",
+  ".woff2": "font/woff2",
 };
 
 function nodeStreamToWeb(filePath: string, options?: ReadableOptions & { start?: number; end?: number }) {

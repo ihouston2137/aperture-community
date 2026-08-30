@@ -10024,3 +10024,45 @@ html:has(.admin-shell) body::-webkit-scrollbar {
   font-size: 0.85rem;
   opacity: 0.6;
 }
+
+/* The files behind an uploaded font family. Each line is set in the face it
+   names, which is the only check that matters: a weight that loads wrong is
+   visible here before it is chosen anywhere. */
+.font-faces {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.font-faces li {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  font-size: 1.05rem;
+}
+
+.font-faces code {
+  font-size: 0.75rem;
+  opacity: 0.7;
+}
+
+.font-upload {
+  max-width: 34rem;
+}
+
+/* Weight, slant and category are one decision about one file, so they sit on
+   one line and wrap together on a narrow screen. */
+.font-upload-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.font-upload-row .field {
+  flex: 1 1 8rem;
+  min-width: 0;
+}

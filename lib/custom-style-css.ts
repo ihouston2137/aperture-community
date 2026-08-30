@@ -1,3 +1,4 @@
+import { fontFaceCss, normalizeSiteFont } from "./site-fonts";
 import { normalizeStyleValues, styleValuesToDeclarations } from "./style-values";
 
 export type CustomStyleRecord = {
@@ -65,15 +66,34 @@ export function customStyleCss(styles: CustomStyleRecord[]): string {
   return blocks.join("\n\n");
 }
 
+/** A font as stored, before `normalizeSiteFont` makes sense of it. */
+type FontRecord = {
+  cssUrl?: string;
+  faces?: unknown[];
+};
+
 export function customStyleClassName(slug: string | null | undefined): string {
   return slug ? `custom-style-${slug}` : "";
 }
 
-/** Font faces for design-library fonts that expose a hosted stylesheet. */
-export function fontImportCss(fonts: { cssUrl?: string }[]): string {
-  return fonts
-    .map((font) => font.cssUrl?.trim())
-    .filter((url): url is string => Boolean(url))
+/**
+ * Every design-library family, however it is served.
+ *
+ * A Google family arrives as a hosted stylesheet to `@import`; an uploaded one
+ * as `@font-face` rules over the stored files. The two are emitted together
+ * because nothing downstream tells them apart — a family is a name in a
+ * picker, and this is where that name is made to mean something.
+ *
+ * The imports lead: CSS ignores an `@import` that follows a rule.
+ */
+export function fontImportCss(fonts: FontRecord[]): string {
+  const imports = fonts
+    .map((font) => (font.faces?.length ? "" : String(font.cssUrl ?? "").trim()))
+    .filter(Boolean)
     .map((url) => `@import url("${url}");`)
     .join("\n");
+
+  const faces = fontFaceCss(fonts.map(normalizeSiteFont));
+
+  return [imports, faces].filter(Boolean).join("\n\n");
 }

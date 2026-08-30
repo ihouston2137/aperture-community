@@ -18,6 +18,7 @@ export const UPLOAD_FOLDERS = [
   "forms",
   "bios",
   "thumbnails",
+  "fonts",
 ] as const;
 
 export type UploadFolder = (typeof UPLOAD_FOLDERS)[number];
@@ -51,6 +52,28 @@ export const FORM_UPLOAD_MIME_TYPES: Record<string, string> = {
   "audio/ogg": ".ogg",
 };
 
+
+/**
+ * Font files, for the design library.
+ *
+ * Kept apart from the media types because a font is not media: it never
+ * belongs in the picker, has no thumbnail, and is only ever reached by the
+ * stylesheet. `application/octet-stream` is here because that is what a
+ * browser reports for a `.ttf` about as often as it reports `font/ttf` — the
+ * extension decides, and `storeFontFile` checks it before this map is built.
+ */
+export const FONT_UPLOAD_MIME_TYPES: Record<string, string> = {
+  "font/ttf": ".ttf",
+  "font/otf": ".otf",
+  "font/woff": ".woff",
+  "font/woff2": ".woff2",
+  "application/x-font-ttf": ".ttf",
+  "application/x-font-truetype": ".ttf",
+  "application/x-font-opentype": ".otf",
+  "application/font-woff": ".woff",
+  "application/font-woff2": ".woff2",
+  "application/vnd.ms-opentype": ".otf",
+};
 
 export function mediaTypeForMime(mimeType: string): "image" | "video" | "audio" | "file" {
   if (mimeType.startsWith("image/")) return "image";
