@@ -8219,6 +8219,81 @@ html:has(.admin-shell) body::-webkit-scrollbar {
 
 /* ------------------------------------------------- Sponsors on a campaign */
 
+/* ------------------------------------------------------- Markdown cheat sheet
+
+   What you type on the left, what it becomes on the right — the right-hand
+   side being the real renderer, so the sheet cannot drift from the grammar. */
+.md-help {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.md-help-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: start;
+  gap: 0.5rem 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid rgba(128, 128, 128, 0.18);
+}
+
+.md-help-row:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+/* The typed form. `pre` for the block examples, which are several lines. */
+.md-help-code {
+  margin: 0;
+  padding: 0.5rem 0.6rem;
+  border-radius: 0.375rem;
+  border: 1px solid var(--admin-border);
+  background: rgba(128, 128, 128, 0.12);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.8125rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.md-help-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+/* The result sits on the page's own surface rather than in a box, so it looks
+   like what it will look like in the document. */
+.md-help-result {
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.md-help-result .doc-content > :first-child {
+  margin-top: 0;
+}
+
+.md-help-result .doc-content > :last-child {
+  margin-bottom: 0;
+}
+
+.md-help-note {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+/* On a narrow screen the two columns become two rows: the typed form, then
+   what it becomes. */
+@media (max-width: 34rem) {
+  .md-help-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 /* ----------------------------------------------------- Campaign breakdowns
 
    Four part-to-whole readings of the same donations: a share bar and the

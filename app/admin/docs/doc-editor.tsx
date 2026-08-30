@@ -19,6 +19,7 @@ import { parseMarkdownBlocks, serializeMarkdown } from "@/lib/doc-markdown";
 import type { DocSetSummary, DocSummary } from "@/lib/doc-tree";
 
 import { saveDocAction } from "./actions";
+import { MarkdownHelpButton } from "./markdown-help";
 
 /**
  * The documentation editor: a list of markdown-shaped blocks.
@@ -285,10 +286,13 @@ export function DocEditor({
             value={markdown}
             onChange={(event) => setMarkdown(event.target.value)}
           />
-          <div style={{ marginTop: "0.75rem" }}>
+          <div className="panel-actions" style={{ marginTop: "0.75rem" }}>
             <button type="button" className="btn btn-primary btn-sm" onClick={applyMarkdown}>
               Apply to blocks
             </button>
+            {/* Beside the box it is about: what the grammar allows is the
+                question somebody has while typing into it. */}
+            <MarkdownHelpButton />
           </div>
           <span className="help-text">
             Editing here replaces the block list when applied. Paste a whole
