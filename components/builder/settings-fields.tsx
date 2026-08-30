@@ -452,16 +452,30 @@ export function RowSettingsFields({
           }))}
           onChange={(value) => onChange({ width: value })}
         />
-        <SelectField
-          label="Vertical alignment"
-          value={row.settings.verticalAlign}
-          options={[
-            { value: "top", label: "Top" },
-            { value: "center", label: "Center" },
-            { value: "bottom", label: "Bottom" },
-          ]}
-          onChange={(value) => onChange({ verticalAlign: value })}
-        />
+        <div className="inspector-grid">
+          {/* Where the columns sit when they do not fill the row — a row of
+              one six-wide column is what this is for. */}
+          <SelectField
+            label="Alignment"
+            value={row.settings.align}
+            options={[
+              { value: "left", label: "Left" },
+              { value: "center", label: "Center" },
+              { value: "right", label: "Right" },
+            ]}
+            onChange={(value) => onChange({ align: value })}
+          />
+          <SelectField
+            label="Vertical"
+            value={row.settings.verticalAlign}
+            options={[
+              { value: "top", label: "Top" },
+              { value: "center", label: "Center" },
+              { value: "bottom", label: "Bottom" },
+            ]}
+            onChange={(value) => onChange({ verticalAlign: value })}
+          />
+        </div>
       </div>
 
       <div className="inspector-section">
@@ -474,6 +488,11 @@ export function RowSettingsFields({
             onChange={(value) => onChange({ parallax: value })}
           />
         ) : null}
+      </div>
+
+      <div className="inspector-section">
+        <h4 className="inspector-title">Border</h4>
+        <BorderFields settings={row.settings} onChange={onChange} />
       </div>
 
       <div className="inspector-section">

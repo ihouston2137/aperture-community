@@ -2,12 +2,18 @@
 
 import {
   CALENDAR_VIEWS,
+  CALENDAR_VIEW_LABELS,
   normalizeCalendarDisplay,
+  openingView,
   type CalendarDisplay,
 } from "@/lib/calendar";
+import {
+  CALENDAR_SIZES,
+  CALENDAR_SIZE_LABELS,
+} from "@/lib/calendar-style";
 import type { PageBlock } from "@/lib/page-layout";
 
-import { CheckField, SelectField } from "./settings-fields";
+import { CheckField, NumField, SelectField } from "./settings-fields";
 
 /**
  * The calendar block's settings.
@@ -75,6 +81,11 @@ export function CalendarDisplayFields({
 }) {
   const set = (patch: Partial<CalendarDisplay>) => onChange({ ...display, ...patch });
 
+  const viewOptions = CALENDAR_VIEWS.map((view) => ({
+    value: view,
+    label: CALENDAR_VIEW_LABELS[view],
+  }));
+
   const fallback = styles.find((style) => style._id === defaultStyleId);
 
   return (
@@ -101,17 +112,36 @@ export function CalendarDisplayFields({
 
       <div className="inspector-section">
         <h4 className="inspector-title">Behaviour</h4>
-        <SelectField
-          label="Opens on"
-          value={display.view}
-          options={CALENDAR_VIEWS.map((view) => ({
-            value: view,
-            label: view === "month" ? "Month" : "Week",
-          }))}
-          onChange={(value) => set({ view: value })}
-        />
+        {/*
+          * What each screen lands on.
+          *
+          * Three settings rather than one, because a month grid is seven
+          * columns and a phone has room for about two — the view that suits a
+          * desk is not the view that suits a pocket, and a calendar that had
+          * to pick one would be picking wrongly for somebody.
+          */}
+        <div className="inspector-grid">
+          {CALENDAR_SIZES.map((size) => (
+            <SelectField
+              key={size}
+              label={`Opens as — ${CALENDAR_SIZE_LABELS[size]}`}
+              value={openingView(display, size)}
+              options={viewOptions}
+              onChange={(value) =>
+                set(
+                  size === "mobile"
+                    ? { viewMobile: value }
+                    : size === "tablet"
+                      ? { viewTablet: value }
+                      : { view: value }
+                )
+              }
+            />
+          ))}
+        </div>
+
         <CheckField
-          label="Month / week switch"
+          label="View switch"
           value={display.showViewSwitch}
           onChange={(value) => set({ showViewSwitch: value })}
         />
@@ -120,6 +150,18 @@ export function CalendarDisplayFields({
           value={display.showNav}
           onChange={(value) => set({ showNav: value })}
         />
+        <NumField
+          label="Events per page in the list"
+          value={display.listPageSize}
+          min={0}
+          max={200}
+          onChange={(value) => set({ listPageSize: value })}
+        />
+        <span className="help-text">
+          Nought puts the whole month on one page. The list covers the same
+          month the grid does, so a page is a slice of that month rather than
+          of an open-ended run of events.
+        </span>
         <CheckField
           label="Weekday headers"
           value={display.showWeekdays}

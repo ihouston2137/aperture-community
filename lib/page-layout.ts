@@ -307,9 +307,18 @@ export type BorderSettings = {
 };
 
 export type RowSettings = SpacingSettings &
-  BackgroundSettings & {
+  BackgroundSettings &
+  BorderSettings & {
     /** Full / Wide / Standard / Narrow, matching the header and footer. */
     width: ContentWidth;
+    /**
+     * Where the columns sit across the row.
+     *
+     * Only visible when they do not fill it: columns spanning twelve of twelve
+     * leave nothing to align. A row of one six-wide column is the case this
+     * exists for.
+     */
+    align: "left" | "center" | "right";
     verticalAlign: "top" | "center" | "bottom";
     parallax: boolean;
   };
@@ -376,7 +385,9 @@ export const defaultBorder: BorderSettings = {
 export const defaultRowSettings: RowSettings = {
   ...defaultSpacing,
   ...defaultBackground,
+  ...defaultBorder,
   width: "standard",
+  align: "left",
   verticalAlign: "top",
   parallax: false,
 };
@@ -841,7 +852,9 @@ export function normalizeRow(
     settings: {
       ...normalizeSpacing(settingsRaw, defaultRowSettings),
       ...normalizeBackground(settingsRaw),
+      ...normalizeBorder(settingsRaw),
       width: normalizeRowWidth(settingsRaw),
+      align: pick(settingsRaw.align, ["left", "center", "right"] as const, "left"),
       verticalAlign: pick(
         settingsRaw.verticalAlign,
         ["top", "center", "bottom"] as const,
@@ -961,7 +974,15 @@ export function rowStyle(row: PageRow): CSSProperties {
     marginLeft: `${row.settings.marginLeft}rem`,
     marginRight: `${row.settings.marginRight}rem`,
   };
-  Object.assign(style, backgroundColorStyle(row.settings), backgroundBoxStyle(row.settings));
+  // The border goes on the same element as the background, as a column's
+  // does — the row's visible box is the full-width one, and a border drawn
+  // anywhere else would not agree with the colour behind it.
+  Object.assign(
+    style,
+    backgroundColorStyle(row.settings),
+    borderStyle(row.settings),
+    backgroundBoxStyle(row.settings)
+  );
   return style;
 }
 
@@ -977,6 +998,7 @@ export function rowInnerStyle(row: PageRow): CSSProperties {
     marginRight: "auto",
     maxWidth: CONTENT_WIDTH_VALUES[row.settings.width] ?? CONTENT_WIDTH_VALUES.standard,
     alignItems: ALIGN_TO_FLEX[row.settings.verticalAlign],
+    justifyContent: ALIGN_TO_ITEMS[row.settings.align],
   };
 }
 

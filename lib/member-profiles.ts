@@ -3,8 +3,7 @@ import { createHash } from "node:crypto";
 import { connectDB } from "./db";
 import { getRoleSummaries, sortRoles, type RoleSummary } from "./members";
 import { clearMediaUsage } from "./media-usage-sync";
-import { Bio, MediaAsset, Role, Story, User } from "./models";
-import { ADMINISTRATOR_ROLE_SLUG } from "./permissions";
+import { Bio, MediaAsset, Story, User } from "./models";
 import { slugify, uniqueSlug } from "./slug";
 
 /**
@@ -83,30 +82,32 @@ export function memberProfileMembership(
     .join(", ");
 }
 
-/** Whether this account is one that must never carry a member profile. */
+/**
+ * Whether this account is one that must never carry a member profile.
+ *
+ * The seed account and nothing else. It is the installer's way in — it belongs
+ * to whoever set the site up rather than to a person in the community, and a
+ * profile for it would put "Site Administrator" in the directory.
+ *
+ * Holding the Administrator role is not enough. The people who run a community
+ * are usually in it: a chair who administers the site still has a photograph, a
+ * biography and a place in the directory, and taking their profile away because
+ * of what they are allowed to edit was the wrong reading of what the role says.
+ */
 async function isExcludedAccount(user: any): Promise<boolean> {
   const seedEmail = (process.env.SEED_ADMIN_EMAIL || "").trim().toLowerCase();
-  if (seedEmail && String(user.email ?? "").trim().toLowerCase() === seedEmail) {
-    return true;
-  }
-
-  const roleIds = user.roleIds ?? [];
-  if (roleIds.length === 0) return false;
-
-  const found = await Role.exists({
-    _id: { $in: roleIds },
-    slug: ADMINISTRATOR_ROLE_SLUG,
-  });
-  return Boolean(found);
+  return Boolean(
+    seedEmail && String(user.email ?? "").trim().toLowerCase() === seedEmail
+  );
 }
 
 /**
  * Creates the profile for one account if it has none, and brings its derived
  * fields up to date either way. Safe to call whenever an account changes.
  *
- * An Administrator is staff rather than a member, so one is never created for
- * them — but if somebody has deliberately given them a profile it is kept in
- * step like any other.
+ * The seed account is staff rather than a member, so one is never created for
+ * it — but if somebody has deliberately given it a profile it is kept in step
+ * like any other.
  */
 export async function syncMemberProfile(userId: string): Promise<void> {
   if (!userId) return;
@@ -285,21 +286,12 @@ async function ensureUniqueAccountIndex(): Promise<void> {
 
 /** The accounts that must never carry a member profile. */
 async function excludedUserIds(): Promise<Set<string>> {
-  const adminRole = await Role.findOne({ slug: ADMINISTRATOR_ROLE_SLUG })
-    .select("_id")
-    .lean<any>();
-
-  const conditions: Record<string, unknown>[] = [];
-  if (adminRole) conditions.push({ roleIds: adminRole._id });
-
-  // Named as well as role-checked, so the seed account is still recognised if
-  // it is ever detached from Administrator.
+  // The seed account alone — see `isExcludedAccount`. An administrator who is
+  // also a member of the community keeps their profile like anybody else.
   const seedEmail = (process.env.SEED_ADMIN_EMAIL || "").trim().toLowerCase();
-  if (seedEmail) conditions.push({ email: seedEmail });
+  if (!seedEmail) return new Set();
 
-  if (conditions.length === 0) return new Set();
-
-  const users = await User.find({ $or: conditions }).select("_id").lean<any[]>();
+  const users = await User.find({ email: seedEmail }).select("_id").lean<any[]>();
   return new Set(users.map((user) => String(user._id)));
 }
 
@@ -404,7 +396,7 @@ export async function pruneMemberProfiles(): Promise<{
     survivors.push(keeper);
   }
 
-  // Administrators, the seed account above all, carry none.
+  // The seed account carries none.
   const excluded = await excludedUserIds();
   for (const bio of survivors) {
     if (!excluded.has(String(bio.userId))) continue;
@@ -427,7 +419,7 @@ export async function pruneMemberProfiles(): Promise<{
  * Brings every account's profile into line in one pass: creates the missing
  * ones, and rewrites the derived fields of the ones that have drifted.
  *
- * Administrators are staff and get none. Written as three reads and a write per
+ * The seed account gets none. Written as three reads and a write per
  * profile that actually changed, rather than a sync per account, so opening the
  * profiles screen on a site with hundreds of members stays cheap.
  */

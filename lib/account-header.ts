@@ -105,7 +105,7 @@ async function readUser(userId: string): Promise<AccountUser | null> {
   // well as the sections they have been given to work in.
   const sections: { label: string; href: string }[] = [];
   if (permissions.includes("community.directory")) {
-    sections.push({ label: "Member directory", href: "/directory" });
+    sections.push({ label: "Directory", href: "/directory" });
   }
   // Named by its own title rather than by a fixed word, so a site that calls it
   // "What's on" says that here too.

@@ -14,8 +14,14 @@
 export const CALENDAR_EVENT_STATUSES = ["draft", "published"] as const;
 export type CalendarEventStatus = (typeof CALENDAR_EVENT_STATUSES)[number];
 
-export const CALENDAR_VIEWS = ["month", "week"] as const;
+export const CALENDAR_VIEWS = ["month", "week", "list"] as const;
 export type CalendarView = (typeof CALENDAR_VIEWS)[number];
+
+export const CALENDAR_VIEW_LABELS: Record<CalendarView, string> = {
+  month: "Month",
+  week: "Week",
+  list: "List",
+};
 
 export type CalendarEventRecord = {
   _id: string;
@@ -114,8 +120,22 @@ export const CALENDAR_EVENT_FIELD_LABELS: Record<CalendarEventField, string> = {
  * every calendar wearing it.
  */
 export type CalendarDisplay = {
-  /** The view a visitor lands on. */
+  /**
+   * The view a visitor lands on, on a desktop.
+   *
+   * Kept under its old name because it is what every saved calendar already
+   * holds, and what a calendar with nothing said about the smaller screens
+   * still opens as on all three.
+   */
   view: CalendarView;
+  /** What a tablet opens as. */
+  viewTablet: CalendarView;
+  /** And a phone — a month grid on a phone is six columns of nothing. */
+  viewMobile: CalendarView;
+  /**
+   * How many events a page of the list holds. Zero shows the lot on one page.
+   */
+  listPageSize: number;
   showViewSwitch: boolean;
   showNav: boolean;
   showWeekdays: boolean;
@@ -130,6 +150,9 @@ export type CalendarDisplay = {
 
 export const defaultCalendarDisplay: CalendarDisplay = {
   view: "month",
+  viewTablet: "month",
+  viewMobile: "list",
+  listPageSize: 10,
   showViewSwitch: true,
   showNav: true,
   showWeekdays: true,
@@ -160,6 +183,14 @@ export function normalizeCalendarDisplay(raw: unknown): CalendarDisplay {
   return {
     view: normalizeView(source.view),
     showViewSwitch: bool(source.showViewSwitch, base.showViewSwitch),
+    // A calendar saved before the smaller screens had their own opening view
+    // opens as it always did on all three.
+    viewTablet: normalizeView(source.viewTablet ?? source.view),
+    viewMobile: normalizeView(source.viewMobile ?? source.view),
+    listPageSize: Math.max(
+      0,
+      Math.min(200, Math.round(Number(source.listPageSize ?? base.listPageSize) || 0))
+    ),
     showNav: bool(source.showNav, base.showNav),
     showWeekdays: bool(source.showWeekdays, base.showWeekdays),
     lightbox: bool(source.lightbox, base.lightbox),
@@ -339,8 +370,20 @@ export function normalizeStatus(value: unknown): CalendarEventStatus {
   return value === "published" ? "published" : "draft";
 }
 
+/** Which view a screen of this size lands on. */
+export function openingView(
+  display: { view: CalendarView; viewTablet: CalendarView; viewMobile: CalendarView },
+  size: "desktop" | "tablet" | "mobile"
+): CalendarView {
+  if (size === "mobile") return display.viewMobile;
+  if (size === "tablet") return display.viewTablet;
+  return display.view;
+}
+
 export function normalizeView(value: unknown): CalendarView {
-  return value === "week" ? "week" : "month";
+  return CALENDAR_VIEWS.includes(value as CalendarView)
+    ? (value as CalendarView)
+    : "month";
 }
 
 /**

@@ -1,12 +1,21 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 
 import {
+  CALENDAR_VIEWS,
+  CALENDAR_VIEW_LABELS,
   filterCalendarEvents,
   monthKeyFromDateKey,
   monthLabel,
   monthRange,
+  openingView,
   shiftDateKey,
   shiftMonthKey,
   weekLabel,
@@ -16,7 +25,11 @@ import {
   type CalendarView,
 } from "@/lib/calendar";
 
-import { calendarStyleClass, type CalendarStyleRecord } from "@/lib/calendar-style";
+import {
+  calendarStyleClass,
+  type CalendarSize,
+  type CalendarStyleRecord,
+} from "@/lib/calendar-style";
 
 import type { PageRow } from "@/lib/page-layout";
 import type { PageSources } from "@/lib/page-source-types";
@@ -33,7 +46,30 @@ export type CalendarManageHandlers = {
 };
 
 /** The inclusive range a view covers, as one cache key. */
+/** The breakpoints the three opening views are chosen between. */
+const TABLET_QUERY = "(max-width: 63.99rem)";
+const MOBILE_QUERY = "(max-width: 47.99rem)";
+
+function readSize(): CalendarSize {
+  if (window.matchMedia(MOBILE_QUERY).matches) return "mobile";
+  if (window.matchMedia(TABLET_QUERY).matches) return "tablet";
+  return "desktop";
+}
+
+function subscribeToWidth(onChange: () => void): () => void {
+  const queries = [
+    window.matchMedia(TABLET_QUERY),
+    window.matchMedia(MOBILE_QUERY),
+  ];
+  for (const query of queries) query.addEventListener("change", onChange);
+  return () => {
+    for (const query of queries) query.removeEventListener("change", onChange);
+  };
+}
+
 function rangeKey(view: CalendarView, date: string): string {
+  // The list covers the same month the grid does — see `CalendarList` — so it
+  // shares the month's range and its cache entry rather than fetching again.
   const { start, end } =
     view === "week" ? weekRange(date) : monthRange(monthKeyFromDateKey(date));
   return `${start}:${end}`;
@@ -84,7 +120,22 @@ export function CalendarBlock({
    */
   reloadToken?: number;
 }) {
-  const [view, setView] = useState<CalendarView>(display.view);
+  /*
+   * Which view this screen opens on.
+   *
+   * The width is a browser fact the server cannot know, so it is read as an
+   * external store rather than assigned in an effect: the server and the first
+   * client render both say "desktop", and React re-renders once with the real
+   * answer. Setting state in an effect would paint the wrong view first and
+   * then correct it, which is the flash this avoids.
+   *
+   * Only the *opening* view. The moment somebody presses the switch their
+   * choice is held, and resizing the window is not an instruction to undo it.
+   */
+  const size = useSyncExternalStore(subscribeToWidth, readSize, () => "desktop" as CalendarSize);
+  const [chosenView, setChosenView] = useState<CalendarView | null>(null);
+  const view = chosenView ?? openingView(display, size);
+  const setView = setChosenView;
   // Where the visitor has navigated to; "" means "wherever `todayKey` is".
   // `todayKey` is always resolved on the server — both the page and the builder
   // preview supply it — so no date is ever computed during render, where the
@@ -151,7 +202,7 @@ export function CalendarBlock({
   if (!anchor) return <div className="pb-calendar is-loading" />;
 
   const visible = filterCalendarEvents(events, display);
-  const eventBox = style.eventBox[view === "week" ? "week" : "month"];
+  const eventBox = style.eventBox[view];
   const rangeLabel =
     view === "week" ? weekLabel(anchor) : monthLabel(monthKeyFromDateKey(anchor));
 
@@ -228,22 +279,17 @@ export function CalendarBlock({
 
           {display.showViewSwitch ? (
             <div className="calendar-view-switch" role="group" aria-label="Calendar view">
-              <button
-                type="button"
-                className={`btn btn-sm${view === "month" ? " is-active" : ""}`}
-                aria-pressed={view === "month"}
-                onClick={() => setView("month")}
-              >
-                Month
-              </button>
-              <button
-                type="button"
-                className={`btn btn-sm${view === "week" ? " is-active" : ""}`}
-                aria-pressed={view === "week"}
-                onClick={() => setView("week")}
-              >
-                Week
-              </button>
+              {CALENDAR_VIEWS.map((entry) => (
+                <button
+                  key={entry}
+                  type="button"
+                  className={`btn btn-sm${view === entry ? " is-active" : ""}`}
+                  aria-pressed={view === entry}
+                  onClick={() => setView(entry)}
+                >
+                  {CALENDAR_VIEW_LABELS[entry]}
+                </button>
+              ))}
             </div>
           ) : null}
         </div>
@@ -259,6 +305,7 @@ export function CalendarBlock({
           events={visible}
           todayKey={todayKey}
           eventBox={eventBox}
+          listPageSize={display.listPageSize}
           layouts={layouts}
           sources={sources}
           showWeekdays={display.showWeekdays}

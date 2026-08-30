@@ -38,12 +38,13 @@ export const CALENDAR_SIZE_LABELS: Record<CalendarSize, string> = {
   mobile: "Mobile",
 };
 
-export const CALENDAR_STYLE_VIEWS = ["month", "week"] as const;
+export const CALENDAR_STYLE_VIEWS = ["month", "week", "list"] as const;
 export type CalendarStyleView = (typeof CALENDAR_STYLE_VIEWS)[number];
 
 export const CALENDAR_STYLE_VIEW_LABELS: Record<CalendarStyleView, string> = {
   month: "Month",
   week: "Week",
+  list: "List",
 };
 
 /**
@@ -62,6 +63,8 @@ export const CALENDAR_PARTS = [
   "dayInMonth",
   "dayOutsideMonth",
   "weekDayBox",
+  "listDayBox",
+  "listDayBox",
   "today",
   "todayLabel",
 ] as const;
@@ -77,6 +80,7 @@ export const CALENDAR_PART_LABELS: Record<CalendarPart, string> = {
   dayInMonth: "Days in month",
   dayOutsideMonth: "Days not in month",
   weekDayBox: "Day boxes",
+  listDayBox: "List day groups",
   today: "Today box",
   todayLabel: "Today highlight",
 };
@@ -91,22 +95,25 @@ export const CALENDAR_PART_NOTES: Record<CalendarPart, string> = {
   dayInMonth: "A day cell belonging to the month shown.",
   dayOutsideMonth: "The neighbouring days padding the first and last rows.",
   weekDayBox: "A day in the week list. Week view only.",
+  listDayBox: "A date and the events under it. List view only.",
   today: "Overrides whichever day box today falls in.",
-  todayLabel: "The date itself on today — the number in month view, the heading in week view.",
+  todayLabel:
+    "The date itself on today — the number in month view, the heading in the week and list views.",
 };
 
 /** Which views a part exists in at all, so the editor can say so. */
 export const CALENDAR_PART_VIEWS: Record<CalendarPart, CalendarStyleView[]> = {
-  container: ["month", "week"],
-  navButton: ["month", "week"],
-  dateTitle: ["month", "week"],
-  grid: ["month", "week"],
+  container: ["month", "week", "list"],
+  navButton: ["month", "week", "list"],
+  dateTitle: ["month", "week", "list"],
+  grid: ["month", "week", "list"],
   weekdayHeader: ["month"],
   dayInMonth: ["month"],
   dayOutsideMonth: ["month"],
   weekDayBox: ["week"],
-  today: ["month", "week"],
-  todayLabel: ["month", "week"],
+  listDayBox: ["list"],
+  today: ["month", "week", "list"],
+  todayLabel: ["month", "week", "list"],
 };
 
 /** Parts holding no text of their own, so typography would have nothing to act on. */
@@ -157,7 +164,11 @@ export function emptyCalendarStyle(): CalendarStyleValues {
   return {
     name: "",
     parts: {},
-    eventBox: { month: bySize(emptyVariant), week: bySize(emptyVariant) },
+    eventBox: {
+      month: bySize(emptyVariant),
+      week: bySize(emptyVariant),
+      list: bySize(emptyVariant),
+    },
     lightbox: { style: {}, bySize: bySize(() => ({ layoutId: "" })) },
   };
 }
@@ -201,6 +212,9 @@ export function normalizeCalendarStyle(raw: unknown): CalendarStyleValues {
     eventBox: {
       month: normalizeBySize(rawEventBox.month, normalizeVariant),
       week: normalizeBySize(rawEventBox.week, normalizeVariant),
+      // A style saved before the list view existed reads back with the list's
+      // boxes unset, which is the same as a style that has never dressed them.
+      list: normalizeBySize(rawEventBox.list, normalizeVariant),
     },
     lightbox: {
       style: normalizeStyleValues(rawLightbox.style),
@@ -238,6 +252,7 @@ const PART_SELECTORS: Record<CalendarPart, string[]> = {
   dayInMonth: [".calendar-grid.is-month .calendar-day:not(.is-outside)"],
   dayOutsideMonth: [".calendar-grid.is-month .calendar-day.is-outside"],
   weekDayBox: [".calendar-grid.is-week .calendar-day"],
+  listDayBox: [".calendar-grid.is-list .calendar-day"],
   today: [".calendar-day.is-today"],
   // Month shows a number, week a heading; one part dresses whichever is there.
   // The view class is carried so these outrank the built-in highlight rules on
@@ -246,6 +261,7 @@ const PART_SELECTORS: Record<CalendarPart, string[]> = {
   todayLabel: [
     ".calendar-grid.is-month .calendar-day.is-today .calendar-day-number",
     ".calendar-grid.is-week .calendar-day.is-today .calendar-day-heading",
+    ".calendar-grid.is-list .calendar-day.is-today .calendar-day-heading",
   ],
 };
 

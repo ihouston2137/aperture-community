@@ -967,10 +967,27 @@ input, select, textarea {
   flex-wrap: wrap;
 }
 
+/*
+ * A notice: something went right, or something went wrong.
+ *
+ * Written against its own tokens rather than the admin panel's. The same
+ * component is shown on the member pages, which wear the site's colours — and
+ * a panel colour chosen for the dark admin shell put dark text on a dark
+ * ground there and made every message unreadable.
+ *
+ * Green for the good news, red for the bad, both as a tinted ground with the
+ * message in a deep shade of the same hue, so the colour is legible as a
+ * colour and the words are legible as words.
+ */
 .admin-notice {
-  border: 1px solid var(--admin-border);
-  border-left: 3px solid var(--admin-accent);
-  background: var(--admin-panel);
+  --notice-edge: #3f6f52;
+  --notice-ground: #e8f3ec;
+  --notice-ink: #1c4a30;
+
+  border: 1px solid var(--notice-edge);
+  border-left: 3px solid var(--notice-edge);
+  background: var(--notice-ground);
+  color: var(--notice-ink);
   border-radius: var(--radius);
   padding: 0.75rem 1rem;
   margin-bottom: 1.25rem;
@@ -978,7 +995,26 @@ input, select, textarea {
 }
 
 .admin-notice.is-error {
-  border-left-color: #f28b82;
+  --notice-edge: #a3453f;
+  --notice-ground: #fbeaea;
+  --notice-ink: #7a2620;
+}
+
+/*
+ * On the admin shell the grounds are stepped for a dark surface instead of a
+ * light one — the same two hues, not an inversion, so a saved message reads as
+ * the same green in both places.
+ */
+.admin-shell .admin-notice {
+  --notice-edge: #4e8a66;
+  --notice-ground: #16261d;
+  --notice-ink: #b7e4c6;
+}
+
+.admin-shell .admin-notice.is-error {
+  --notice-edge: #c2635c;
+  --notice-ground: #2a1717;
+  --notice-ink: #f3b7b2;
 }
 
 /* Builders take over the window; their own topbar provides the way out. */
@@ -1574,6 +1610,46 @@ input, select, textarea {
 .calendar-day-heading {
   font-size: 0.9375rem;
   font-weight: 500;
+}
+
+/* ------------------------------------------------------- Calendar list view
+
+   The same days read down a page instead of across a grid: one group per date,
+   its events under it. Deliberately the same `.calendar-day` parts as the other
+   views, so a saved style dresses all three without a second vocabulary. */
+.calendar-grid.is-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.calendar-grid.is-list .calendar-day {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-height: 0;
+  padding: 0.6rem 0.75rem;
+}
+
+.calendar-grid.is-list .calendar-day-events {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+/* Where a page ends. Quiet — it is navigation, not content. */
+.calendar-list-pages {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid rgba(128, 128, 128, 0.22);
+}
+
+.calendar-list-count {
+  font-size: 0.875rem;
+  opacity: 0.75;
 }
 
 .calendar-grid.is-week .calendar-day.is-today .calendar-day-heading {

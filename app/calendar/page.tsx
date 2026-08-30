@@ -4,6 +4,8 @@ import { SiteChrome } from "@/components/site-chrome";
 import { getUserAccess } from "@/lib/access";
 import { normalizeVocabulary } from "@/lib/calendar";
 import { getCalendarPageSettings, loadCalendarPage } from "@/lib/calendar-page";
+import { calendarStyleCss } from "@/lib/calendar-style";
+import { layoutResponsiveCss } from "@/lib/responsive-style";
 import { connectDB } from "@/lib/db";
 import { CalendarSettings } from "@/lib/models";
 import { getSession } from "@/lib/session";
@@ -70,6 +72,26 @@ export default async function CalendarPage() {
   return (
     <SiteChrome>
       <div className="page-shell calendar-page">
+        {/*
+         * The style's own sheet.
+         *
+         * The calendar wears the style's class either way, but this page is
+         * not a page-builder page and so nothing else emits its rules — the
+         * class matched nothing here, and every saved style silently did
+         * nothing on the one screen the calendar has of its own. The layouts
+         * its templates use carry per-size rules of the same kind.
+         */}
+        <style
+          dangerouslySetInnerHTML={{
+            __html: [
+              calendarStyleCss(view.style),
+              ...Object.values(view.layouts).map(layoutResponsiveCss),
+            ]
+              .filter(Boolean)
+              .join("\n"),
+          }}
+        />
+
         <header className="calendar-page-head">
           <h1 className="calendar-page-title">{view.settings.title}</h1>
           {view.settings.intro ? (
