@@ -1,4 +1,11 @@
-import { makeId, SHAPE_TEXT_PLACEMENTS, type ShapeTextPlacement } from "./page-layout";
+import {
+  defaultSponsorScroll,
+  makeId,
+  normalizeSponsorScroll,
+  SHAPE_TEXT_PLACEMENTS,
+  type ShapeTextPlacement,
+  type SponsorScrollSettings,
+} from "./page-layout";
 import { sanitizeMediaPath } from "./protected-media-url";
 import { normalizeRichText } from "./rich-text";
 import { normalizeStyleValues, type StyleValues } from "./style-values";
@@ -26,6 +33,8 @@ export const PUBLICATION_BLOCK_TYPES = [
   "story",
   "collection",
   "form",
+  // A run of sponsor logos, drawn from the recognition levels it names.
+  "sponsorScroll",
 ] as const;
 
 export type PublicationBlockType = (typeof PUBLICATION_BLOCK_TYPES)[number];
@@ -123,6 +132,14 @@ export type PublicationBlock = {
   storyId?: string;
   collectionId?: string;
   formId?: string;
+  /**
+   * A sponsor scroll's settings, minus the height.
+   *
+   * The block's own box is the band here — a publication block is a rectangle
+   * somebody drew on a canvas, and a second height in rem would be a setting
+   * that could disagree with the one they can see.
+   */
+  sponsorScroll?: SponsorScrollSettings;
 
   /** Click action for visual blocks: navigate, jump to a page, or nothing. */
   clickAction?: "none" | "link" | "page";
@@ -285,6 +302,14 @@ export function createPublicationBlock(type: PublicationBlockType): PublicationB
       block.width = 240;
       block.height = 240;
       break;
+    case "sponsorScroll":
+      block.sponsorScroll = { ...defaultSponsorScroll };
+      // A band across the slide rather than the default rectangle: the block's
+      // own box is the height of the logos, and 200 units of logo would be a
+      // very loud strip to have to shrink before it reads as a run.
+      block.width = 960;
+      block.height = 120;
+      break;
     case "icon":
       block.iconName = "Star";
       block.color = "#ffffff";
@@ -428,6 +453,9 @@ export function normalizePublicationBlock(input: unknown): PublicationBlock | nu
       break;
     case "form":
       block.formId = str(raw.formId);
+      break;
+    case "sponsorScroll":
+      block.sponsorScroll = normalizeSponsorScroll(raw.sponsorScroll);
       break;
   }
 

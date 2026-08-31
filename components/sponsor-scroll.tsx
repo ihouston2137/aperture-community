@@ -30,18 +30,30 @@ export function SponsorScroll({
   style,
   /** True on the builder canvas, where a still block is easier to place. */
   designTime = false,
+  height,
 }: {
   settings: SponsorScrollSettings;
   logos: SponsorLogo[];
   className?: string;
   style?: CSSProperties;
   designTime?: boolean;
+  /**
+   * The band's height as a CSS length, where something else decides it.
+   *
+   * A publication block is a box somebody drew on a canvas, and its own height
+   * is the band — asking for a second height in rem would be two settings that
+   * could disagree. Passed as a length rather than left to a percentage, so
+   * the sizing stays free of the percentage chains Safari mishandles.
+   */
+  height?: string;
 }) {
+  const band = height ?? `${settings.height}rem`;
+
   if (logos.length === 0) {
     return designTime ? (
       <div
         className={`sponsor-scroll is-empty ${className ?? ""}`.trim()}
-        style={{ ...style, height: `${settings.height}rem` }}
+        style={{ ...style, height: band }}
       >
         <span>No sponsor logos match these recognition levels yet.</span>
       </div>
@@ -57,7 +69,7 @@ export function SponsorScroll({
   const seconds = Math.max(1, settings.secondsPerLogo * logos.length);
 
   const vars = {
-    "--sponsor-scroll-height": `${settings.height}rem`,
+    "--sponsor-scroll-height": band,
     "--sponsor-scroll-seconds": `${seconds}s`,
   } as CSSProperties;
 

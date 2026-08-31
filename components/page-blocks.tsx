@@ -14,6 +14,7 @@ import {
 } from "@/lib/page-container-layout";
 import {
   blockFillsWidth,
+  normalizeFeaturedSponsor,
   normalizeSponsorScroll,
   type PageBlock,
   type PageColumn,
@@ -65,6 +66,7 @@ import { Panorama } from "./panorama";
 import { QrCode } from "./qr-code";
 import { CustomShapeView, Shape } from "./shape";
 import { FormShell } from "./form-shell";
+import { FeaturedSponsor } from "./featured-sponsor";
 import { SponsorScroll } from "./sponsor-scroll";
 import { MenuBlockView } from "./menu-block";
 
@@ -429,6 +431,19 @@ export function BlockView({
           logos={sources.sponsorLogos[block.id] ?? []}
           // The canvas holds it still: a block that will not stay put is
           // hard to select, and its movement is not what is being arranged.
+          designTime={!interactive}
+        />
+      );
+
+    case "featuredSponsor":
+      return (
+        <FeaturedSponsor
+          settings={normalizeFeaturedSponsor(block.featuredSponsor)}
+          sponsor={sources.featuredSponsors[block.id]}
+          // Each column resolves the same way every other style slot does, so
+          // a named style saved anywhere on the site can dress one.
+          logoColumn={styleSlotProps(block, "logoColumnStyle")}
+          detailColumn={styleSlotProps(block, "detailColumnStyle")}
           designTime={!interactive}
         />
       );

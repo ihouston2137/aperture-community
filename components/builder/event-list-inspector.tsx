@@ -244,7 +244,7 @@ function FilterChecklist({
  * block, which is exactly where these slots live — so unlike the calendar's
  * settings the patch needs no folding.
  */
-function StyleSlotButton({
+export function StyleSlotButton({
   label,
   note,
   slugKey,
@@ -255,8 +255,12 @@ function StyleSlotButton({
 }: {
   label: string;
   note: string;
-  slugKey: "listStyleSlug" | "itemStyleSlug";
-  valuesKey: "listStyle" | "itemStyle";
+  slugKey:
+    | "listStyleSlug"
+    | "itemStyleSlug"
+    | "logoColumnStyleSlug"
+    | "detailColumnStyleSlug";
+  valuesKey: "listStyle" | "itemStyle" | "logoColumnStyle" | "detailColumnStyle";
   block: PageBlock;
   update: (patch: Partial<PageBlock>) => void;
   onEditStyle: OpenStyleEditor;

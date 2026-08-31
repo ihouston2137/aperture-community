@@ -14,7 +14,12 @@ import {
 } from "./models";
 import { normalizeCalendarTemplateLayout } from "./calendar-slot-layout";
 import { getRecognitionLevels, getSponsors } from "./sponsorships";
-import { isPubliclyNamed, primaryLogo, sponsorLogoSrc } from "./sponsorship-types";
+import {
+  isPubliclyNamed,
+  primaryLogo,
+  sponsorLogoSrc,
+  type SponsorSummary,
+} from "./sponsorship-types";
 import {
   eventListQuery,
   normalizeEventListSettings,
@@ -42,6 +47,7 @@ import {
 import {
   emptyPageSources,
   type BioSummary,
+  type FeaturedSponsorView,
   type FormSummary,
   type PageSources,
 } from "./page-source-types";
@@ -50,8 +56,10 @@ import { toStoryView } from "./stories";
 import type { StoryView } from "@/components/story-blocks";
 import { getSiteContent } from "./site-settings";
 import {
+  normalizeFeaturedSponsor,
   normalizeSponsorScroll,
   walkBlocks,
+  type FeaturedSponsorSettings,
   type PageLayout,
   type PageRow,
 } from "./page-layout";
@@ -123,6 +131,7 @@ export async function loadPageSources(layout: PageLayout): Promise<PageSources> 
   const calendarLayoutIds = new Set<string>();
   const eventListBlocks: { id: string; settings: EventListSettings }[] = [];
   const sponsorScrollBlocks: { id: string; levelIds: string[] }[] = [];
+  const featuredSponsorBlocks: { id: string; settings: FeaturedSponsorSettings }[] = [];
 
   walkBlocks(layout, (block) => {
     if (block.type === "bio" && block.bioId) bioIds.add(block.bioId);
@@ -146,6 +155,12 @@ export async function loadPageSources(layout: PageLayout): Promise<PageSources> 
     if (block.type === "sponsorScroll") {
       const settings = normalizeSponsorScroll(block.sponsorScroll);
       sponsorScrollBlocks.push({ id: block.id, levelIds: settings.levelIds });
+    }
+    if (block.type === "featuredSponsor") {
+      featuredSponsorBlocks.push({
+        id: block.id,
+        settings: normalizeFeaturedSponsor(block.featuredSponsor),
+      });
     }
     if (block.type === "customShape" && block.shapeSlug) shapeSlugs.add(block.shapeSlug);
 
@@ -414,6 +429,63 @@ export async function loadPageSources(layout: PageLayout): Promise<PageSources> 
     }
   }
 
+  /*
+   * The sponsor each featured block is showing.
+   *
+   * The draw is made here, on the server, once per request — so two blocks set
+   * to draw at random can land on different sponsors, and a page looked at
+   * twice features two, which is the point of featuring one rather than
+   * listing them all.
+   */
+  const featuredSponsors: Record<string, FeaturedSponsorView> = {};
+  if (featuredSponsorBlocks.length > 0) {
+    const [levels, sponsors] = await Promise.all([
+      getRecognitionLevels(),
+      getSponsors(),
+    ]);
+    const levelName = (id: string) =>
+      levels.find((level) => level._id === id)?.name ?? "";
+
+    for (const entry of featuredSponsorBlocks) {
+      const { settings } = entry;
+
+      let chosen: SponsorSummary | undefined;
+      if (settings.source === "one") {
+        chosen = sponsors.find((sponsor) => sponsor._id === settings.sponsorId);
+      } else {
+        const pool = sponsors.filter((sponsor) => {
+          // A level marked anonymous is never drawn from: the level says the
+          // site does not name them, and this block is nothing but naming.
+          if (!isPubliclyNamed(sponsor, levels)) return false;
+          if (!sponsor.recognitionLevelId) return false;
+          return (
+            settings.levelIds.length === 0 ||
+            settings.levelIds.includes(sponsor.recognitionLevelId)
+          );
+        });
+        chosen = pool[Math.floor(Math.random() * pool.length)];
+      }
+
+      // A named sponsor is shown whatever their level says: somebody has
+      // chosen them by hand, which is a decision the record cannot overrule.
+      if (!chosen) continue;
+
+      featuredSponsors[entry.id] = {
+        id: chosen._id,
+        name: chosen.name,
+        logoSrc: sponsorLogoSrc(primaryLogo(chosen.logos)),
+        description: chosen.description,
+        recognitionLevel: levelName(chosen.recognitionLevelId),
+        industry: chosen.industry,
+        website: chosen.website,
+        email: chosen.email,
+        phone: chosen.phone,
+        address: chosen.address,
+        links: chosen.links.map((link) => ({ label: link.label, url: link.href })),
+      };
+    }
+  }
+
   /**
    * Menu items per block, filtered to whoever is asking.
    *
@@ -438,6 +510,7 @@ export async function loadPageSources(layout: PageLayout): Promise<PageSources> 
 
   return {
     sponsorLogos,
+    featuredSponsors,
     storyViews,
     latestStoryView,
     bios,

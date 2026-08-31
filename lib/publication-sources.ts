@@ -1,4 +1,11 @@
-import type { PublicationSources } from "@/components/publication-blocks";
+import type {
+  PublicationSources,
+} from "@/components/publication-blocks";
+import type { SponsorLogo } from "@/components/sponsor-scroll";
+
+import { normalizeSponsorScroll } from "./page-layout";
+import { isPubliclyNamed, primaryLogo, sponsorLogoSrc } from "./sponsorship-types";
+import { getRecognitionLevels, getSponsors } from "./sponsorships";
 
 import { connectDB } from "./db";
 import { Collection, CustomShape, FormDefinition, MediaAsset, Story } from "./models";
@@ -17,8 +24,13 @@ export async function loadPublicationSources(
   const formIds = new Set<string>();
   const shapeSlugs = new Set<string>();
   const mediaIds = new Set<string>();
+  const sponsorScrollBlocks: { id: string; levelIds: string[] }[] = [];
 
   for (const block of [...repeatedBlocks, ...pages.flatMap((page) => page.blocks)]) {
+    if (block.type === "sponsorScroll") {
+      const settings = normalizeSponsorScroll(block.sponsorScroll);
+      sponsorScrollBlocks.push({ id: block.id, levelIds: settings.levelIds });
+    }
     if (block.mediaId) mediaIds.add(block.mediaId);
     if (block.storyId) storyIds.add(block.storyId);
     if (block.collectionId) collectionIds.add(block.collectionId);
@@ -55,7 +67,49 @@ export async function loadPublicationSources(
       : Promise.resolve([]),
   ]);
 
+  /*
+   * Sponsor logos per scroll block.
+   *
+   * The sponsors and levels are read once however many scrolls a publication
+   * holds. A sponsor at a level marked anonymous is never included: the level
+   * says the site does not name them, and a logo names them louder than a line
+   * of type would.
+   */
+  const sponsorLogos: Record<string, SponsorLogo[]> = {};
+  if (sponsorScrollBlocks.length > 0) {
+    const [levels, sponsors] = await Promise.all([
+      getRecognitionLevels(),
+      getSponsors(),
+    ]);
+
+    // Highest recognition first, then alphabetically — the order the rest of
+    // the site lists sponsors in, so a run agrees with a wall of them.
+    const rank = new Map(levels.map((level, index) => [level._id, index]));
+    const ordered = [...sponsors].sort(
+      (a, b) =>
+        (rank.get(a.recognitionLevelId) ?? 999) - (rank.get(b.recognitionLevelId) ?? 999) ||
+        a.name.localeCompare(b.name)
+    );
+
+    for (const entry of sponsorScrollBlocks) {
+      sponsorLogos[entry.id] = ordered
+        .filter((sponsor) => {
+          if (!isPubliclyNamed(sponsor, levels)) return false;
+          if (entry.levelIds.length === 0) return Boolean(sponsor.recognitionLevelId);
+          return entry.levelIds.includes(sponsor.recognitionLevelId);
+        })
+        .map((sponsor) => ({
+          id: sponsor._id,
+          name: sponsor.name,
+          src: sponsorLogoSrc(primaryLogo(sponsor.logos)),
+        }))
+        // A sponsor with no artwork has nothing to put in a run of logos.
+        .filter((sponsor) => Boolean(sponsor.src));
+    }
+  }
+
   return {
+    sponsorLogos,
     media: Object.fromEntries(
       media.map((asset) => [String(asset._id), asset.url ?? ""])
     ),

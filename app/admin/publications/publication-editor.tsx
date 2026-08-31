@@ -64,10 +64,12 @@ import {
   type Transition,
 } from "@/lib/publication-layout";
 import {
+  normalizeSponsorScroll,
   SHAPE_KINDS,
   SHAPE_KIND_LABELS,
   SHAPE_TEXT_PLACEMENTS,
   SHAPE_TEXT_PLACEMENT_LABELS,
+  type SponsorScrollSettings,
 } from "@/lib/page-layout";
 
 import { savePublicationAction } from "./actions";
@@ -85,6 +87,7 @@ const BLOCK_ICONS: Record<string, string> = {
   story: "Newspaper",
   collection: "Images",
   form: "ClipboardList",
+  sponsorScroll: "GalleryHorizontal",
 };
 
 const BLOCK_LABELS: Record<string, string> = {
@@ -100,6 +103,7 @@ const BLOCK_LABELS: Record<string, string> = {
   story: "Story",
   collection: "Collection",
   form: "Form",
+  sponsorScroll: "Sponsor scroll",
 };
 
 /**
@@ -2354,6 +2358,16 @@ export function PublicationEditor({
                     onChange={(formId) => updateBlock(selected.id, { formId })}
                   />
                 ) : null}
+
+                {selected.type === "sponsorScroll" ? (
+                  <SponsorScrollFields
+                    settings={normalizeSponsorScroll(selected.sponsorScroll)}
+                    levels={sources.recognitionLevels}
+                    onChange={(sponsorScroll) =>
+                      updateBlock(selected.id, { sponsorScroll })
+                    }
+                  />
+                ) : null}
               </div>
 
               <div className="inspector-section">
@@ -2467,5 +2481,100 @@ export function PublicationEditor({
         </div>
       ) : null}
     </div>
+  );
+}
+
+
+/**
+ * A sponsor scroll's settings, on a slide.
+ *
+ * No height here, unlike the page builder's version: the block is a rectangle
+ * somebody drew on the canvas and its own box is the band. Two heights would
+ * be two settings that could disagree, and only one of them would be the one
+ * being looked at.
+ */
+function SponsorScrollFields({
+  settings,
+  levels,
+  onChange,
+}: {
+  settings: SponsorScrollSettings;
+  levels: { _id: string; name: string }[];
+  onChange: (settings: SponsorScrollSettings) => void;
+}) {
+  const patch = (next: Partial<SponsorScrollSettings>) =>
+    onChange({ ...settings, ...next });
+
+  return (
+    <>
+      <NumField
+        label="Seconds per logo"
+        value={settings.secondsPerLogo}
+        min={0.5}
+        max={60}
+        step={0.5}
+        onChange={(value) => patch({ secondsPerLogo: value })}
+      />
+      <span className="help-text">
+        How long one logo takes to cross the block. Set per logo, so adding a
+        sponsor makes the run longer rather than making everything faster. The
+        block\u2019s own height sizes the logos.
+      </span>
+
+      <SelectField
+        label="Travels"
+        value={settings.direction}
+        options={[
+          { value: "left", label: "Right to left" },
+          { value: "right", label: "Left to right" },
+        ]}
+        onChange={(value) =>
+          patch({ direction: value as SponsorScrollSettings["direction"] })
+        }
+      />
+
+      <CheckField
+        label="Stop while the pointer is over it"
+        value={settings.pauseOnHover}
+        onChange={(value) => patch({ pauseOnHover: value })}
+      />
+
+      <div className="field">
+        <label>Recognition levels</label>
+        {levels.length === 0 ? (
+          <span className="help-text">
+            No recognition levels are defined yet, so there are no logos to
+            draw on.
+          </span>
+        ) : (
+          <>
+            <div className="chip-picker">
+              {levels.map((level) => (
+                <label key={level._id} className="chip-option">
+                  <input
+                    type="checkbox"
+                    checked={settings.levelIds.includes(level._id)}
+                    onChange={(event) =>
+                      patch({
+                        levelIds: event.target.checked
+                          ? [...settings.levelIds, level._id]
+                          : settings.levelIds.filter((id: string) => id !== level._id),
+                      })
+                    }
+                  />
+                  {level.name}
+                </label>
+              ))}
+            </div>
+            <span className="help-text">
+              {settings.levelIds.length === 0
+                ? "Every level, since none is named."
+                : "Only sponsors at these levels."}{" "}
+              A level marked anonymous is never included.
+            </span>
+          </>
+        )}
+      </div>
+    </>
   );
 }

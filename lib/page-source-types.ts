@@ -22,6 +22,22 @@ export type BioSummary = {
   headshotUrl: string;
 };
 
+/** One sponsor, reduced to what a featured block draws. */
+export type FeaturedSponsorView = {
+  id: string;
+  name: string;
+  /** Already through the media route; empty when they have no artwork. */
+  logoSrc: string;
+  description: string;
+  recognitionLevel: string;
+  industry: string;
+  website: string;
+  email: string;
+  phone: string;
+  address: string;
+  links: { label: string; url: string }[];
+};
+
 export type FormSummary = {
   id: string;
   title: string;
@@ -74,6 +90,14 @@ export type PageSources = {
    */
   sponsorLogos: Record<string, { id: string; name: string; src: string }[]>;
   /**
+   * The sponsor each featured-sponsor block is showing, keyed by block id.
+   *
+   * Resolved on the server, which is also where the random draw happens — two
+   * blocks set to draw at random should be able to land on different sponsors,
+   * and a draw made in the browser would flash the wrong one first.
+   */
+  featuredSponsors: Record<string, FeaturedSponsorView>;
+  /**
    * Paths for the pages and collections that blocks link to, keyed by record
    * id. Resolved here rather than stored on the block so renaming a slug moves
    * every link that points at it.
@@ -84,6 +108,7 @@ export type PageSources = {
 
 export const emptyPageSources: PageSources = {
   sponsorLogos: {},
+  featuredSponsors: {},
   storyViews: {},
   latestStoryView: null,
   bios: {},

@@ -10,7 +10,8 @@ import { styleValuesToCss } from "@/lib/style-values";
 import { LucideIconView } from "./lucide-icon";
 import { QrCode } from "./qr-code";
 import { CustomShapeView, Shape } from "./shape";
-import type { ShapeKind } from "@/lib/page-layout";
+import { normalizeSponsorScroll, type ShapeKind } from "@/lib/page-layout";
+import { SponsorScroll, type SponsorLogo } from "./sponsor-scroll";
 
 export type PublicationSources = {
   /** Media asset id -> url, so blocks that only store an id still resolve. */
@@ -19,9 +20,17 @@ export type PublicationSources = {
   stories: Record<string, { headline: string; slug: string; featureMediaUrl: string }>;
   collections: Record<string, { name: string; slug: string }>;
   forms: Record<string, { title: string; slug: string }>;
+  /**
+   * Logos for each sponsor scroll block, keyed by block id.
+   *
+   * Keyed by block rather than by level, because two scrolls in one
+   * publication can name different levels and each is filtered for itself.
+   */
+  sponsorLogos: Record<string, SponsorLogo[]>;
 };
 
 export const emptyPublicationSources: PublicationSources = {
+  sponsorLogos: {},
   media: {},
   shapes: {},
   stories: {},
@@ -311,6 +320,30 @@ export function PublicationBlockView({
         <div className="pb-empty-drop">
           {form ? `Form: ${form.title}` : "No form selected"}
         </div>
+      );
+      break;
+    }
+
+    case "sponsorScroll": {
+      /*
+       * Drawn for real, unlike the story, collection and form blocks above.
+       *
+       * Those stand for a page somewhere else and can only be a label on a
+       * slide; a run of logos is the whole of what it is, and a publication
+       * showing a placeholder where the sponsors should be would be missing
+       * the point of putting it on the slide.
+       *
+       * The block's own box is the band, in canvas units — the stage scales
+       * the lot, so a logo drawn at the block's height is drawn at the right
+       * size whatever the slide is shown at.
+       */
+      content = (
+        <SponsorScroll
+          settings={normalizeSponsorScroll(block.sponsorScroll)}
+          logos={sources.sponsorLogos[block.id] ?? []}
+          height={`${block.height}px`}
+          designTime={!interactive}
+        />
       );
       break;
     }

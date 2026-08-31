@@ -10822,3 +10822,132 @@ html:has(.admin-shell) body::-webkit-scrollbar {
     mask-image: none;
   }
 }
+
+/* ---------------------------------------------------- Featured sponsor */
+
+/*
+ * One sponsor across the page: the logo, and what is worth saying about them.
+ *
+ * Two columns, because a mark and a paragraph want different things — a logo
+ * wants room around it and centring both ways, and words want a left edge to
+ * run from. `--featured-logo-width` is the share the logo takes, set on the
+ * block from its own setting.
+ */
+.featured-sponsor {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 1.5rem;
+  width: 100%;
+}
+
+/* Which side the logo sits on, without reordering the markup — the logo is
+   read first either way, and on a phone it should still come first. */
+.featured-sponsor[data-logo-side="right"] {
+  flex-direction: row-reverse;
+}
+
+.featured-sponsor-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* The named share, but never so narrow that a logo has nowhere to go. The
+     column gives up and wraps below 18rem rather than squeezing the mark. */
+  flex: 1 1 max(18rem, var(--featured-logo-width, 35%));
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.featured-sponsor-logo img {
+  max-width: 100%;
+  max-height: 16rem;
+  /* Whole and undistorted: a sponsor's mark is the one image on a site that
+     must not be cropped or stretched to fit. */
+  object-fit: contain;
+}
+
+/* Their name set large, for a sponsor with no artwork — a gap where a mark
+   should be reads as something failing to load. */
+.featured-sponsor-wordmark {
+  font-family: var(--heading-font);
+  font-size: clamp(1.5rem, 4vw, 2.5rem);
+  text-align: center;
+  line-height: 1.15;
+}
+
+/*
+ * The words. `flex: 1 1 18rem` rather than the remainder of the share, so the
+ * two columns wrap to one at the same point whichever way round they are and
+ * whatever the share is set to.
+ */
+.featured-sponsor-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  flex: 1 1 18rem;
+  min-width: 0;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+.featured-sponsor-field {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.featured-sponsor-field p {
+  margin: 0;
+}
+
+/* The name and the level are the two that carry weight of their own; the rest
+   is left to the column's style, which is what it is for. */
+.featured-sponsor-name {
+  font-family: var(--heading-font);
+  font-size: 1.5rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.featured-sponsor-level {
+  font-size: 0.875rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.75;
+}
+
+/* An address is a shape as much as it is a string, so the lines it was written
+   with are the lines it is printed with. */
+.featured-sponsor-address {
+  white-space: pre-line;
+}
+
+.featured-sponsor-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.9rem;
+}
+
+.featured-sponsor.is-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 8rem;
+  border: 1px dashed var(--admin-border, rgba(128, 128, 128, 0.4));
+  border-radius: var(--radius, 0.5rem);
+  font-size: 0.875rem;
+  opacity: 0.7;
+  text-align: center;
+  padding: 1rem;
+}
+
+/* The field list in the inspector: a tick and, once ticked, the two arrows
+   that place it. */
+.featured-field-list .admin-list-item {
+  padding: 0.3rem 0.5rem;
+}
+
+.featured-field-list .checkbox-row {
+  flex: 1;
+  margin: 0;
+}

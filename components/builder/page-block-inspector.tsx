@@ -13,6 +13,7 @@ import {
 import { ICON_NAMES } from "@/components/icons";
 import type { BuilderSources } from "@/lib/builder-sources";
 import {
+  normalizeFeaturedSponsor,
   normalizeSponsorScroll,
   PAGE_BLOCK_TYPES,
   PAGE_LINK_TYPES,
@@ -20,7 +21,11 @@ import {
   SHAPE_KINDS,
   SHAPE_TEXT_PLACEMENTS,
   SHAPE_TEXT_PLACEMENT_LABELS,
+  SPONSOR_FIELDS,
+  SPONSOR_FIELD_LABELS,
+  type FeaturedSponsorSettings,
   type PageBlock,
+  type SponsorField,
   type SponsorScrollSettings,
 } from "@/lib/page-layout";
 import {
@@ -53,7 +58,7 @@ import {
 import { CalendarBlockInspector } from "./calendar-block-inspector";
 import { CalendarSlotInspector } from "./calendar-slot-inspector";
 import { DocSlotInspector } from "./doc-slot-inspector";
-import { EventListInspector } from "./event-list-inspector";
+import { EventListInspector, StyleSlotButton } from "./event-list-inspector";
 import { ContainerInspector } from "./container-inspector";
 import type { InspectorContext, PaletteItem } from "./layout-builder";
 import {
@@ -180,6 +185,7 @@ const BLOCK_LABELS: Record<string, string> = {
   form: "Form",
   menu: "Menu",
   sponsorScroll: "Sponsor scroll",
+  featuredSponsor: "Featured sponsor",
   container: "Container",
 
   // Story slots. Not in the palette — they are added from a story-bound
@@ -215,7 +221,8 @@ const BLOCK_ICONS: Record<string, string> = {
   qrCode: "QrCode",
   button: "MousePointerClick",
   bio: "Contact",
-  sponsorScroll: "GalleryVertical",
+  sponsorScroll: "GalleryHorizontal",
+  featuredSponsor: "BadgeCheck",
   collection: "Images",
   calendar: "Calendar",
   eventList: "Rows",
@@ -880,6 +887,15 @@ export function PageBlockInspector({
           </>
         ) : null}
 
+        {block.type === "featuredSponsor" ? (
+          <FeaturedSponsorFields
+            settings={normalizeFeaturedSponsor(block.featuredSponsor)}
+            sponsors={sources.sponsors}
+            levels={sources.recognitionLevels}
+            onChange={(featuredSponsor) => update({ featuredSponsor })}
+          />
+        ) : null}
+
         {block.type === "sponsorScroll" ? (
           <SponsorScrollFields
             settings={normalizeSponsorScroll(block.sponsorScroll)}
@@ -888,6 +904,34 @@ export function PageBlockInspector({
           />
         ) : null}
       </div>
+
+      {block.type === "featuredSponsor" ? (
+        <div className="inspector-section">
+          <h4 className="inspector-title">The columns</h4>
+          <p className="help-text" style={{ marginTop: "-0.35rem" }}>
+            The block\u2019s own style dresses the box around both. These dress
+            each column inside it.
+          </p>
+          <StyleSlotButton
+            label="Logo column"
+            note="The box the logo is centred in."
+            slugKey="logoColumnStyleSlug"
+            valuesKey="logoColumnStyle"
+            block={block}
+            update={update}
+            onEditStyle={onEditStyle}
+          />
+          <StyleSlotButton
+            label="Details column"
+            note="The box the chosen fields are set in."
+            slugKey="detailColumnStyleSlug"
+            valuesKey="detailColumnStyle"
+            block={block}
+            update={update}
+            onEditStyle={onEditStyle}
+          />
+        </div>
+      ) : null}
 
       <div className="inspector-section">
         <h4 className="inspector-title">Placement</h4>
@@ -1007,6 +1051,182 @@ function SponsorScrollFields({
           </>
         )}
       </div>
+    </>
+  );
+}
+
+
+/**
+ * A featured sponsor: who, and what is said about them.
+ *
+ * The field list is ticked and ordered in one control rather than two. A
+ * separate "which" and "in what order" would need the two kept in step, and
+ * the list is short enough that one row per field carrying both is clearer
+ * than a picker and a sorter that have to agree.
+ */
+function FeaturedSponsorFields({
+  settings,
+  sponsors,
+  levels,
+  onChange,
+}: {
+  settings: FeaturedSponsorSettings;
+  sponsors: { _id: string; label: string }[];
+  levels: { _id: string; name: string }[];
+  onChange: (settings: FeaturedSponsorSettings) => void;
+}) {
+  const patch = (next: Partial<FeaturedSponsorSettings>) =>
+    onChange({ ...settings, ...next });
+
+  /** Chosen fields first, in their order, then the ones left out. */
+  const rows = [
+    ...settings.fields,
+    ...SPONSOR_FIELDS.filter((field) => !settings.fields.includes(field)),
+  ];
+
+  const move = (field: SponsorField, direction: -1 | 1) => {
+    const index = settings.fields.indexOf(field);
+    const target = index + direction;
+    if (index < 0 || target < 0 || target >= settings.fields.length) return;
+    const next = [...settings.fields];
+    [next[index], next[target]] = [next[target], next[index]];
+    patch({ fields: next });
+  };
+
+  return (
+    <>
+      <SelectField
+        label="Shows"
+        value={settings.source}
+        options={[
+          { value: "one", label: "A sponsor you choose" },
+          { value: "random", label: "A different one each time" },
+        ]}
+        onChange={(value) =>
+          patch({ source: value as FeaturedSponsorSettings["source"] })
+        }
+      />
+
+      {settings.source === "one" ? (
+        <SelectField
+          label="Sponsor"
+          value={settings.sponsorId}
+          options={[
+            { value: "", label: "Select a sponsor\u2026" },
+            ...sponsors.map((sponsor) => ({
+              value: sponsor._id,
+              label: sponsor.label,
+            })),
+          ]}
+          onChange={(sponsorId) => patch({ sponsorId })}
+        />
+      ) : (
+        <div className="field">
+          <label>Drawn from</label>
+          {levels.length === 0 ? (
+            <span className="help-text">
+              No recognition levels are defined yet, so there is nobody to draw
+              from.
+            </span>
+          ) : (
+            <>
+              <div className="chip-picker">
+                {levels.map((level) => (
+                  <label key={level._id} className="chip-option">
+                    <input
+                      type="checkbox"
+                      checked={settings.levelIds.includes(level._id)}
+                      onChange={(event) =>
+                        patch({
+                          levelIds: event.target.checked
+                            ? [...settings.levelIds, level._id]
+                            : settings.levelIds.filter((id) => id !== level._id),
+                        })
+                      }
+                    />
+                    {level.name}
+                  </label>
+                ))}
+              </div>
+              <span className="help-text">
+                {settings.levelIds.length === 0
+                  ? "Every level, since none is named."
+                  : "Only sponsors at these levels."}{" "}
+                Drawn afresh each time the page is loaded. A level marked
+                anonymous is never drawn from.
+              </span>
+            </>
+          )}
+        </div>
+      )}
+
+      <h4 className="inspector-title">The two columns</h4>
+
+      <SelectField
+        label="Logo sits"
+        value={settings.logoSide}
+        options={[
+          { value: "left", label: "On the left" },
+          { value: "right", label: "On the right" },
+        ]}
+        onChange={(value) =>
+          patch({ logoSide: value as FeaturedSponsorSettings["logoSide"] })
+        }
+      />
+
+      <NumField
+        label="Logo column width (%)"
+        value={settings.logoWidth}
+        min={15}
+        max={75}
+        step={5}
+        onChange={(value) => patch({ logoWidth: value })}
+      />
+      <span className="help-text">
+        The share of the block the logo takes. Both columns stack on a phone,
+        where two columns of anything are one narrow column of two things.
+      </span>
+
+      <h4 className="inspector-title">What it says</h4>
+      <p className="help-text" style={{ marginTop: "-0.35rem" }}>
+        Ticked fields are shown, in this order. A field the sponsor has nothing
+        in is left out rather than printed empty.
+      </p>
+
+      <ul className="admin-list featured-field-list">
+        {rows.map((field) => {
+          const on = settings.fields.includes(field);
+          return (
+            <li key={field} className="admin-list-item">
+              <label className="checkbox-row">
+                <input
+                  type="checkbox"
+                  checked={on}
+                  onChange={(event) =>
+                    patch({
+                      fields: event.target.checked
+                        ? [...settings.fields, field]
+                        : settings.fields.filter((entry) => entry !== field),
+                    })
+                  }
+                />
+                {SPONSOR_FIELD_LABELS[field]}
+              </label>
+
+              {on ? (
+                <div className="admin-list-actions">
+                  <button type="button" className="btn btn-sm" onClick={() => move(field, -1)}>
+                    \u2191
+                  </button>
+                  <button type="button" className="btn btn-sm" onClick={() => move(field, 1)}>
+                    \u2193
+                  </button>
+                </div>
+              ) : null}
+            </li>
+          );
+        })}
+      </ul>
     </>
   );
 }

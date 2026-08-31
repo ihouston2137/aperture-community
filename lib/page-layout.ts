@@ -65,6 +65,8 @@ export const PAGE_BLOCK_TYPES = [
   "menu",
   // A slow vertical scroll of sponsor logos, drawn from recognition levels.
   "sponsorScroll",
+  // One sponsor at length: the logo beside whatever is worth saying about them.
+  "featuredSponsor",
   "container",
 ] as const;
 
@@ -122,6 +124,105 @@ export const PAGE_LINK_TYPE_LABELS: Record<PageLinkType, string> = {
   collection: "Collection",
   url: "Custom URL",
 };
+
+/**
+ * The things a featured sponsor block can say about one, beyond the logo.
+ *
+ * Named rather than "everything on the record": notes and contacts are for the
+ * people running the programme, and a block that offered them would eventually
+ * put somebody's phone number on a public page because a list was ticked
+ * without being read.
+ */
+export const SPONSOR_FIELDS = [
+  "name",
+  "description",
+  "recognitionLevel",
+  "industry",
+  "website",
+  "email",
+  "phone",
+  "address",
+  "links",
+] as const;
+
+export type SponsorField = (typeof SPONSOR_FIELDS)[number];
+
+export const SPONSOR_FIELD_LABELS: Record<SponsorField, string> = {
+  name: "Name",
+  description: "Description",
+  recognitionLevel: "Recognition level",
+  industry: "Industry",
+  website: "Website",
+  email: "Email",
+  phone: "Phone",
+  address: "Address",
+  links: "Links",
+};
+
+/** How a featured sponsor block is set up. */
+export type FeaturedSponsorSettings = {
+  /**
+   * `one` names a sponsor; `random` draws from the levels named below.
+   *
+   * Random is drawn per request rather than per visitor, so a page that is
+   * looked at twice shows two sponsors — which is the point of featuring one
+   * at a time rather than listing them all.
+   */
+  source: "one" | "random";
+  /** The sponsor being featured, when one is named. */
+  sponsorId: string;
+  /** Which levels the draw comes from. Empty means every level. */
+  levelIds: string[];
+  /**
+   * The fields shown beside the logo, in the order they are shown.
+   *
+   * An order of its own rather than the order of `SPONSOR_FIELDS`: a block
+   * leading with the description and closing with the name is a perfectly
+   * good way to introduce somebody, and the list is short enough to arrange
+   * by hand.
+   */
+  fields: SponsorField[];
+  /** How wide the logo's column is, as a share of the block. */
+  logoWidth: number;
+  /** Which side the logo sits on. */
+  logoSide: "left" | "right";
+};
+
+export const defaultFeaturedSponsor: FeaturedSponsorSettings = {
+  source: "one",
+  sponsorId: "",
+  levelIds: [],
+  fields: ["name", "recognitionLevel", "description"],
+  logoWidth: 35,
+  logoSide: "left",
+};
+
+export function normalizeFeaturedSponsor(input: unknown): FeaturedSponsorSettings {
+  const raw = (input ?? {}) as Record<string, unknown>;
+  const base = defaultFeaturedSponsor;
+
+  const fields = Array.isArray(raw.fields)
+    ? raw.fields
+        .map(String)
+        .filter((field): field is SponsorField =>
+          (SPONSOR_FIELDS as readonly string[]).includes(field)
+        )
+    : base.fields;
+
+  return {
+    source: raw.source === "random" ? "random" : "one",
+    sponsorId: str(raw.sponsorId),
+    levelIds: Array.isArray(raw.levelIds)
+      ? [...new Set(raw.levelIds.map(String).filter(Boolean))].slice(0, 50)
+      : [],
+    // Deduplicated, since a field shown twice is a mistake rather than a look.
+    fields: [...new Set(fields)],
+    // Neither column may vanish: a two-column block with one column is a
+    // one-column block that still costs a gap.
+    logoWidth: Math.min(75, Math.max(15, num(raw.logoWidth, base.logoWidth))),
+    logoSide: raw.logoSide === "right" ? "right" : "left",
+  };
+}
 
 /** How a sponsor scroll is set up. */
 export type SponsorScrollSettings = {
@@ -281,6 +382,19 @@ export type PageBlock = ResponsiveStyleFields & {
    * row of marks of different proportions reads evenly.
    */
   sponsorScroll?: SponsorScrollSettings;
+
+  /*
+   * One sponsor, at length.
+   *
+   * Two columns, so it carries two style slots beyond the block's own: the
+   * side the logo sits on and the side the words do. The block's own style
+   * dresses the box around both.
+   */
+  featuredSponsor?: FeaturedSponsorSettings;
+  logoColumnStyleSlug?: string;
+  logoColumnStyle?: StyleValues;
+  detailColumnStyleSlug?: string;
+  detailColumnStyle?: StyleValues;
 
   // container
   container?: ContainerLayout;
@@ -518,6 +632,9 @@ export function createBlock(type: PageBlockType): PageBlock {
   const block: PageBlock = { id: makeId("block"), type };
 
   if (type === "sponsorScroll") block.sponsorScroll = { ...defaultSponsorScroll };
+  if (type === "featuredSponsor") {
+    block.featuredSponsor = { ...defaultFeaturedSponsor, fields: [...defaultFeaturedSponsor.fields] };
+  }
 
   switch (type) {
     case "headline":
@@ -912,6 +1029,17 @@ export function normalizeBlock(
     case "sponsorScroll":
       block.sponsorScroll = normalizeSponsorScroll(raw.sponsorScroll);
       break;
+    case "featuredSponsor":
+      block.featuredSponsor = normalizeFeaturedSponsor(raw.featuredSponsor);
+      // The two columns, each with its own named-style slot and its own
+      // per-view overrides, exactly like the event list's two boxes.
+      for (const slot of ["logoColumnStyle", "detailColumnStyle"] as const) {
+        const slugKey = `${slot}Slug` as "logoColumnStyleSlug" | "detailColumnStyleSlug";
+        if (raw[slugKey]) block[slugKey] = str(raw[slugKey]);
+        if (raw[slot]) block[slot] = normalizeStyleValues(raw[slot]);
+        normalizeResponsiveStyle(raw, block, slot);
+      }
+      break;
     case "container":
       // `normalizeContainerLayout` already runs the normalizer over every
       // cell's blocks. Running the plain one again here would drop the story
@@ -1295,6 +1423,9 @@ export function blockFillsWidth(block: WidthAwareBlock): boolean {
     // given, and shrink-wrapping it to the widest logo would leave the window
     // narrower than the block it is in.
     case "sponsorScroll":
+    // Two columns across the page. There is no width control on it and
+    // nothing to shrink to — a featured sponsor is a band, not a card.
+    case "featuredSponsor":
       return true;
     default:
       return false;
