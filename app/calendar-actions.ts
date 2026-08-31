@@ -30,6 +30,8 @@ export type RsvpPerson = {
   name: string;
   /** Community role ids only: the membership levels, not what they administer. */
   levelIds: string[];
+  /** What they said along with the answer. Empty when they said nothing. */
+  note: string;
 };
 
 export type RsvpView = {
@@ -44,6 +46,8 @@ export type RsvpView = {
   canRsvp: boolean;
   signedIn: boolean;
   reason: string;
+  /** This viewer's own note, so the box opens with what they last wrote. */
+  myNote: string;
   /**
    * Every membership level on the site, so a block naming them by id can print
    * their names.
@@ -65,6 +69,7 @@ const emptyRsvpView: RsvpView = {
   canRsvp: false,
   signedIn: false,
   reason: "",
+  myNote: "",
   levels: [],
 };
 
@@ -103,35 +108,38 @@ async function loadRsvpView(eventId: string): Promise<RsvpView> {
     getRoleSummaries(),
   ]);
 
-  const personOf = (userId: unknown): RsvpPerson => {
-    const user = users.find((candidate) => String(candidate._id) === String(userId));
-    if (!user) return { name: "A member", levelIds: [] };
+  const personOf = (rsvp: any): RsvpPerson => {
+    const user = users.find((candidate) => String(candidate._id) === String(rsvp.userId));
+    const note = String(rsvp.note ?? "").trim();
+    if (!user) return { name: "A member", levelIds: [], note };
 
     const { community } = splitRoles((user.roleIds ?? []).map(String), roles);
-    return { name: fullName(user), levelIds: community.map((role) => role._id) };
+    return {
+      name: fullName(user),
+      levelIds: community.map((role) => role._id),
+      note,
+    };
   };
 
   const yes = rsvps.filter((rsvp) => rsvp.response === "yes");
   const no = rsvps.filter((rsvp) => rsvp.response === "no");
 
-  const mine = session
-    ? (rsvps.find((rsvp) => String(rsvp.userId) === session.userId)?.response ?? null)
+  const own = session
+    ? rsvps.find((rsvp) => String(rsvp.userId) === session.userId)
     : null;
+  const mine = own?.response ?? null;
 
   return {
     enabled: true,
     mine: normalizeRsvpResponse(mine),
-    yes: yes
-      .map((rsvp) => personOf(rsvp.userId))
-      .sort((a, b) => a.name.localeCompare(b.name)),
-    no: no
-      .map((rsvp) => personOf(rsvp.userId))
-      .sort((a, b) => a.name.localeCompare(b.name)),
+    yes: yes.map(personOf).sort((a, b) => a.name.localeCompare(b.name)),
+    no: no.map(personOf).sort((a, b) => a.name.localeCompare(b.name)),
     yesCount: yes.length,
     noCount: no.length,
     canRsvp,
     signedIn,
     reason,
+    myNote: String(own?.note ?? ""),
     levels: roles
       .filter((role) => role.kind === "community")
       .map((role) => ({ _id: role._id, name: role.name })),
@@ -184,9 +192,13 @@ export async function getEventRsvpsAction(eventId: string): Promise<RsvpView> {
   }
 }
 
+/** Long enough for "arriving after the talk, leaving before the raffle". */
+const MAX_RSVP_NOTE = 500;
+
 export async function setMyRsvpAction(
   eventId: string,
-  response: string
+  response: string,
+  note?: string
 ): Promise<{ ok: boolean; error?: string; view?: RsvpView }> {
   const answer = normalizeRsvpResponse(response);
   if (!answer) return { ok: false, error: "Choose yes or no." };
@@ -209,9 +221,19 @@ export async function setMyRsvpAction(
   }
 
   // One answer per member per event, so changing your mind updates in place.
+  /*
+   * The note only moves when one is passed.
+   *
+   * Pressing "Going" after writing a note should not wipe the note, and
+   * saving a note should not need the answer re-sent — so each call says
+   * which of the two it is changing.
+   */
+  const changes: Record<string, unknown> = { response: answer };
+  if (note !== undefined) changes.note = note.trim().slice(0, MAX_RSVP_NOTE);
+
   await EventRsvp.findOneAndUpdate(
     { eventId, userId: session.userId },
-    { $set: { response: answer } },
+    { $set: changes },
     { upsert: true }
   );
 
@@ -223,6 +245,8 @@ export async function setMyRsvpAction(
 export type AttendanceRow = {
   userId: string;
   name: string;
+  /** What they said when they answered, for whoever is taking the register. */
+  rsvpNote: string;
   /** The levels they hold, written out, for the line under the name. */
   level: string;
   /** The same levels as ids, for grouping the sheet into columns. */
@@ -308,6 +332,9 @@ async function loadAttendanceView(eventId: string): Promise<AttendanceView> {
       rsvp: normalizeRsvpResponse(
         rsvps.find((rsvp) => String(rsvp.userId) === id)?.response
       ),
+      rsvpNote: String(
+        rsvps.find((rsvp) => String(rsvp.userId) === id)?.note ?? ""
+      ).trim(),
       present: Boolean(
         marks.find((mark) => String(mark.userId) === id)?.present
       ),

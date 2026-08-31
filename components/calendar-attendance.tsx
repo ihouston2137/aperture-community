@@ -226,8 +226,26 @@ export function CalendarAttendance({
                         <span className="cal-attendance-level">{row.level}</span>
                       ) : null}
                       {row.rsvp ? (
-                        <span className="cal-attendance-rsvp" data-answer={row.rsvp}>
+                        <span
+                          className="cal-attendance-rsvp"
+                          data-answer={row.rsvp}
+                          // Whoever is taking the register always sees the
+                          // note — knowing somebody is arriving late is the
+                          // difference between marking them absent and
+                          // waiting for them.
+                          title={row.rsvpNote || undefined}
+                        >
                           {row.rsvp === "yes" ? "said yes" : "said no"}
+                        </span>
+                      ) : null}
+                      {row.rsvpNote ? (
+                        <span className="cal-attendance-note-mark" aria-hidden="true">
+                          &#9998;
+                        </span>
+                      ) : null}
+                      {row.rsvpNote ? (
+                        <span className="visually-hidden">
+                          Note: {row.rsvpNote}
                         </span>
                       ) : null}
                     </button>

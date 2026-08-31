@@ -1664,6 +1664,14 @@ const EventRsvpSchema = new Schema<any>(
     eventId: { type: Schema.Types.ObjectId, ref: "CalendarEvent", required: true },
     userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
     response: { type: String, enum: RSVP_RESPONSES, required: true },
+    /**
+     * What they wanted to say along with the answer.
+     *
+     * Yes and no are rarely the whole of it: somebody is coming but arriving
+     * late, or leaving early, or is away that week. A bare yes/no throws that
+     * away and the organiser hears it some other way, or not at all.
+     */
+    note: { type: String, default: "" },
   },
   { timestamps: true }
 );

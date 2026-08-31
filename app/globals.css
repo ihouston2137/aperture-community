@@ -10161,6 +10161,58 @@ html:has(.admin-shell) body::-webkit-scrollbar {
   letter-spacing: 0;
 }
 
+/* What somebody wrote alongside their answer. Set under the name and quieter
+   than it: the name is who, the note is a detail about them. */
+.cal-rsvp-person-note {
+  display: block;
+  font-size: 0.85em;
+  opacity: 0.7;
+  font-style: italic;
+  overflow-wrap: anywhere;
+}
+
+.cal-rsvp-names li {
+  line-height: 1.35;
+}
+
+/* The note box in the RSVP popup. */
+.cal-rsvp-note {
+  margin-top: 1rem;
+}
+
+.cal-rsvp-note label {
+  display: block;
+  font-size: 0.875rem;
+  margin-bottom: 0.3rem;
+}
+
+.cal-rsvp-note textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
+  border-radius: 0.375rem;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 0.9375rem;
+  resize: vertical;
+}
+
+.cal-rsvp-note-actions {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 0.4rem;
+}
+
+/* A pencil beside a name on the register, saying there is something to read in
+   the tooltip. Small: the register is scanned for who is missing, and a note
+   is a detail somebody goes looking for once they have found the name. */
+.cal-attendance-note-mark {
+  font-size: 0.8em;
+  opacity: 0.6;
+}
+
 .cal-rsvp-empty {
   font-size: 0.9em;
   opacity: 0.55;

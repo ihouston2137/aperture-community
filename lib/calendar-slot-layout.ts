@@ -158,6 +158,15 @@ export type CalendarSlotBlock = ResponsiveStyleFields & {
   otherHeading?: string;
   /** `calRsvpList`: whether to break the lists out by level at all. */
   groupByLevels?: boolean;
+  /**
+   * `calRsvpList`: whether the notes people left are printed beside the names.
+   *
+   * Off unless asked for. A note explains an absence — an illness, a funeral,
+   * a job — and the list it would appear on is whatever page the template is
+   * put on, which may be one the whole membership reads. Whoever takes the
+   * register always sees them; everybody else only if a template says so.
+   */
+  showNotes?: boolean;
 
   /** `calAttendance`: opens with only the members who said yes. */
   attendanceFromRsvp?: boolean;
@@ -209,6 +218,7 @@ export function createCalendarSlotBlock(
     block.yesHeading = "Going";
     block.noHeading = "Not going";
     block.groupByLevels = false;
+    block.showNotes = false;
     block.levelIds = [];
     block.otherHeading = "Other";
   }
@@ -295,6 +305,7 @@ export function normalizeCalendarSlotBlock(input: unknown): CalendarSlotBlock | 
     block.yesHeading = str(raw.yesHeading, "Going");
     block.noHeading = str(raw.noHeading, "Not going");
     block.groupByLevels = Boolean(raw.groupByLevels);
+    block.showNotes = Boolean(raw.showNotes);
     block.levelIds = levelIds(raw.levelIds);
     block.otherHeading = str(raw.otherHeading, "Other");
   }

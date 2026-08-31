@@ -159,6 +159,17 @@ export function CalendarSlotInspector({
               <LevelPicker block={block} update={update} levels={levels} />
             ) : null}
 
+            <CheckField
+              label="Show the notes people left"
+              value={block.showNotes ?? false}
+              onChange={(value) => update({ showNotes: value } as Partial<PageBlock>)}
+            />
+            <span className="help-text">
+              A note usually explains an absence, and this list appears on
+              whatever page the template is put on. Whoever takes the register
+              sees them either way.
+            </span>
+
             <TextField
               label="Not going heading"
               value={block.noHeading ?? "Not going"}

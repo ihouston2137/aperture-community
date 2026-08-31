@@ -133,6 +133,17 @@ function RsvpDialog({
   const [error, setError] = useState("");
   const [saving, startSaving] = useTransition();
 
+  /*
+   * The note box, seeded from what was saved once the view arrives.
+   *
+   * `null` means "not typed in yet", which is how a box that has never been
+   * touched can show the saved note while a box somebody has cleared stays
+   * cleared — an empty string is a real answer here, not a missing one.
+   */
+  const [draft, setDraft] = useState<string | null>(null);
+  const note = draft ?? view?.myNote ?? "";
+  const noteChanged = draft !== null && draft.trim() !== (view?.myNote ?? "").trim();
+
   useEffect(() => {
     const onKeyDown = (keyEvent: KeyboardEvent) => {
       if (keyEvent.key === "Escape") onClose();
@@ -141,14 +152,32 @@ function RsvpDialog({
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [onClose]);
 
-  function answer(response: "yes" | "no") {
+  /*
+   * Answering and noting are one call each, and each says what it changes.
+   *
+   * The answer saves the moment it is pressed, as it always has — that is the
+   * thing being asked, and it should not wait behind a note nobody has typed.
+   * The note is sent with the answer that stands, so saving one never rewrites
+   * the other.
+   */
+  function save(response: "yes" | "no", withNote: boolean) {
     setError("");
     startSaving(async () => {
-      const result = await setMyRsvpAction(event._id, response);
-      if (result.ok && result.view) publish(result.view);
-      else setError(result.error ?? "Could not save your answer.");
+      const result = await setMyRsvpAction(
+        event._id,
+        response,
+        withNote ? note : undefined
+      );
+      if (result.ok && result.view) {
+        publish(result.view);
+        if (withNote) setDraft(null);
+      } else {
+        setError(result.error ?? "Could not save your answer.");
+      }
     });
   }
+
+  const answer = (response: "yes" | "no") => save(response, false);
 
   const busy = !view || saving;
 
@@ -219,6 +248,50 @@ function RsvpDialog({
                     can change this at any time.
                   </p>
                 ) : null}
+
+                {/* Offered only once there is an answer for it to belong to:
+                    a note without a yes or a no is a message to nobody. */}
+                {view.mine ? (
+                  <div className="cal-rsvp-note">
+                    <label htmlFor={`rsvp-note-${event._id}`}>
+                      Anything to add?
+                    </label>
+                    <textarea
+                      id={`rsvp-note-${event._id}`}
+                      rows={3}
+                      maxLength={500}
+                      value={note}
+                      disabled={busy}
+                      placeholder={
+                        view.mine === "yes"
+                          ? "Arriving late, leaving early, bringing someone…"
+                          : "Away that week, another commitment…"
+                      }
+                      onChange={(changeEvent) => setDraft(changeEvent.target.value)}
+                    />
+
+                    <div className="cal-rsvp-note-actions">
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-primary"
+                        disabled={busy || !noteChanged}
+                        onClick={() => save(view.mine as "yes" | "no", true)}
+                      >
+                        {noteChanged ? "Save note" : "Note saved"}
+                      </button>
+                      {noteChanged ? (
+                        <button
+                          type="button"
+                          className="btn btn-sm"
+                          disabled={busy}
+                          onClick={() => setDraft(null)}
+                        >
+                          Undo
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : null}
               </>
             ) : (
               <>
@@ -274,10 +347,17 @@ export function CalendarRsvpList({
   const levels = namedLevels(block.levelIds, view?.levels ?? []);
   const grouped = Boolean(block.groupByLevels) && levels.length > 0;
 
+  const withNotes = Boolean(block.showNotes);
+
   const names = (people: RsvpPerson[]) => (
     <ul className="cal-rsvp-names">
       {people.map((person) => (
-        <li key={person.name}>{person.name}</li>
+        <li key={person.name}>
+          {person.name}
+          {withNotes && person.note ? (
+            <span className="cal-rsvp-person-note">{person.note}</span>
+          ) : null}
+        </li>
       ))}
     </ul>
   );
