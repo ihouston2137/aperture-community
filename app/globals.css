@@ -1727,7 +1727,21 @@ input, select, textarea {
   opacity: 0.4;
 }
 
-.calendar-day.is-today .calendar-day-number {
+/*
+ * Today's date, in every view.
+ *
+ * The month number, the week heading and the list heading are the same thing
+ * wearing three names — the date of the day being looked at — so they carry
+ * the same mark. Week and list used to get a colour and nothing else, which
+ * left the highlight looking like a different feature in each view and gave a
+ * Calendar Style's "Today highlight" nothing to sit on but the text.
+ *
+ * A span in a flex row, so the padding and the rounding wrap the words rather
+ * than the whole line.
+ */
+.calendar-day.is-today .calendar-day-number,
+.calendar-grid.is-week .calendar-day.is-today .calendar-day-heading,
+.calendar-grid.is-list .calendar-day.is-today .calendar-day-heading {
   background: var(--cal-accent);
   color: #0d1014;
   border-radius: 999px;
@@ -1932,10 +1946,6 @@ input, select, textarea {
 .calendar-list-count {
   font-size: 0.875rem;
   opacity: 0.75;
-}
-
-.calendar-grid.is-week .calendar-day.is-today .calendar-day-heading {
-  color: var(--cal-accent);
 }
 
 .calendar-day-empty {
