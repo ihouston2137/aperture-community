@@ -1,6 +1,7 @@
 import {
   filterCalendarEvents,
   monthKeyFromDateKey,
+  listRange,
   monthRange,
   normalizeCalendarPageSettings,
   normalizeStatus,
@@ -124,7 +125,12 @@ export async function loadCalendarPage(canManage = false): Promise<CalendarPageV
   const { start, end } =
     display.view === "week"
       ? weekRange(todayKey)
-      : monthRange(monthKeyFromDateKey(todayKey));
+      : display.view === "list"
+        ? // The list runs forward from today rather than covering a month, so
+          // the first paint has to be given the same range the browser will
+          // ask for — otherwise it fetches again before showing anything.
+          listRange(todayKey)
+        : monthRange(monthKeyFromDateKey(todayKey));
 
   const scope: Record<string, unknown> = { date: { $gte: start, $lte: end } };
   if (!canManage) scope.status = "published";

@@ -560,6 +560,30 @@ export function monthRange(monthKey: string): { start: string; end: string } {
   };
 }
 
+/**
+ * How far ahead the list looks, in months.
+ *
+ * The list is not a month, so it needs some other bound, and "everything ever
+ * scheduled" is not one — a site that plans two years out would load two years
+ * to show the next ten items. A year forward is long enough that the end of it
+ * is never what somebody is looking at, and short enough to be one query.
+ */
+export const LIST_HORIZON_MONTHS = 12;
+
+/**
+ * What is still to come: from today forward, not bounded by a month.
+ *
+ * A list read down the page has no reason to stop at the end of a month — the
+ * thing somebody wants from it is what is coming up next, and on the 30th that
+ * is mostly in the month after. The grid views still ask by month, because a
+ * grid *is* a month.
+ */
+export function listRange(fromDateKey: string): { start: string; end: string } {
+  const start = normalizeDateKey(fromDateKey) || todayDateKey();
+  const horizon = shiftMonthKey(monthKeyFromDateKey(start), LIST_HORIZON_MONTHS);
+  return { start, end: monthRange(horizon).end };
+}
+
 export type MonthCell = {
   dateKey: string;
   day: number;
@@ -754,11 +778,26 @@ export function formatDayHeading(dateKey: string): string {
   return `${WEEKDAY_FULL_LABELS[weekday]}, ${MONTH_NAMES[month - 1]} ${day}`;
 }
 
-/** Untimed events lead the day, then everything else by start time, then name. */
-export function sortEvents<T extends { startTime: string; name?: string }>(
+/**
+ * Chronological: the day first, then the time within it, then the name.
+ *
+ * The date leads because a list runs down the calendar rather than across one
+ * day of it — without it, every day's nine o'clock event comes before every
+ * day's ten o'clock, and the days interleave. The month grid sorts a single
+ * day at a time, where the dates are all equal and this decides nothing, so
+ * one comparator serves both.
+ *
+ * Untimed events carry an empty start time, which sorts before any clock time
+ * and so leads its day — which is where something happening on a day but at no
+ * particular time belongs.
+ */
+export function sortEvents<T extends { date: string; startTime: string; name?: string }>(
   events: T[]
 ): T[] {
   return [...events].sort((a, b) => {
+    // Date keys are fixed-width `YYYY-MM-DD`, so comparing them as text is
+    // comparing them as dates — the reason the format was chosen.
+    if (a.date !== b.date) return a.date.localeCompare(b.date);
     if (a.startTime !== b.startTime) return a.startTime.localeCompare(b.startTime);
     return eventLabel(a).localeCompare(eventLabel(b));
   });

@@ -73,12 +73,12 @@ export function CalendarGrid({
 }: CalendarGridProps) {
   const byDate = groupEventsByDate(events);
   /*
-   * The list is the same month, read down instead of across.
+   * The list is what is coming up, not a month read downwards.
    *
-   * Keeping the range means the switch between views does not move anybody:
-   * March as a grid and March as a list are the same March, and the toolbar
-   * steps months either way. Pagination then divides a busy month into pages
-   * rather than deciding what "a page" of an open-ended list would even be.
+   * Its range is set by the caller and runs forward from today, so it is not
+   * bounded by the month the grid views are showing — what somebody wants from
+   * a list is the next few things, and on the 30th those are mostly in the
+   * month after. Pagination divides that rather than the calendar doing it.
    */
   if (view === "list") {
     return (

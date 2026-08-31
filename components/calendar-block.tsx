@@ -14,6 +14,7 @@ import {
   filterCalendarEvents,
   monthKeyFromDateKey,
   monthLabel,
+  listRange,
   monthRange,
   openingView,
   shiftDateKey,
@@ -67,11 +68,20 @@ function subscribeToWidth(onChange: () => void): () => void {
   };
 }
 
-function rangeKey(view: CalendarView, date: string): string {
-  // The list covers the same month the grid does — see `CalendarList` — so it
-  // shares the month's range and its cache entry rather than fetching again.
+function rangeKey(view: CalendarView, date: string, todayKey: string): string {
+  /*
+   * The list is not a month.
+   *
+   * It runs forward from today, so it ignores wherever the visitor has
+   * navigated to — there is nowhere to navigate to. The grid views ask by the
+   * month or week around the anchor, as they always have.
+   */
   const { start, end } =
-    view === "week" ? weekRange(date) : monthRange(monthKeyFromDateKey(date));
+    view === "list"
+      ? listRange(todayKey || date)
+      : view === "week"
+        ? weekRange(date)
+        : monthRange(monthKeyFromDateKey(date));
   return `${start}:${end}`;
 }
 
@@ -147,7 +157,7 @@ export function CalendarBlock({
 
   // Seeded with whatever the server already sent for the opening range.
   const cache = useRef<Record<string, CalendarEventRecord[]>>(
-    todayKey ? { [rangeKey(display.view, todayKey)]: initialEvents } : {}
+    todayKey ? { [rangeKey(display.view, todayKey, todayKey)]: initialEvents } : {}
   );
   const [events, setEvents] = useState<CalendarEventRecord[]>(initialEvents);
   const [loading, setLoading] = useState(false);
@@ -156,7 +166,7 @@ export function CalendarBlock({
     async (currentView: CalendarView, date: string) => {
       if (!date) return;
 
-      const key = rangeKey(currentView, date);
+      const key = rangeKey(currentView, date, todayKey);
       const cached = cache.current[key];
       if (cached) {
         setEvents(cached);
@@ -181,7 +191,7 @@ export function CalendarBlock({
         setLoading(false);
       }
     },
-    []
+    [todayKey]
   );
 
   useEffect(() => {
@@ -203,6 +213,15 @@ export function CalendarBlock({
 
   const visible = filterCalendarEvents(events, display);
   const eventBox = style.eventBox[view];
+
+  /*
+   * The list has no month to name, and nowhere to step to.
+   *
+   * It starts at today and runs forward, so a month label would be naming a
+   * container it no longer sits in, and Prev / Next / Today would move an
+   * anchor the list does not read. Its own pagination is its navigation.
+   */
+  const showsRange = view !== "list";
   const rangeLabel =
     view === "week" ? weekLabel(anchor) : monthLabel(monthKeyFromDateKey(anchor));
 
@@ -231,7 +250,7 @@ export function CalendarBlock({
     >
       {display.showNav || display.showViewSwitch || manage ? (
         <div className="calendar-toolbar">
-          {display.showNav ? (
+          {display.showNav && showsRange ? (
             <button
               type="button"
               className="btn btn-sm"
@@ -242,9 +261,11 @@ export function CalendarBlock({
             </button>
           ) : null}
 
-          <strong className="calendar-month-label">{rangeLabel}</strong>
+          {showsRange ? (
+            <strong className="calendar-month-label">{rangeLabel}</strong>
+          ) : null}
 
-          {display.showNav ? (
+          {display.showNav && showsRange ? (
             <button
               type="button"
               className="btn btn-sm"
@@ -255,7 +276,7 @@ export function CalendarBlock({
             </button>
           ) : null}
 
-          {display.showNav && !showsToday ? (
+          {display.showNav && showsRange && !showsToday ? (
             <button
               type="button"
               className="btn btn-sm"
