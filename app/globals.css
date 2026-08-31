@@ -139,6 +139,23 @@ input, select, textarea {
   padding-bottom: 3rem;
 }
 
+/*
+ * A built page ends where its last row ends.
+ *
+ * The gap above is for the screens that lay themselves out — a document, the
+ * directory, a story — and have no say in their own spacing. A page-builder
+ * page is nothing but spacing decisions: its rows carry their own padding and
+ * margins, and the last one is where the author put it. Three rem of somebody
+ * else's is a band of content colour they cannot remove from any screen the
+ * builder offers, which is the same as it not being theirs to decide.
+ *
+ * Scoped by what is inside rather than by a class on `main`, since the chrome
+ * is shared by every route and only this one draws a built layout.
+ */
+.site-main:has(> .page-render) {
+  padding-bottom: 0;
+}
+
 .site-header {
   background: var(--header-bg);
   color: var(--header-text);
