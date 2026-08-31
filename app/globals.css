@@ -11055,13 +11055,26 @@ html:has(.admin-shell) body::-webkit-scrollbar {
  * element to this rule's one class, and was quietly winning. The height
  * setting did nothing and the logo drew at its natural size, which is where
  * the room above and below it was coming from.
+ *
+ * `inline-block`, not `block`. A block-level image fills nothing and sits
+ * wherever its margins put it, so `text-align` on the item has no say over it
+ * — which is why setting Alignment on the logo's style appeared to do nothing.
+ * Inline-level, it is placed by the alignment like any other content, and
+ * `vertical-align` keeps the line box from leaving descender space under it.
  */
 .sponsor-highlight .sponsor-highlight-logo {
-  display: block;
+  display: inline-block;
+  vertical-align: middle;
   height: var(--highlight-logo-height, 6rem);
   width: auto;
   max-width: 100%;
   object-fit: contain;
+}
+
+/* The logo item holds nothing but the logo, so its line height is only ever
+   a gap around it. At no specificity, so a style that sets one still wins. */
+:where(.sponsor-highlight-field[data-field="logo"]) {
+  line-height: 0;
 }
 
 /* The name and the level start somewhere, at no specificity at all — so an
