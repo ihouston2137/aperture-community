@@ -10902,22 +10902,44 @@ html:has(.admin-shell) body::-webkit-scrollbar {
 
 .featured-sponsor-field p {
   margin: 0;
+  /* Inherited, so a size or a face set on the field reaches the words. A `p`
+     carrying its own would win against the field the same way a class does. */
+  font: inherit;
 }
 
-/* The name and the level are the two that carry weight of their own; the rest
-   is left to the column's style, which is what it is for. */
-.featured-sponsor-name {
+/*
+ * The built-in look of the two fields that carry weight of their own.
+ *
+ * Two things matter about how these are written. They sit on the *field*
+ * rather than on the element inside it, because that is the element a field's
+ * style lands on — set on the inner span, a `font-size` of its own would beat
+ * anything inherited from the field and only colour would get through, which
+ * is what was happening.
+ *
+ * And they are wrapped in `:where()`, which contributes no specificity at all.
+ * So a named style's class, or values set on the field, win outright rather
+ * than by a count of selectors — these are a starting point, not a rule.
+ */
+:where(.featured-sponsor-field[data-field="name"]) {
   font-family: var(--heading-font);
   font-size: 1.5rem;
   font-weight: 600;
   line-height: 1.2;
 }
 
-.featured-sponsor-level {
+:where(.featured-sponsor-field[data-field="recognitionLevel"]) {
   font-size: 0.875rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   opacity: 0.75;
+}
+
+/* The inner spans are hooks to aim at, and set nothing of their own: whatever
+   they carried would be a thing the field's own style could not change. `font`
+   alone, since the rest of the typographic properties inherit already. */
+.featured-sponsor-name,
+.featured-sponsor-level {
+  font: inherit;
 }
 
 /* An address is a shape as much as it is a string, so the lines it was written

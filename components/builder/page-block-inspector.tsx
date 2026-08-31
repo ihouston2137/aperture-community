@@ -913,8 +913,8 @@ export function PageBlockInspector({
         <div className="inspector-section">
           <h4 className="inspector-title">The columns</h4>
           <p className="help-text" style={{ marginTop: "-0.35rem" }}>
-            The block’s own style dresses the box around both. These dress
-            each column inside it.
+            One for each side. A field can then depart from its column below,
+            and a column’s type reaches every field that has not.
           </p>
           <StyleSlotButton
             label="Logo column"
