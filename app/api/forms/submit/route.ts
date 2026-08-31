@@ -3,6 +3,12 @@ import type { NextRequest } from "next/server";
 import { connectDB } from "@/lib/db";
 import { sendFormSubmissionNotification } from "@/lib/email";
 import { collectFormFields, normalizeFormLayout, normalizeFormSettings } from "@/lib/form-layout";
+import {
+  gradeForTaker,
+  gradeSitting,
+  normalizeTestSettings,
+  type SittingRef,
+} from "@/lib/form-test";
 import { FormDefinition, FormSubmission } from "@/lib/models";
 
 const MAX_VALUE_LENGTH = 20_000;
@@ -25,9 +31,42 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: "This form is not accepting submissions." }, { status: 404 });
   }
 
-  const layout = normalizeFormLayout(form.layout);
   const settings = normalizeFormSettings(form.settings);
-  const definedFields = collectFormFields(layout);
+  const isTest = form.kind === "test";
+  const test = normalizeTestSettings(form.test);
+
+  /*
+   * A test's questions are not in its layout, and which of them were asked is
+   * not the same from one sitting to the next — so the fields it is graded
+   * against are the ones the client says it was served, checked back against
+   * the stored test rather than taken on trust. The key is never sent to the
+   * browser; only the shape of the paper comes back.
+   */
+  const sitting: SittingRef[] = isTest
+    ? (Array.isArray(body.sitting) ? body.sitting : [])
+        .map((entry: any) => ({
+          questionId: String(entry?.questionId ?? ""),
+          variantId: String(entry?.variantId ?? ""),
+        }))
+        .filter((ref: SittingRef) =>
+          test.questions.some(
+            (question) =>
+              question.id === ref.questionId &&
+              question.variants.some((variant) => variant.id === ref.variantId)
+          )
+        )
+    : [];
+
+  const layout = isTest ? [] : normalizeFormLayout(form.layout);
+  const definedFields = isTest
+    ? sitting
+        .map((ref) => {
+          const question = test.questions.find((entry) => entry.id === ref.questionId);
+          return question?.variants.find((entry) => entry.id === ref.variantId)?.block;
+        })
+        .filter(Boolean)
+        .map((block) => block!)
+    : collectFormFields(layout);
 
   // Trust the stored definition, not the client, for which fields exist and
   // which are required.
@@ -61,12 +100,26 @@ export async function POST(request: NextRequest) {
     });
   }
 
+  /*
+   * Marked here and stored, never recomputed later: the key can be edited
+   * afterwards, and a grade that silently changes when somebody fixes a typo
+   * in an answer is not a record of anything.
+   */
+  const grade = isTest
+    ? gradeSitting(
+        test,
+        sitting,
+        Object.fromEntries(definedFields.map((field) => [field.id, submitted.get(field.id) ?? ""]))
+      )
+    : null;
+
   await FormSubmission.create({
     formId: String(form._id),
     formTitle: form.title ?? "",
     data,
     fields,
     status: "new",
+    ...(grade ? { grade, sitting } : {}),
   });
 
   // A failed notification must not fail the submission — it is already stored.
@@ -74,11 +127,15 @@ export async function POST(request: NextRequest) {
     formTitle: form.title ?? "",
     fields,
     extraRecipients: settings.notifyEmails,
+    grade,
   });
 
   return Response.json({
     ok: true,
     message: settings.successMessage,
     notified: notification.sent,
+    // Shaped by the test's own setting: the whole marking, the percentage
+    // alone, or nothing at all.
+    grade: grade ? gradeForTaker(grade, test.resultMode) : undefined,
   });
 }

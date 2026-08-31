@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { requirePermission } from "@/lib/access";
 import { adminExit } from "@/lib/admin-exit";
@@ -25,6 +25,9 @@ export default async function EditFormPage({
   await connectDB();
   const doc = await FormDefinition.findById(id).lean<any>();
   if (!doc) notFound();
+
+  // A test has no page to lay out; its questions are a list, edited elsewhere.
+  if (doc.kind === "test") redirect(`/admin/forms/${id}/test`);
 
   const sources = await loadBuilderSources();
 

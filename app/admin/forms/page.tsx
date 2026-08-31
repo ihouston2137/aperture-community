@@ -22,11 +22,16 @@ export default async function FormsPage() {
     <>
       <AdminHeader
         title="Forms"
-        subtitle="Forms built with the same row and column model as pages."
+        subtitle="Forms built with the same row and column model as pages. A test is a form with an answer key."
         actions={
-          <Link href="/admin/forms/new" className="btn btn-primary">
-            New form
-          </Link>
+          <>
+            <Link href="/admin/forms/new" className="btn btn-primary">
+              New form
+            </Link>
+            <Link href="/admin/forms/new-test" className="btn">
+              New test
+            </Link>
+          </>
         }
       />
 
@@ -41,7 +46,14 @@ export default async function FormsPage() {
           {forms.map((form, index) => (
             <li key={String(form._id)} className="admin-list-item">
               <div>
-                <h3>{form.title}</h3>
+                <h3>
+                  {form.title}
+                  {form.kind === "test" ? (
+                    <span className="badge" style={{ marginLeft: "0.5rem" }}>
+                      test
+                    </span>
+                  ) : null}
+                </h3>
                 <div className="admin-list-meta">
                   /forms/{form.slug} · {counts[index]} submission
                   {counts[index] === 1 ? "" : "s"}
@@ -49,7 +61,14 @@ export default async function FormsPage() {
               </div>
               <StatusBadge status={form.status} />
               <div className="admin-list-actions">
-                <Link className="btn btn-sm" href={`/admin/forms/${form._id}/edit`}>
+                <Link
+                  className="btn btn-sm"
+                  href={
+                    form.kind === "test"
+                      ? `/admin/forms/${form._id}/test`
+                      : `/admin/forms/${form._id}/edit`
+                  }
+                >
                   Edit
                 </Link>
                 <Link

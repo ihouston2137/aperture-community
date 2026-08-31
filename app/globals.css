@@ -1339,6 +1339,127 @@ input, select, textarea {
   color: var(--admin-muted);
 }
 
+/* ------------------------------------------------------------------ Tests */
+
+/* What a test came back as. The percentage leads because it is the answer to
+   the question somebody just asked by pressing send. */
+.test-result {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(128, 128, 128, 0.3);
+}
+
+.test-result-figure {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  margin: 0 0 0.75rem;
+  flex-wrap: wrap;
+}
+
+.test-result-figure strong {
+  font-size: 2.5rem;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.test-result-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.test-result-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: var(--radius);
+  border-left: 3px solid transparent;
+}
+
+/* Right and wrong carry a mark as well as a colour: a review read by somebody
+   who cannot tell the two greens apart still has to say which is which. */
+.test-result-list li.is-right {
+  border-left-color: #4caf72;
+  background: rgba(76, 175, 114, 0.1);
+}
+
+.test-result-list li.is-wrong {
+  border-left-color: #e06c6c;
+  background: rgba(224, 108, 108, 0.1);
+}
+
+.test-result-mark {
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.test-result-question {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.grade-review {
+  margin-bottom: 1.25rem;
+}
+
+/* One question in the test editor, with its variants folded inside it. */
+.test-question {
+  border: 1px solid var(--admin-border);
+  border-radius: var(--radius);
+  padding: 0.875rem;
+  margin-bottom: 0.875rem;
+}
+
+.test-question-head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+
+.test-question-head h3 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.test-question-head .admin-list-actions {
+  margin-left: auto;
+}
+
+/* A "worth" box beside its label rather than above it: one number, and the
+   heading row it sits in is already a line. */
+.field.is-inline {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+}
+
+.field.is-inline label {
+  margin: 0;
+  white-space: nowrap;
+}
+
+.field.is-inline input {
+  width: 4.5rem;
+}
+
+/* The question as the site will ask it, shown inert under its settings. */
+.test-question-preview {
+  border: 1px dashed var(--admin-border);
+  border-radius: var(--radius);
+  padding: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
 /* Two answers per field — listed, and opened — so the ticks sit under their
    headings rather than being pushed to the far edge like a count would be. */
 .submission-layout-table th.is-narrow,

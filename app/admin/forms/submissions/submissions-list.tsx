@@ -14,6 +14,23 @@ export type SubmittedField = {
   value: unknown;
 };
 
+/** Set only on a test's submissions. */
+export type SubmissionGrade = {
+  scored: number;
+  available: number;
+  percent: number;
+  right: number;
+  marked: number;
+  questions: {
+    questionId: string;
+    label: string;
+    points: number;
+    correct: boolean;
+    given?: string;
+    expected?: string;
+  }[];
+};
+
 export type SubmissionRecord = {
   _id: string;
   formId: string;
@@ -21,6 +38,7 @@ export type SubmissionRecord = {
   status: string;
   createdAt: string;
   fields: SubmittedField[];
+  grade?: SubmissionGrade;
 };
 
 export type FormSummary = {
@@ -30,6 +48,8 @@ export type FormSummary = {
   columns: { id: string; label: string }[];
   /** Field ids the opened entry shows, in order. Empty means all of them. */
   layoutOrder: string[];
+  /** A test's submissions are graded, so the list leads with the mark. */
+  isTest: boolean;
 };
 
 const STATUSES = ["new", "read", "archived"] as const;
@@ -189,6 +209,9 @@ export function SubmissionsList({
           <table className="admin-table">
             <thead>
               <tr>
+                {/* The mark is why a test's submissions are being looked at,
+                    so it leads rather than being found among the answers. */}
+                {form.isTest ? <th className="is-figure">Grade</th> : null}
                 {form.columns.map((column) => (
                   <th key={column.id}>{column.label}</th>
                 ))}
@@ -205,6 +228,21 @@ export function SubmissionsList({
                   className={`is-openable${submission.status === "new" ? " is-unread" : ""}`}
                   onClick={() => openEntry(submission)}
                 >
+                  {form.isTest ? (
+                    <td className="is-figure">
+                      {submission.grade ? (
+                        <>
+                          <strong>{submission.grade.percent}%</strong>
+                          <span className="help-text">
+                            {submission.grade.right} of {submission.grade.marked}
+                          </span>
+                        </>
+                      ) : (
+                        <span className="help-text">not marked</span>
+                      )}
+                    </td>
+                  ) : null}
+
                   {form.columns.map((column, index) => {
                     const field = submission.fields.find((entry) => entry.id === column.id);
                     const text = cellText(field?.value, field?.type);
@@ -341,6 +379,8 @@ function SubmissionDialog({
           </div>
 
           <div className="style-modal-body">
+            {submission.grade ? <GradeReview grade={submission.grade} /> : null}
+
             <table className="admin-table">
               <tbody>
                 {ordered.map((field) => (
@@ -373,5 +413,50 @@ function SubmissionDialog({
         </div>
       </div>
     </ModalPortal>
+  );
+}
+
+/**
+ * How a test was marked, question by question.
+ *
+ * Read from what was stored at the time rather than marked again now: the key
+ * can be edited afterwards, and a grade that changes when somebody fixes a
+ * typo is not a record of what happened.
+ */
+function GradeReview({ grade }: { grade: SubmissionGrade }) {
+  return (
+    <section className="grade-review">
+      <p className="test-result-figure">
+        <strong>{grade.percent}%</strong>
+        <span>
+          {grade.scored} of {grade.available} points &middot; {grade.right} of{" "}
+          {grade.marked} questions
+        </span>
+      </p>
+
+      {grade.questions.length > 0 ? (
+        <ul className="test-result-list">
+          {grade.questions.map((question) => (
+            <li
+              key={question.questionId}
+              className={question.correct ? "is-right" : "is-wrong"}
+            >
+              <span className="test-result-mark" aria-hidden="true">
+                {question.correct ? "\u2713" : "\u2717"}
+              </span>
+              <span className="test-result-question">
+                <strong>{question.label}</strong>
+                <span className="help-text">
+                  Answered: {question.given || "nothing"}
+                </span>
+                {question.correct ? null : (
+                  <span className="help-text">Correct: {question.expected}</span>
+                )}
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </section>
   );
 }

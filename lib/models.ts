@@ -1358,8 +1358,19 @@ const FormDefinitionSchema = new Schema<any>(
     title: { type: String, required: true },
     slug: { type: String, required: true, unique: true },
     status: { type: String, enum: ["draft", "published"], default: "draft" },
+    /**
+     * `form` collects answers; `test` marks them.
+     *
+     * The same record either way — a test reuses the fields, the styles and
+     * the submission pipeline whole. What differs is that it carries an answer
+     * key, and that its questions live in `test` rather than in `layout`,
+     * since a test is a list and not a page.
+     */
+    kind: { type: String, enum: ["form", "test"], default: "form" },
     layout: { type: [Mixed], default: [] },
     settings: { type: Mixed, default: {} },
+    /** Questions, variants, the answer key and how a sitting varies. */
+    test: { type: Mixed, default: {} },
     /** Which fields the full entry shows, and in what order. */
     submissionLayout: { type: [Mixed], default: [] },
     /**
@@ -1379,6 +1390,26 @@ const FormDefinitionSchema = new Schema<any>(
 
 export const FormDefinition = model("FormDefinition", FormDefinitionSchema);
 
+/**
+ * What a marked submission scored.
+ *
+ * Stored rather than recomputed: the key can be edited afterwards, and a grade
+ * that silently changes when somebody fixes a typo in an answer is not a
+ * record of anything. `sitting` says which paper was given, so a review can
+ * still read back the questions that were actually asked.
+ */
+const TestGradeSchema = new Schema<any>(
+  {
+    scored: { type: Number, default: 0 },
+    available: { type: Number, default: 0 },
+    percent: { type: Number, default: 0 },
+    right: { type: Number, default: 0 },
+    marked: { type: Number, default: 0 },
+    questions: { type: [Mixed], default: [] },
+  },
+  { _id: false }
+);
+
 const FormSubmissionSchema = new Schema<any>(
   {
     formId: { type: String, required: true },
@@ -1386,6 +1417,10 @@ const FormSubmissionSchema = new Schema<any>(
     data: { type: Mixed, default: {} },
     fields: { type: [Mixed], default: [] },
     status: { type: String, enum: ["new", "read", "archived"], default: "new" },
+    /** Set only for a test. Absent on every ordinary submission. */
+    grade: { type: TestGradeSchema, default: undefined },
+    /** Which question and which variant of it was served, in order. */
+    sitting: { type: [Mixed], default: [] },
   },
   { timestamps: true }
 );

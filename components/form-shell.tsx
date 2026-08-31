@@ -13,6 +13,7 @@ import {
   type FormBlock,
   type FormSettings,
 } from "@/lib/form-layout";
+import type { SittingRef, TestGrade } from "@/lib/form-test";
 import type { PageColumn, PageRow } from "@/lib/page-layout";
 import { CONTENT_WIDTH_VALUES } from "@/lib/site-values";
 import { styleValuesToDeclarations } from "@/lib/style-values";
@@ -35,6 +36,14 @@ export type FormShellForm = {
   slug: string;
   layout: unknown[];
   settings: Record<string, unknown>;
+  /**
+   * Which questions this sitting was served, for a test.
+   *
+   * Sent back with the answers so the marking knows which paper it was —
+   * a test drawn from a pool, or varied per question, is not the same set of
+   * questions twice. The key itself never comes to the browser.
+   */
+  sitting?: SittingRef[];
 };
 
 type UploadedFile = {
@@ -453,6 +462,8 @@ export function FormShell({
    */
   const [chosen, setChosen] = useState<Record<string, string[]>>({});
   const [uploads, setUploads] = useState<Record<string, UploadedFile[]>>({});
+  /** What the test came back as, when it was one and the result is shown. */
+  const [grade, setGrade] = useState<TestGrade | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [message, setMessage] = useState("");
@@ -526,7 +537,12 @@ export function FormShell({
       const response = await fetch("/api/forms/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ formId: form.id, data, fields: ordered }),
+        body: JSON.stringify({
+          formId: form.id,
+          data,
+          fields: ordered,
+          sitting: form.sitting ?? [],
+        }),
       });
       const result = await response.json();
 
@@ -538,6 +554,7 @@ export function FormShell({
 
       setStatus("sent");
       setMessage(settings.successMessage);
+      setGrade((result.grade as TestGrade | undefined) ?? null);
       if (settings.redirectUrl) window.location.href = settings.redirectUrl;
     } catch {
       setStatus("error");
@@ -621,9 +638,12 @@ export function FormShell({
     // business on a public page.
     const successStyled = styleSlotProps(settings.successStyle);
     return (
-      <div className={successStyled.className || undefined} style={successStyled.style}>
-        {message}
-      </div>
+      <>
+        <div className={successStyled.className || undefined} style={successStyled.style}>
+          {message}
+        </div>
+        {grade ? <TestResult grade={grade} /> : null}
+      </>
     );
   }
 
@@ -663,5 +683,55 @@ export function FormShell({
         </RowShell>
       ))}
     </form>
+  );
+}
+
+/**
+ * What a test came back as.
+ *
+ * The percentage leads because it is the answer to the question somebody just
+ * asked by pressing send. The per-question review is only present when the
+ * test is set to show it — it is built from what the server sent, so a test
+ * that keeps its answers to itself sends nothing to keep.
+ */
+function TestResult({ grade }: { grade: TestGrade }) {
+  return (
+    <section className="test-result" aria-label="Your result">
+      <p className="test-result-figure">
+        <strong>{grade.percent}%</strong>
+        <span>
+          {grade.right} of {grade.marked} correct
+        </span>
+      </p>
+
+      {grade.questions.length > 0 ? (
+        <ul className="test-result-list">
+          {grade.questions.map((question) => (
+            <li
+              key={question.questionId}
+              className={question.correct ? "is-right" : "is-wrong"}
+            >
+              <span className="test-result-mark" aria-hidden="true">
+                {question.correct ? "\u2713" : "\u2717"}
+              </span>
+              <span className="test-result-question">
+                <strong>{question.label}</strong>
+                {question.correct ? null : (
+                  <>
+                    <span className="help-text">
+                      You answered: {question.given || "nothing"}
+                    </span>
+                    <span className="help-text">Correct: {question.expected}</span>
+                  </>
+                )}
+              </span>
+              <span className="visually-hidden">
+                {question.correct ? "Correct" : "Wrong"}
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </section>
   );
 }

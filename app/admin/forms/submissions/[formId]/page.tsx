@@ -34,7 +34,7 @@ export default async function FormSubmissionsPage({
     // A deleted form is not an error here: its submissions outlive it, and the
     // inbox still lists them under the title they were taken with.
     FormDefinition.findById(formId)
-      .select("title layout submissionLayout submissionColumns")
+      .select("title kind layout submissionLayout submissionColumns")
       .lean<any>()
       .catch(() => null),
     FormSubmission.find({ formId }).sort({ createdAt: -1 }).limit(500).lean<any[]>(),
@@ -62,6 +62,7 @@ export default async function FormSubmissionsPage({
       .filter(Boolean)
       .map((field) => ({ id: field!.id, label: field!.label || field!.name || field!.id })),
     layoutOrder: idsOf(form?.submissionLayout),
+    isTest: form?.kind === "test",
   };
 
   const records: SubmissionRecord[] = submissions.map((submission) => ({
@@ -77,6 +78,9 @@ export default async function FormSubmissionsPage({
       type: field.type,
       value: field.value,
     })),
+    grade: submission.grade
+      ? JSON.parse(JSON.stringify(submission.grade))
+      : undefined,
   }));
 
   return (

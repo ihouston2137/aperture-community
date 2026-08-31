@@ -7,6 +7,7 @@ import { withExit } from "@/lib/admin-exit";
 import { requirePermission } from "@/lib/access";
 import { connectDB } from "@/lib/db";
 import { normalizeFormLayout, normalizeFormSettings } from "@/lib/form-layout";
+import { normalizeTestSettings } from "@/lib/form-test";
 import { clearMediaUsage, syncMediaUsage } from "@/lib/media-usage-sync";
 import { FormDefinition } from "@/lib/models";
 import { slugify, uniqueSlug } from "@/lib/slug";
@@ -77,6 +78,57 @@ export async function deleteFormAction(formData: FormData) {
   revalidatePath("/admin/forms");
   if (form?.slug) revalidatePath(`/forms/${form.slug}`);
   redirect("/admin/forms");
+}
+
+/**
+ * Save a test.
+ *
+ * Its own action rather than a branch inside `saveFormAction`: a test has no
+ * layout to normalize and no media to keep track of, and a form has no answer
+ * key — sharing one action would mean each half guarding against the other's
+ * fields on every save.
+ */
+export async function saveTestAction(formData: FormData) {
+  await guard();
+
+  const id = String(formData.get("id") ?? "");
+  const title = String(formData.get("title") ?? "").trim();
+  if (!title) return;
+
+  const slug = await uniqueSlug(
+    FormDefinition,
+    String(formData.get("slug") ?? "") || slugify(title),
+    title,
+    id || undefined
+  );
+
+  const parse = (key: string) => {
+    try {
+      return JSON.parse(String(formData.get(key) ?? "{}"));
+    } catch {
+      return {};
+    }
+  };
+
+  const record = {
+    title,
+    slug,
+    status: String(formData.get("status") ?? "draft"),
+    kind: "test",
+    // A test's questions are its own; the layout stays empty so nothing tries
+    // to render a page that was never arranged.
+    layout: [],
+    settings: normalizeFormSettings(parse("settings")),
+    test: normalizeTestSettings(parse("test")),
+  };
+
+  const formId = id
+    ? (await FormDefinition.findByIdAndUpdate(id, record), id)
+    : String((await FormDefinition.create(record))._id);
+
+  revalidatePath("/admin/forms");
+  revalidatePath(`/forms/${slug}`);
+  redirect(`/admin/forms/${formId}/test`);
 }
 
 export async function saveSubmissionLayoutAction(formData: FormData) {

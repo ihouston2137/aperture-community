@@ -306,6 +306,8 @@ export async function sendFormSubmissionNotification(input: {
   formTitle: string;
   fields: SubmissionField[];
   extraRecipients?: string[];
+  /** Set when the form was a test. Leads the message, as the mark does the list. */
+  grade?: { percent: number; right: number; marked: number } | null;
 }): Promise<{ sent: boolean; error?: string }> {
   const settings = await getEmailSettings();
 
@@ -326,10 +328,16 @@ export async function sendFormSubmissionNotification(input: {
     return `${field.label || field.name}: ${value}`;
   });
 
+  const scored = input.grade
+    ? `Graded ${input.grade.percent}% — ${input.grade.right} of ${input.grade.marked} correct.\n\n`
+    : "";
+
   const result = await sendMail({
     to: recipients,
-    subject: `New submission: ${input.formTitle}`,
-    text: `A new submission was received for “${input.formTitle}”.\n\n${lines.join("\n")}`,
+    subject: input.grade
+      ? `New test result: ${input.formTitle} (${input.grade.percent}%)`
+      : `New submission: ${input.formTitle}`,
+    text: `A new submission was received for “${input.formTitle}”.\n\n${scored}${lines.join("\n")}`,
   });
 
   return { sent: result.ok, error: result.error };
