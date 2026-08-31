@@ -7305,16 +7305,6 @@ html:has(.admin-shell) body::-webkit-scrollbar {
 /* Managing events from the calendar page itself, for somebody holding
    `calendar.manage`. None of this is on screen for anybody else. */
 
-.calendar-page-note {
-  margin: 0.75rem 0 0;
-  padding: 0.5rem 0.75rem;
-  border-left: 3px solid rgba(128, 128, 128, 0.45);
-  background: rgba(128, 128, 128, 0.08);
-  border-radius: 0 var(--radius) var(--radius) 0;
-  font-size: 0.875rem;
-  opacity: 0.85;
-}
-
 /* Pushed away from the navigation, so adding an event is not adjacent to
    stepping a month and cannot be hit by mistake. */
 .calendar-toolbar .calendar-add-event {

@@ -244,6 +244,15 @@ export async function saveCalendarPageAction(
 ): Promise<CalendarActionResult> {
   await guard();
 
+  /** Anything unreadable becomes the defaults, which normalization handles. */
+  const parseJson = (value: FormDataEntryValue | null): unknown => {
+    try {
+      return JSON.parse(String(value ?? "null"));
+    } catch {
+      return null;
+    }
+  };
+
   let display: unknown = null;
   try {
     display = JSON.parse(String(formData.get("display") ?? "null"));
@@ -260,6 +269,7 @@ export async function saveCalendarPageAction(
     title: String(formData.get("title") ?? ""),
     intro: String(formData.get("intro") ?? ""),
     backgroundColor: String(formData.get("backgroundColor") ?? ""),
+    titleStyle: parseJson(formData.get("titleStyle")),
     display,
   });
 

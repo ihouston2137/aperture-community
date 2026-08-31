@@ -6,6 +6,7 @@ import { useState } from "react";
 
 import { AdminHeader } from "@/components/admin-ui";
 import { CalendarGrid } from "@/components/calendar-grid";
+import type { SavedStyle } from "@/components/style-editor";
 import {
   CALENDAR_SIZES,
   calendarStyleClass,
@@ -68,6 +69,8 @@ export function CalendarManager({
   adminStyle,
   adminLayouts,
   defaultStyleId,
+  fonts,
+  savedStyles,
 }: {
   view: CalendarView;
   anchorDate: string;
@@ -89,6 +92,9 @@ export function CalendarManager({
   /** Layouts that style reaches for, keyed by id. */
   adminLayouts: Record<string, PageRow[]>;
   defaultStyleId: string;
+  /** Design-library fonts and named styles, for the page title's own styling. */
+  fonts: string[];
+  savedStyles: SavedStyle[];
 }) {
   const router = useRouter();
   const [dialog, setDialog] = useState<DialogState>(null);
@@ -263,6 +269,8 @@ export function CalendarManager({
         categories={settings.categories}
         who={settings.who}
         tags={settings.tags}
+        fonts={fonts}
+        savedStyles={savedStyles}
       />
 
       {dialog && dialog.mode !== "repeat" ? (

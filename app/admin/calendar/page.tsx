@@ -30,6 +30,8 @@ import {
   CalendarSettings,
   CalendarStyle,
   CalendarTemplate,
+  CustomStyle,
+  FontFamily,
 } from "@/lib/models";
 
 import { CalendarManager } from "./calendar-manager";
@@ -141,6 +143,21 @@ export default async function CalendarPage({
     countByArrayField("tags"),
   ]);
 
+  // Just the two the title's style editor needs — the full builder sources are
+  // a page's worth of queries for a control that only sets type and colour.
+  const [fontDocs, savedStyleDocs] = await Promise.all([
+    FontFamily.find().select("family").sort({ family: 1 }).lean<any[]>(),
+    CustomStyle.find().select("name slug style").sort({ name: 1 }).lean<any[]>(),
+  ]);
+
+  const fonts = fontDocs.map((font) => String(font.family ?? ""));
+  const savedStyles = savedStyleDocs.map((style) => ({
+    _id: String(style._id),
+    name: style.name ?? "",
+    slug: style.slug ?? "",
+    style: style.style ?? {},
+  }));
+
   const toUsageMap = (rows: { _id: string; count: number }[]) =>
     Object.fromEntries(rows.map((row) => [String(row._id), row.count]));
 
@@ -165,6 +182,8 @@ export default async function CalendarPage({
       defaultStyleId={String(settingsDoc?.defaultStyleId ?? "")}
       adminStyle={adminStyle}
       adminLayouts={adminLayouts}
+      fonts={fonts}
+      savedStyles={savedStyles}
     />
   );
 }

@@ -6,6 +6,7 @@ import { normalizeVocabulary } from "@/lib/calendar";
 import { getCalendarPageSettings, loadCalendarPage } from "@/lib/calendar-page";
 import { calendarStyleCss } from "@/lib/calendar-style";
 import { layoutResponsiveCss } from "@/lib/responsive-style";
+import { styleSlotProps } from "@/lib/display-templates";
 import { connectDB } from "@/lib/db";
 import { CalendarSettings } from "@/lib/models";
 import { getSession } from "@/lib/session";
@@ -69,6 +70,8 @@ export default async function CalendarPage() {
     };
   }
 
+  const titleStyled = styleSlotProps(view.settings.titleStyle);
+
   return (
     <SiteChrome
       // Redeclared for this page only, so the calendar's own paper reaches the
@@ -101,15 +104,16 @@ export default async function CalendarPage() {
         />
 
         <header className="calendar-page-head">
-          <h1 className="calendar-page-title">{view.settings.title}</h1>
+          {/* The page's own title styling, layered over the built-in look —
+              so a style that says only a colour keeps the size it had. */}
+          <h1
+            className={`calendar-page-title ${titleStyled.className}`.trim()}
+            style={titleStyled.style}
+          >
+            {view.settings.title}
+          </h1>
           {view.settings.intro ? (
             <p className="calendar-page-intro">{view.settings.intro}</p>
-          ) : null}
-          {canManage ? (
-            <p className="calendar-page-note">
-              You can add and change events here. Drafts are shown to you with a
-              dashed edge; nobody else sees them at all.
-            </p>
           ) : null}
         </header>
 

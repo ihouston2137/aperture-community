@@ -11,6 +11,12 @@
 
 
 
+import {
+  emptyStyleSlot,
+  normalizeStyleSlot,
+  type StyleSlot,
+} from "./display-templates";
+
 export const CALENDAR_EVENT_STATUSES = ["draft", "published"] as const;
 export type CalendarEventStatus = (typeof CALENDAR_EVENT_STATUSES)[number];
 
@@ -242,6 +248,14 @@ export type CalendarPageSettings = {
    * a decision about this page — which is why it is here and not in the style.
    */
   backgroundColor: string;
+  /**
+   * How the page's own title is set.
+   *
+   * The page's rather than the Calendar Style's: a style dresses the grid and
+   * travels with it wherever a calendar is put, and this heading belongs to
+   * one page — the same reason the background colour lives here.
+   */
+  titleStyle: StyleSlot;
   display: CalendarDisplay;
 };
 
@@ -250,6 +264,7 @@ export const defaultCalendarPageSettings: CalendarPageSettings = {
   title: "Calendar",
   intro: "",
   backgroundColor: "",
+  titleStyle: emptyStyleSlot,
   display: defaultCalendarDisplay,
 };
 
@@ -266,6 +281,7 @@ export function normalizeCalendarPageSettings(raw: unknown): CalendarPageSetting
     // Pages saved before this carry nothing, which means "the site's own" —
     // exactly what they have always shown.
     backgroundColor: str(source.backgroundColor).slice(0, 40),
+    titleStyle: normalizeStyleSlot(source.titleStyle),
     display: normalizeCalendarDisplay(source.display),
   };
 }

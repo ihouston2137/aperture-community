@@ -5,12 +5,14 @@ import { useState, useTransition } from "react";
 
 import { Panel } from "@/components/admin-ui";
 import { ColorPicker } from "@/components/color-field";
+import { InlineStyleEditor, type SavedStyle } from "@/components/style-editor";
 import { CalendarDisplayFields } from "@/components/builder/calendar-block-inspector";
 import {
   defaultCalendarPageSettings,
   type CalendarDisplay,
   type CalendarPageSettings,
 } from "@/lib/calendar";
+import type { StyleSlot } from "@/lib/display-templates";
 
 import { saveCalendarPageAction } from "./actions";
 
@@ -29,6 +31,8 @@ export function CalendarPageSettingsPanel({
   categories,
   who,
   tags,
+  fonts,
+  savedStyles,
 }: {
   settings: CalendarPageSettings;
   styles: { _id: string; name: string }[];
@@ -36,11 +40,15 @@ export function CalendarPageSettingsPanel({
   categories: string[];
   who: string[];
   tags: string[];
+  /** Design-library fonts and named styles, for the title's own styling. */
+  fonts: string[];
+  savedStyles: SavedStyle[];
 }) {
   const [enabled, setEnabled] = useState(settings.enabled);
   const [title, setTitle] = useState(settings.title);
   const [intro, setIntro] = useState(settings.intro);
   const [background, setBackground] = useState(settings.backgroundColor);
+  const [titleStyle, setTitleStyle] = useState<StyleSlot>(settings.titleStyle);
   const [display, setDisplay] = useState<CalendarDisplay>(settings.display);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
@@ -55,6 +63,7 @@ export function CalendarPageSettingsPanel({
       formData.set("title", title);
       formData.set("intro", intro);
       formData.set("backgroundColor", background);
+      formData.set("titleStyle", JSON.stringify(titleStyle));
       formData.set("display", JSON.stringify(display));
 
       const result = await saveCalendarPageAction(formData);
@@ -107,6 +116,36 @@ export function CalendarPageSettingsPanel({
               />
             </div>
           </div>
+
+          {/* Folded, because a full set of style controls above the display
+              settings would push them off the screen. */}
+          <details className="inspector-fold is-top">
+            <summary>
+              Title style
+              <span className="help-text">
+                {titleStyle.styleSlug
+                  ? titleStyle.styleSlug
+                  : Object.keys(titleStyle.style ?? {}).length > 0
+                    ? "set"
+                    : "unset"}
+              </span>
+            </summary>
+            <div className="inspector-fold-body">
+              <InlineStyleEditor
+                values={titleStyle.style}
+                styleSlug={titleStyle.styleSlug}
+                fonts={fonts}
+                savedStyles={savedStyles}
+                onChange={({ values, styleSlug }) =>
+                  setTitleStyle({ styleSlug, style: styleSlug ? {} : values })
+                }
+              />
+              <p className="help-text">
+                Laid over the heading&rsquo;s built-in look, so a style saying
+                only a colour keeps the size it had.
+              </p>
+            </div>
+          </details>
 
           <ColorPicker
             label="Page background"
