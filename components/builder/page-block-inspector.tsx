@@ -18,6 +18,9 @@ import {
   HIGHLIGHT_FIELDS,
   HIGHLIGHT_FIELD_LABELS,
   normalizeFeaturedSponsor,
+  normalizeSponsorCollection,
+  SPONSOR_ORDERS,
+  SPONSOR_ORDER_LABELS,
   normalizeSponsorHighlight,
   normalizeSponsorScroll,
   PAGE_BLOCK_TYPES,
@@ -31,6 +34,7 @@ import {
   type FeaturedSponsorSettings,
   type HighlightField,
   type PageBlock,
+  type SponsorCollectionSettings,
   type SponsorHighlightSettings,
   type SponsorField,
   type SponsorScrollSettings,
@@ -194,6 +198,7 @@ const BLOCK_LABELS: Record<string, string> = {
   sponsorScroll: "Sponsor scroll",
   featuredSponsor: "Featured sponsor",
   sponsorHighlight: "Sponsor highlight",
+  sponsorCollection: "Sponsor collection",
   container: "Container",
 
   // Story slots. Not in the palette — they are added from a story-bound
@@ -232,6 +237,7 @@ const BLOCK_ICONS: Record<string, string> = {
   sponsorScroll: "GalleryHorizontal",
   featuredSponsor: "BadgeCheck",
   sponsorHighlight: "AlignVerticalSpaceAround",
+  sponsorCollection: "LayoutGrid",
   collection: "Images",
   calendar: "Calendar",
   eventList: "Rows",
@@ -896,6 +902,16 @@ export function PageBlockInspector({
           </>
         ) : null}
 
+        {block.type === "sponsorCollection" ? (
+          <SponsorCollectionFields
+            settings={normalizeSponsorCollection(block.sponsorCollection)}
+            levels={sources.recognitionLevels}
+            fonts={sources.fonts}
+            savedStyles={sources.styles}
+            onChange={(sponsorCollection) => update({ sponsorCollection })}
+          />
+        ) : null}
+
         {block.type === "sponsorHighlight" ? (
           <SponsorHighlightFields
             settings={normalizeSponsorHighlight(block.sponsorHighlight)}
@@ -926,6 +942,32 @@ export function PageBlockInspector({
           />
         ) : null}
       </div>
+
+      {block.type === "sponsorCollection" ? (
+        <div className="inspector-section">
+          <h4 className="inspector-title">The boxes</h4>
+          <StyleSlotButton
+            label="The wall"
+            note="Around every card. Type set here reaches the cards."
+            slugKey="containerStyleSlug"
+            valuesKey="containerStyle"
+            block={block}
+            update={update}
+            onEditStyle={onEditStyle}
+            showTypography
+          />
+          <StyleSlotButton
+            label="Each card"
+            note="Padding, a background, a border, corners \u2014 around one sponsor."
+            slugKey="itemStyleSlug"
+            valuesKey="itemStyle"
+            block={block}
+            update={update}
+            onEditStyle={onEditStyle}
+            showTypography
+          />
+        </div>
+      ) : null}
 
       {block.type === "sponsorHighlight" ? (
         <div className="inspector-section">
@@ -1367,6 +1409,7 @@ function SponsorHighlightFields({
   fonts,
   savedStyles,
   onChange,
+  cardOnly = false,
 }: {
   settings: SponsorHighlightSettings;
   sponsors: { _id: string; label: string }[];
@@ -1374,6 +1417,13 @@ function SponsorHighlightFields({
   fonts: string[];
   savedStyles: SavedStyle[];
   onChange: (settings: SponsorHighlightSettings) => void;
+  /**
+   * Hides the "which sponsor" half.
+   *
+   * A collection's cards are the same settings, but the wall chooses who is on
+   * it — asking each card who it is about would be a question with no answer.
+   */
+  cardOnly?: boolean;
 }) {
   const patch = (next: Partial<SponsorHighlightSettings>) =>
     onChange({ ...settings, ...next });
@@ -1395,19 +1445,21 @@ function SponsorHighlightFields({
 
   return (
     <>
-      <SelectField
-        label="Shows"
-        value={settings.source}
-        options={[
-          { value: "one", label: "A sponsor you choose" },
-          { value: "random", label: "A different one each time" },
-        ]}
-        onChange={(value) =>
-          patch({ source: value as SponsorHighlightSettings["source"] })
-        }
-      />
+      {cardOnly ? null : (
+        <SelectField
+          label="Shows"
+          value={settings.source}
+          options={[
+            { value: "one", label: "A sponsor you choose" },
+            { value: "random", label: "A different one each time" },
+          ]}
+          onChange={(value) =>
+            patch({ source: value as SponsorHighlightSettings["source"] })
+          }
+        />
+      )}
 
-      {settings.source === "one" ? (
+      {cardOnly ? null : settings.source === "one" ? (
         <SelectField
           label="Sponsor"
           value={settings.sponsorId}
@@ -1553,6 +1605,132 @@ function SponsorHighlightFields({
           );
         })}
       </ul>
+    </>
+  );
+}
+
+
+/**
+ * A sponsor collection: who is on the wall, how it is laid out, and what one
+ * card says.
+ *
+ * The card settings are a sponsor highlight's, edited by the same control —
+ * one place decides what a card may say, however many blocks show one.
+ */
+function SponsorCollectionFields({
+  settings,
+  levels,
+  fonts,
+  savedStyles,
+  onChange,
+}: {
+  settings: SponsorCollectionSettings;
+  levels: { _id: string; name: string }[];
+  fonts: string[];
+  savedStyles: SavedStyle[];
+  onChange: (settings: SponsorCollectionSettings) => void;
+}) {
+  const patch = (next: Partial<SponsorCollectionSettings>) =>
+    onChange({ ...settings, ...next });
+
+  return (
+    <>
+      <div className="field">
+        <label>Recognition levels</label>
+        {levels.length === 0 ? (
+          <span className="help-text">
+            No recognition levels are defined yet, so there is nobody to show.
+          </span>
+        ) : (
+          <>
+            <div className="chip-picker">
+              {levels.map((level) => (
+                <label key={level._id} className="chip-option">
+                  <input
+                    type="checkbox"
+                    checked={settings.levelIds.includes(level._id)}
+                    onChange={(event) =>
+                      patch({
+                        levelIds: event.target.checked
+                          ? [...settings.levelIds, level._id]
+                          : settings.levelIds.filter((id) => id !== level._id),
+                      })
+                    }
+                  />
+                  {level.name}
+                </label>
+              ))}
+            </div>
+            <span className="help-text">
+              {settings.levelIds.length === 0
+                ? "Every level, since none is named."
+                : "Only sponsors at these levels."}{" "}
+              A level marked anonymous is never included.
+            </span>
+          </>
+        )}
+      </div>
+
+      <SelectField
+        label="Ordered by"
+        value={settings.order}
+        options={SPONSOR_ORDERS.map((order) => ({
+          value: order,
+          label: SPONSOR_ORDER_LABELS[order],
+        }))}
+        onChange={(value) =>
+          patch({ order: value as SponsorCollectionSettings["order"] })
+        }
+      />
+
+      <NumField
+        label="At most"
+        value={settings.limit}
+        min={0}
+        max={200}
+        onChange={(value) => patch({ limit: Math.max(0, value) })}
+      />
+      <span className="help-text">
+        Zero shows everybody. Worth setting alongside a shuffle, which is how a
+        wall shows a different few each time rather than the same forty.
+      </span>
+
+      <h4 className="inspector-title">The wall</h4>
+
+      <RemField
+        label="Card width"
+        value={settings.columnWidth}
+        onChange={(value) => patch({ columnWidth: Math.max(8, value) })}
+      />
+      <span className="help-text">
+        The narrowest a column may be. The number of columns follows from it, so
+        the wall thins to one on a phone on its own.
+      </span>
+
+      <NumField
+        label="Most columns"
+        value={settings.maxColumns}
+        min={1}
+        max={8}
+        onChange={(value) => patch({ maxColumns: Math.max(1, value) })}
+      />
+
+      <RemField
+        label="Space between cards"
+        value={settings.gap}
+        onChange={(value) => patch({ gap: Math.max(0, value) })}
+      />
+
+      <h4 className="inspector-title">What a card says</h4>
+      <SponsorHighlightFields
+        settings={settings.card}
+        sponsors={[]}
+        levels={[]}
+        fonts={fonts}
+        savedStyles={savedStyles}
+        onChange={(card) => patch({ card })}
+        cardOnly
+      />
     </>
   );
 }

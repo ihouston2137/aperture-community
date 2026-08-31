@@ -11092,3 +11092,61 @@ html:has(.admin-shell) body::-webkit-scrollbar {
   text-align: center;
   padding: 1rem;
 }
+
+/* --------------------------------------------------- Sponsor collection */
+
+/*
+ * A wall of sponsor cards.
+ *
+ * CSS columns rather than a grid. A grid gives every row the height of its
+ * tallest cell, so one sponsor with a long name would put a band of space
+ * under every card beside it. Columns let each card be its own height and the
+ * next start where it ends, which is what makes a wall of logos read as a wall
+ * rather than as a table.
+ *
+ * `column-width` with `column-count` as a ceiling: the browser fits as many
+ * columns of that width as the block is wide, up to the most the block allows.
+ * So it thins to one on a phone without a breakpoint having to guess where.
+ */
+.sponsor-collection {
+  column-width: var(--wall-column-width, 18rem);
+  column-count: var(--wall-max-columns, 4);
+  column-gap: var(--wall-gap, 1.25rem);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/*
+ * One card.
+ *
+ * `break-inside: avoid` is what keeps a sponsor whole: without it a column
+ * break lands mid-card and a logo appears at the foot of one column with its
+ * name at the head of the next. `inline-block` and a full width are the older
+ * half of the same fix, which some browsers still need.
+ */
+.sponsor-collection-card {
+  break-inside: avoid;
+  -webkit-column-break-inside: avoid;
+  page-break-inside: avoid;
+  display: inline-block;
+  width: 100%;
+  box-sizing: border-box;
+  /* The gap between rows is a margin, since `column-gap` only separates the
+     columns themselves. */
+  margin-bottom: var(--wall-gap, 1.25rem);
+}
+
+.sponsor-collection.is-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 8rem;
+  border: 1px dashed var(--admin-border, rgba(128, 128, 128, 0.4));
+  border-radius: var(--radius, 0.5rem);
+  font-size: 0.875rem;
+  opacity: 0.7;
+  text-align: center;
+  padding: 1rem;
+  /* The empty state is one line, not a wall of them. */
+  column-count: 1;
+}

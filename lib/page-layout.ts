@@ -73,6 +73,8 @@ export const PAGE_BLOCK_TYPES = [
   "featuredSponsor",
   // The same, read down a single column with the logo among the fields.
   "sponsorHighlight",
+  // A wall of those, for everybody at the recognition levels it names.
+  "sponsorCollection",
   "container",
 ] as const;
 
@@ -249,6 +251,83 @@ function normalizeHighlightFieldStyles(
   }
 
   return out;
+}
+
+/** The order a wall of sponsors is laid out in. */
+export const SPONSOR_ORDERS = ["level", "name", "random"] as const;
+export type SponsorOrder = (typeof SPONSOR_ORDERS)[number];
+
+export const SPONSOR_ORDER_LABELS: Record<SponsorOrder, string> = {
+  level: "Recognition level, then name",
+  name: "Name",
+  random: "Shuffled each time",
+};
+
+/**
+ * How a sponsor collection is set up.
+ *
+ * The card is a sponsor highlight — the same fields in the same order wearing
+ * the same styles — so everything about one card is the highlight's settings,
+ * and everything about the wall is here.
+ */
+export type SponsorCollectionSettings = {
+  /** Which levels are on the wall. Empty means every level. */
+  levelIds: string[];
+  /** How many to show at most. Zero shows everybody. */
+  limit: number;
+  order: SponsorOrder;
+  /**
+   * The narrowest a column may be, in rem.
+   *
+   * The count follows from it rather than being set: a fixed three columns is
+   * three unreadable columns on a phone, and the width of a card is the thing
+   * an author can actually judge.
+   */
+  columnWidth: number;
+  /** The most columns to break into, however wide the block is. */
+  maxColumns: number;
+  /** Between the cards, in rem. */
+  gap: number;
+  /** One card's contents — the sponsor highlight's own settings. */
+  card: SponsorHighlightSettings;
+};
+
+export const defaultSponsorCollection: SponsorCollectionSettings = {
+  levelIds: [],
+  limit: 0,
+  order: "level",
+  columnWidth: 18,
+  maxColumns: 4,
+  gap: 1.25,
+  card: {
+    ...defaultSponsorHighlight,
+    // A card on a wall is not the block that features one: the level is
+    // already the heading it sits under, and a description on forty cards is
+    // a page nobody reads.
+    fields: ["logo", "name"],
+  },
+};
+
+export function normalizeSponsorCollection(input: unknown): SponsorCollectionSettings {
+  const raw = (input ?? {}) as Record<string, unknown>;
+  const base = defaultSponsorCollection;
+
+  return {
+    levelIds: Array.isArray(raw.levelIds)
+      ? [...new Set(raw.levelIds.map(String).filter(Boolean))].slice(0, 50)
+      : [],
+    // A wall of two hundred is a directory; the cap keeps one page one page.
+    limit: Math.min(200, Math.max(0, Math.round(num(raw.limit, base.limit)))),
+    order: SPONSOR_ORDERS.includes(raw.order as SponsorOrder)
+      ? (raw.order as SponsorOrder)
+      : base.order,
+    columnWidth: Math.min(40, Math.max(8, num(raw.columnWidth, base.columnWidth))),
+    maxColumns: Math.min(8, Math.max(1, Math.round(num(raw.maxColumns, base.maxColumns)))),
+    gap: Math.min(6, Math.max(0, num(raw.gap, base.gap))),
+    // The card is a highlight, read by the highlight's own normalizer — one
+    // place decides what a card may say, however many blocks show one.
+    card: normalizeSponsorHighlight(raw.card ?? base.card),
+  };
 }
 
 /** How a featured sponsor block is set up. */
@@ -535,6 +614,8 @@ export type PageBlock = ResponsiveStyleFields & {
   featuredSponsor?: FeaturedSponsorSettings;
   /** One sponsor down one column, the logo among the fields. */
   sponsorHighlight?: SponsorHighlightSettings;
+  /** A wall of those. Its cards are sponsor highlights. */
+  sponsorCollection?: SponsorCollectionSettings;
   /**
    * The box around a sponsor highlight.
    *
@@ -793,6 +874,12 @@ export function createBlock(type: PageBlockType): PageBlock {
     block.sponsorHighlight = {
       ...defaultSponsorHighlight,
       fields: [...defaultSponsorHighlight.fields],
+    };
+  }
+  if (type === "sponsorCollection") {
+    block.sponsorCollection = {
+      ...defaultSponsorCollection,
+      card: { ...defaultSponsorCollection.card, fields: [...defaultSponsorCollection.card.fields] },
     };
   }
 
@@ -1188,6 +1275,16 @@ export function normalizeBlock(
       break;
     case "sponsorScroll":
       block.sponsorScroll = normalizeSponsorScroll(raw.sponsorScroll);
+      break;
+    case "sponsorCollection":
+      block.sponsorCollection = normalizeSponsorCollection(raw.sponsorCollection);
+      // The box around the wall, and the box around each card.
+      for (const slot of ["containerStyle", "itemStyle"] as const) {
+        const slugKey = `${slot}Slug` as "containerStyleSlug" | "itemStyleSlug";
+        if (raw[slugKey]) block[slugKey] = str(raw[slugKey]);
+        if (raw[slot]) block[slot] = normalizeStyleValues(raw[slot]);
+        normalizeResponsiveStyle(raw, block, slot);
+      }
       break;
     case "sponsorHighlight":
       block.sponsorHighlight = normalizeSponsorHighlight(raw.sponsorHighlight);
@@ -1595,6 +1692,8 @@ export function blockFillsWidth(block: WidthAwareBlock): boolean {
     // One column of somebody's details. There is no width control on it, and
     // shrinking it to its longest line would be a column nobody chose.
     case "sponsorHighlight":
+    // A wall. Its columns are worked out from its width, so it needs one.
+    case "sponsorCollection":
       return true;
     default:
       return false;

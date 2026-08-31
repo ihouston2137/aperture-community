@@ -15,6 +15,7 @@ import {
 import {
   blockFillsWidth,
   normalizeFeaturedSponsor,
+  normalizeSponsorCollection,
   normalizeSponsorHighlight,
   normalizeSponsorScroll,
   type PageBlock,
@@ -68,6 +69,7 @@ import { QrCode } from "./qr-code";
 import { CustomShapeView, Shape } from "./shape";
 import { FormShell } from "./form-shell";
 import { FeaturedSponsor } from "./featured-sponsor";
+import { SponsorCollection } from "./sponsor-collection";
 import { SponsorHighlight } from "./sponsor-highlight";
 import { SponsorScroll } from "./sponsor-scroll";
 import { MenuBlockView } from "./menu-block";
@@ -456,6 +458,17 @@ export function BlockView({
           settings={normalizeSponsorHighlight(block.sponsorHighlight)}
           sponsor={sources.featuredSponsors[block.id]}
           container={styleSlotProps(block, "containerStyle")}
+          designTime={!interactive}
+        />
+      );
+
+    case "sponsorCollection":
+      return (
+        <SponsorCollection
+          settings={normalizeSponsorCollection(block.sponsorCollection)}
+          sponsors={sources.sponsorCollections[block.id] ?? []}
+          container={styleSlotProps(block, "containerStyle")}
+          card={styleSlotProps(block, "itemStyle")}
           designTime={!interactive}
         />
       );

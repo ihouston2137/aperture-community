@@ -101,6 +101,15 @@ export type PageSources = {
    */
   featuredSponsors: Record<string, FeaturedSponsorView>;
   /**
+   * Everybody on each sponsor collection's wall, keyed by block id, in the
+   * order the block asked for.
+   *
+   * Ordered here rather than in the browser: a shuffled wall shuffled after
+   * the first paint would visibly rearrange itself, and the same wall on the
+   * server and in the page is one fewer thing that can disagree.
+   */
+  sponsorCollections: Record<string, FeaturedSponsorView[]>;
+  /**
    * Paths for the pages and collections that blocks link to, keyed by record
    * id. Resolved here rather than stored on the block so renaming a slug moves
    * every link that points at it.
@@ -112,6 +121,7 @@ export type PageSources = {
 export const emptyPageSources: PageSources = {
   sponsorLogos: {},
   featuredSponsors: {},
+  sponsorCollections: {},
   storyViews: {},
   latestStoryView: null,
   bios: {},

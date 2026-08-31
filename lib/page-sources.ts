@@ -57,6 +57,7 @@ import type { StoryView } from "@/components/story-blocks";
 import { getSiteContent } from "./site-settings";
 import {
   normalizeFeaturedSponsor,
+  normalizeSponsorCollection,
   normalizeSponsorHighlight,
   normalizeSponsorScroll,
   walkBlocks,
@@ -131,6 +132,13 @@ export async function loadPageSources(layout: PageLayout): Promise<PageSources> 
   const calendarLayoutIds = new Set<string>();
   const eventListBlocks: { id: string; settings: EventListSettings }[] = [];
   const sponsorScrollBlocks: { id: string; levelIds: string[] }[] = [];
+  const sponsorWalls: {
+    id: string;
+    levelIds: string[];
+    limit: number;
+    order: "level" | "name" | "random";
+  }[] = [];
+
   /** Both sponsor blocks: one sponsor each, chosen the same way. */
   const sponsorBlocks: {
     id: string;
@@ -167,6 +175,12 @@ export async function loadPageSources(layout: PageLayout): Promise<PageSources> 
         block.featuredSponsor
       );
       sponsorBlocks.push({ id: block.id, source, sponsorId, levelIds });
+    }
+    if (block.type === "sponsorCollection") {
+      const { levelIds, limit, order } = normalizeSponsorCollection(
+        block.sponsorCollection
+      );
+      sponsorWalls.push({ id: block.id, levelIds, limit, order });
     }
     if (block.type === "sponsorHighlight") {
       const { source, sponsorId, levelIds } = normalizeSponsorHighlight(
@@ -450,13 +464,71 @@ export async function loadPageSources(layout: PageLayout): Promise<PageSources> 
    * listing them all.
    */
   const featuredSponsors: Record<string, FeaturedSponsorView> = {};
-  if (sponsorBlocks.length > 0) {
+  const sponsorCollections: Record<string, FeaturedSponsorView[]> = {};
+
+  if (sponsorBlocks.length > 0 || sponsorWalls.length > 0) {
     const [levels, sponsors] = await Promise.all([
       getRecognitionLevels(),
       getSponsors(),
     ]);
     const levelName = (id: string) =>
       levels.find((level) => level._id === id)?.name ?? "";
+
+    /** One sponsor, reduced to what either sponsor block draws. */
+    const toView = (sponsor: SponsorSummary): FeaturedSponsorView => ({
+      id: sponsor._id,
+      name: sponsor.name,
+      logoSrc: sponsorLogoSrc(primaryLogo(sponsor.logos)),
+      description: sponsor.description,
+      recognitionLevel: levelName(sponsor.recognitionLevelId),
+      industry: sponsor.industry,
+      website: sponsor.website,
+      email: sponsor.email,
+      phone: sponsor.phone,
+      address: sponsor.address,
+      links: sponsor.links.map((link) => ({ label: link.label, url: link.href })),
+    });
+
+    /*
+     * A wall is everybody at the levels it names, in the order it asked for.
+     *
+     * `level` follows the levels' own rank — the order the rest of the site
+     * lists them in — so a wall agrees with a recognition report. Shuffled is
+     * shuffled here, per request, for the same reason the featured block draws
+     * here: a wall rearranging itself after the first paint would be worse
+     * than one that never varies.
+     */
+    const byLevelRank = new Map(levels.map((level, index) => [level._id, index]));
+
+    for (const wall of sponsorWalls) {
+      const pool = sponsors.filter((sponsor) => {
+        if (!isPubliclyNamed(sponsor, levels)) return false;
+        if (!sponsor.recognitionLevelId) return false;
+        return (
+          wall.levelIds.length === 0 || wall.levelIds.includes(sponsor.recognitionLevelId)
+        );
+      });
+
+      if (wall.order === "random") {
+        for (let index = pool.length - 1; index > 0; index -= 1) {
+          const swap = Math.floor(Math.random() * (index + 1));
+          [pool[index], pool[swap]] = [pool[swap], pool[index]];
+        }
+      } else if (wall.order === "name") {
+        pool.sort((a, b) => a.name.localeCompare(b.name));
+      } else {
+        pool.sort(
+          (a, b) =>
+            (byLevelRank.get(a.recognitionLevelId) ?? 999) -
+              (byLevelRank.get(b.recognitionLevelId) ?? 999) ||
+            a.name.localeCompare(b.name)
+        );
+      }
+
+      sponsorCollections[wall.id] = (
+        wall.limit > 0 ? pool.slice(0, wall.limit) : pool
+      ).map(toView);
+    }
 
     for (const settings of sponsorBlocks) {
       let chosen: SponsorSummary | undefined;
@@ -480,19 +552,7 @@ export async function loadPageSources(layout: PageLayout): Promise<PageSources> 
       // chosen them by hand, which is a decision the record cannot overrule.
       if (!chosen) continue;
 
-      featuredSponsors[settings.id] = {
-        id: chosen._id,
-        name: chosen.name,
-        logoSrc: sponsorLogoSrc(primaryLogo(chosen.logos)),
-        description: chosen.description,
-        recognitionLevel: levelName(chosen.recognitionLevelId),
-        industry: chosen.industry,
-        website: chosen.website,
-        email: chosen.email,
-        phone: chosen.phone,
-        address: chosen.address,
-        links: chosen.links.map((link) => ({ label: link.label, url: link.href })),
-      };
+      featuredSponsors[settings.id] = toView(chosen);
     }
   }
 
@@ -521,6 +581,7 @@ export async function loadPageSources(layout: PageLayout): Promise<PageSources> 
   return {
     sponsorLogos,
     featuredSponsors,
+    sponsorCollections,
     storyViews,
     latestStoryView,
     bios,
