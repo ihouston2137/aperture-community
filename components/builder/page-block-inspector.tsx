@@ -15,8 +15,11 @@ import { InlineStyleEditor, type SavedStyle } from "@/components/style-editor";
 import type { StyleSlot } from "@/lib/display-templates";
 import type { BuilderSources } from "@/lib/builder-sources";
 import {
+  blockTakesClick,
   HIGHLIGHT_FIELDS,
   HIGHLIGHT_FIELD_LABELS,
+  PAGE_CLICK_ACTIONS,
+  PAGE_CLICK_ACTION_LABELS,
   normalizeFeaturedSponsor,
   normalizeSponsorCollection,
   SPONSOR_ORDERS,
@@ -90,7 +93,9 @@ import {
  * What clicking an image does. Only the fields the chosen action uses are
  * shown; the normaliser clears the rest on save.
  */
-function ImageClickFields({
+function BlockClickFields({
+  actions = MEDIA_CLICK_ACTIONS as readonly string[],
+  labels = MEDIA_CLICK_ACTION_LABELS as Record<string, string>,
   block,
   sources,
   update,
@@ -98,6 +103,9 @@ function ImageClickFields({
   block: PageBlock;
   sources: BuilderSources;
   update: (patch: Partial<PageBlock>) => void;
+  /** What this block may be told to do. A lightbox needs a picture to show. */
+  actions?: readonly string[];
+  labels?: Record<string, string>;
 }) {
   const clickAction = block.clickAction ?? "none";
   const linkType = block.linkType ?? "page";
@@ -114,11 +122,13 @@ function ImageClickFields({
       <SelectField
         label="On click"
         value={clickAction}
-        options={MEDIA_CLICK_ACTIONS.map((action) => ({
+        options={actions.map((action) => ({
           value: action,
-          label: MEDIA_CLICK_ACTION_LABELS[action],
+          label: labels[action] ?? action,
         }))}
-        onChange={(value) => update({ clickAction: value })}
+        onChange={(value) =>
+          update({ clickAction: value as PageBlock["clickAction"] })
+        }
       />
 
       {clickAction === "link" ? (
@@ -550,7 +560,7 @@ export function PageBlockInspector({
             </div>
 
             {block.type === "image" ? (
-              <ImageClickFields block={block} sources={sources} update={update} />
+              <BlockClickFields block={block} sources={sources} update={update} />
             ) : null}
           </>
         ) : null}
@@ -942,6 +952,19 @@ export function PageBlockInspector({
           />
         ) : null}
       </div>
+
+      {blockTakesClick(block.type) ? (
+        <div className="inspector-section">
+          <h4 className="inspector-title">On click</h4>
+          <BlockClickFields
+            block={block}
+            sources={sources}
+            update={update}
+            actions={PAGE_CLICK_ACTIONS}
+            labels={PAGE_CLICK_ACTION_LABELS}
+          />
+        </div>
+      ) : null}
 
       {block.type === "sponsorCollection" ? (
         <div className="inspector-section">

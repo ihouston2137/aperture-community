@@ -4516,6 +4516,24 @@ ol.doc-list ol.doc-list ol.doc-list {
   min-width: 0;
 }
 
+/*
+ * A block that leads somewhere.
+ *
+ * The link is a wrapper round whatever the block draws, so it carries none of
+ * an anchor's own look — no colour, no underline — and takes its size from
+ * what is inside it rather than shrinking to a line of text.
+ */
+.pb-block-link {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+
+.pb-block-link:hover {
+  /* Something, so a heading that leads somewhere says so on the way past. */
+  opacity: 0.85;
+}
+
 .pb-block img,
 .pb-block video {
   display: block;

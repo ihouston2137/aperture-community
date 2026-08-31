@@ -14,6 +14,7 @@ import {
 } from "@/lib/page-container-layout";
 import {
   blockFillsWidth,
+  blockTakesClick,
   normalizeFeaturedSponsor,
   normalizeSponsorCollection,
   normalizeSponsorHighlight,
@@ -256,6 +257,13 @@ function ShapeBlockView({ block, sources }: { block: PageBlock; sources: PageSou
 
 /* ------------------------------------------------------------------ Blocks */
 
+/**
+ * One block, and the link around it if it was given one.
+ *
+ * The link is applied out here rather than inside each case, so a block that
+ * gains a click action gains nothing else to write — and so the rule about
+ * *when* a block leads somewhere is stated once.
+ */
 export function BlockView({
   block,
   sources,
@@ -264,6 +272,49 @@ export function BlockView({
   block: PageBlock;
   sources: PageSources;
   /** The builder preview turns interactivity off so clicks select instead. */
+  interactive?: boolean;
+}) {
+  const content = <BlockContent block={block} sources={sources} interactive={interactive} />;
+
+  /*
+   * Not on the canvas: a link round a block would take a click meant to select
+   * it, and the builder is where blocks are arranged rather than followed.
+   */
+  if (!interactive || !blockTakesClick(block.type) || block.clickAction !== "link") {
+    return content;
+  }
+
+  // A page or collection resolves through `linkHrefs`; a custom url is used as
+  // typed. An unresolved target renders the block unwrapped rather than as a
+  // link to nowhere.
+  const href =
+    block.linkType === "url"
+      ? block.linkHref ?? ""
+      : sources.linkHrefs[
+          (block.linkType === "collection" ? block.linkCollectionId : block.linkPageId) ?? ""
+        ] ?? "";
+
+  if (!href) return content;
+
+  return (
+    <Link
+      href={href}
+      className="pb-block-link"
+      target={block.linkNewTab ? "_blank" : undefined}
+      rel={block.linkNewTab ? "noreferrer" : undefined}
+    >
+      {content}
+    </Link>
+  );
+}
+
+function BlockContent({
+  block,
+  sources,
+  interactive = true,
+}: {
+  block: PageBlock;
+  sources: PageSources;
   interactive?: boolean;
 }) {
   switch (block.type) {

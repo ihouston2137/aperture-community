@@ -124,6 +124,39 @@ export const SHAPE_TEXT_PLACEMENT_LABELS: Record<ShapeTextPlacement, string> = {
 };
 
 /** Where a linked image block points. */
+/**
+ * Blocks that can be made to lead somewhere.
+ *
+ * Not everything: a form or a calendar is already full of things to click, and
+ * a link wrapped round one would swallow them. These are the blocks that are a
+ * single thing to look at — a heading, a mark, a shape, a run of logos — where
+ * "and clicking it goes here" is a reasonable thing to want.
+ *
+ * The image block is deliberately absent. It has the same setting plus a
+ * lightbox of its own, which none of these has anything to show in.
+ */
+export const CLICKABLE_BLOCK_TYPES = [
+  "headline",
+  "plainText",
+  "icon",
+  "shape",
+  "customShape",
+  "qrCode",
+  "sponsorScroll",
+] as const;
+
+export function blockTakesClick(type: string): boolean {
+  return (CLICKABLE_BLOCK_TYPES as readonly string[]).includes(type);
+}
+
+/** What one of those can be told to do. No lightbox: there is no picture. */
+export const PAGE_CLICK_ACTIONS = ["none", "link"] as const;
+
+export const PAGE_CLICK_ACTION_LABELS: Record<string, string> = {
+  none: "Nothing",
+  link: "Open a link",
+};
+
 export const PAGE_LINK_TYPES = ["page", "collection", "url"] as const;
 export type PageLinkType = (typeof PAGE_LINK_TYPES)[number];
 
@@ -1061,6 +1094,30 @@ function normalizeImageClick(raw: any): Partial<PageBlock> {
 }
 
 /**
+ * The same, for the blocks that only ever lead somewhere.
+ *
+ * Shares every field with the image's version so one link target is one shape
+ * of data throughout, and clears the rest for the same reason: switching away
+ * from a link and back must not resurface a stale target.
+ */
+function normalizeLinkClick(raw: any): Partial<PageBlock> {
+  const clickAction = raw?.clickAction === "link" ? "link" : "none";
+  if (clickAction !== "link") {
+    return { clickAction, linkType: "page", linkPageId: "", linkCollectionId: "", linkHref: "", linkNewTab: false };
+  }
+
+  const linkType = pick(raw?.linkType, PAGE_LINK_TYPES, "page");
+  return {
+    clickAction,
+    linkType,
+    linkPageId: linkType === "page" ? str(raw?.linkPageId) : "",
+    linkCollectionId: linkType === "collection" ? str(raw?.linkCollectionId) : "",
+    linkHref: linkType === "url" ? str(raw?.linkHref) : "",
+    linkNewTab: Boolean(raw?.linkNewTab),
+  };
+}
+
+/**
  * A shape's label and the style slot that dresses it.
  *
  * Kept beside the two shape cases rather than in the shared preamble because
@@ -1163,6 +1220,11 @@ export function normalizeBlock(
   if (raw.textStyle) block.textStyle = normalizeStyleValues(raw.textStyle);
   normalizeResponsiveStyle(raw, block, "textStyle");
   if (raw.align) block.align = pick(raw.align, ["left", "center", "right"] as const, "left");
+
+  // Read before the switch, since it is the same setting on every block that
+  // takes one — and the image's own version, which adds a lightbox, is read
+  // inside its case instead.
+  if (blockTakesClick(block.type)) Object.assign(block, normalizeLinkClick(raw));
 
   switch (block.type) {
     case "headline":
