@@ -1,12 +1,13 @@
 import { notFound } from "next/navigation";
 import { guardContent } from "@/lib/content-guard";
+import { getMenuViewer } from "@/lib/menus";
 
 import { PageRenderer } from "@/components/page-renderer";
 import { SiteChrome } from "@/components/site-chrome";
 import { connectDB } from "@/lib/db";
 import { SitePage } from "@/lib/models";
 import { colorOverrideStyle, normalizeColorOverrides } from "@/lib/color-overrides";
-import { normalizePageLayout } from "@/lib/page-layout";
+import { filterLayoutForViewer, normalizePageLayout } from "@/lib/page-layout";
 import { normalizeBlocksWithStorySlots } from "@/lib/story-template-layout";
 import { loadPageSources } from "@/lib/page-sources";
 import { getSiteContent } from "@/lib/site-settings";
@@ -45,7 +46,14 @@ export default async function CustomPage({
   if (!page) notFound();
   await guardContent("page", String(page._id), `/${slug}`);
 
-  const layout = normalizePageLayout(page.layout, normalizeBlocksWithStorySlots);
+  /*
+   * Restricted rows are dropped here, before the sources are loaded — so what
+   * this viewer may not see is neither fetched for them nor sent to them.
+   */
+  const layout = filterLayoutForViewer(
+    normalizePageLayout(page.layout, normalizeBlocksWithStorySlots),
+    await getMenuViewer()
+  );
   const sources = await loadPageSources(layout);
   const colors = normalizeColorOverrides(page.colors);
 

@@ -19,6 +19,7 @@ import {
   FontFamily,
   FormDefinition,
   Menu,
+  Role,
   SitePage,
   Story,
   StoryTemplate,
@@ -66,6 +67,15 @@ export type BuilderSources = {
   calendarWho: string[];
   calendarTags: string[];
   savedBlocks: { _id: string; name: string; icon: string; block: unknown }[];
+  /**
+   * Every role, for the row and column visibility pickers.
+   *
+   * Both kinds, split by `kind` where they are offered: the community ones are
+   * the membership levels, the management ones the jobs people do. A row for
+   * committee members only is as reasonable a thing to want as one for paid-up
+   * members, so neither list is left out.
+   */
+  roles: { _id: string; name: string; kind: string }[];
 };
 
 export async function loadBuilderSources(): Promise<BuilderSources> {
@@ -85,6 +95,7 @@ export async function loadBuilderSources(): Promise<BuilderSources> {
     calendarSettings,
     calendarStyles,
     savedBlocks,
+    roles,
   ] = await Promise.all([
     FontFamily.find().select("family").sort({ family: 1 }).lean<any[]>(),
     CustomStyle.find().select("name slug").sort({ name: 1 }).lean<any[]>(),
@@ -101,6 +112,7 @@ export async function loadBuilderSources(): Promise<BuilderSources> {
       .lean<any>(),
     CalendarStyle.find().sort({ name: 1 }).lean<any[]>(),
     CustomPageBlock.find().sort({ name: 1 }).lean<any[]>(),
+    Role.find().select("name kind").sort({ kind: 1, name: 1 }).lean<any[]>(),
   ]);
 
   const styleRecords: CalendarStyleRecord[] = calendarStyles.map((doc) => ({
@@ -197,6 +209,11 @@ export async function loadBuilderSources(): Promise<BuilderSources> {
       name: saved.name,
       icon: saved.icon ?? "",
       block: saved.block,
+    })),
+    roles: roles.map((role) => ({
+      _id: String(role._id),
+      name: role.name ?? "",
+      kind: role.kind ?? "management",
     })),
   };
 }

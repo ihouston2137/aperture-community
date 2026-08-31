@@ -1,7 +1,8 @@
 import { connectDB } from "@/lib/db";
 import { SitePage } from "@/lib/models";
 import { colorOverrideStyle, normalizeColorOverrides } from "@/lib/color-overrides";
-import { normalizePageLayout } from "@/lib/page-layout";
+import { filterLayoutForViewer, normalizePageLayout } from "@/lib/page-layout";
+import { getMenuViewer } from "@/lib/menus";
 import { normalizeBlocksWithStorySlots } from "@/lib/story-template-layout";
 import { SiteChrome } from "@/components/site-chrome";
 import { PageRenderer } from "@/components/page-renderer";
@@ -21,7 +22,14 @@ export default async function HomePage() {
     );
   }
 
-  const layout = normalizePageLayout(home.layout, normalizeBlocksWithStorySlots);
+  /*
+   * Restricted rows are dropped here, before the sources are loaded — so what
+   * a stranger may not see is neither fetched for them nor sent to them.
+   */
+  const layout = filterLayoutForViewer(
+    normalizePageLayout(home.layout, normalizeBlocksWithStorySlots),
+    await getMenuViewer()
+  );
   const sources = await loadPageSources(layout);
   const colors = normalizeColorOverrides(home.colors);
 

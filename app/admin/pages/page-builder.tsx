@@ -413,6 +413,7 @@ export function PageBuilder({
           setSavedBlocks((current) => current.filter((saved) => saved._id !== id));
         }}
         newContainerPadding={NEW_CONTAINER_PADDING}
+        visibilityRoles={sources.roles}
         exitHref={exit.href}
         exitLabel={exit.label}
         topbar={

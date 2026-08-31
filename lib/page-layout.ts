@@ -10,6 +10,13 @@ import { ASPECT_RATIOS, aspectRatioCss, type AspectRatio } from "./aspect-ratio"
 import { normalizeCalendarDisplay, type CalendarDisplay } from "./calendar";
 import { normalizeEventListSettings, type EventListSettings } from "./event-list";
 import { isFieldBlock } from "./form-block-types";
+import {
+  normalizeVisibility,
+  publicVisibility,
+  visibilityAllows,
+  type MenuViewer,
+  type MenuVisibility,
+} from "./menu-types";
 import { normalizeContainerLayout, type ContainerLayout } from "./page-container-layout";
 import { normalizeRichText } from "./rich-text";
 import { sanitizeMediaPath } from "./protected-media-url";
@@ -306,6 +313,20 @@ export type BackgroundSettings = {
   backgroundOverlay: string;
 };
 
+/**
+ * Who a row or a column is for.
+ *
+ * The same three answers a menu item gives — everyone, anyone signed in, or
+ * only these roles — and the same vocabulary, so a members-only section of a
+ * page is restricted the way a members-only link is. "Membership levels" are
+ * community roles, which is what that list is offering.
+ *
+ * Enforced by dropping the row before the page is rendered, never by hiding it
+ * in CSS: a row that reaches the browser has been sent to the browser, and
+ * anybody can read it there.
+ */
+export type LayoutVisibility = MenuVisibility;
+
 export type BorderSettings = {
   borderWidth: number; // rem
   borderColor: string;
@@ -317,6 +338,8 @@ export type BorderSettings = {
 export type RowSettings = SpacingSettings &
   BackgroundSettings &
   BorderSettings & {
+    /** Who may see this row. Public unless somebody has said otherwise. */
+    visibility: LayoutVisibility;
     /** Full / Wide / Standard / Narrow, matching the header and footer. */
     width: ContentWidth;
     /**
@@ -338,6 +361,8 @@ export type RowSettings = SpacingSettings &
 export type ContainerSettings = SpacingSettings & BackgroundSettings & BorderSettings;
 
 export type ColumnSettings = ContainerSettings & {
+  /** Who may see this column. Public unless somebody has said otherwise. */
+  visibility: LayoutVisibility;
   align: "left" | "center" | "right";
   verticalAlign: "top" | "center" | "bottom";
 };
@@ -395,6 +420,7 @@ export const defaultRowSettings: RowSettings = {
   ...defaultSpacing,
   ...defaultBackground,
   ...defaultBorder,
+  visibility: publicVisibility,
   width: "standard",
   align: "left",
   verticalAlign: "top",
@@ -409,6 +435,7 @@ export const defaultContainerSettings: ContainerSettings = {
 
 export const defaultColumnSettings: ColumnSettings = {
   ...defaultContainerSettings,
+  visibility: publicVisibility,
   align: "left",
   verticalAlign: "top",
 };
@@ -858,6 +885,9 @@ export function normalizeColumnSettings(input: unknown): ColumnSettings {
   const raw = (input ?? {}) as Record<string, unknown>;
   return {
     ...normalizeContainerSettings(raw),
+    // Anything saved before this existed carries nothing here, and reads as
+    // public — which is what it has been all along.
+    visibility: normalizeVisibility(raw.visibility),
     align: pick(raw.align, ["left", "center", "right"] as const, "left"),
     verticalAlign: pick(raw.verticalAlign, ["top", "center", "bottom"] as const, "top"),
   };
@@ -891,6 +921,7 @@ export function normalizeRow(
       ...normalizeSpacing(settingsRaw, defaultRowSettings),
       ...normalizeBackground(settingsRaw),
       ...normalizeBorder(settingsRaw),
+      visibility: normalizeVisibility(settingsRaw.visibility),
       width: normalizeRowWidth(settingsRaw),
       align: pick(settingsRaw.align, ["left", "center", "right"] as const, "left"),
       verticalAlign: pick(
@@ -905,6 +936,44 @@ export function normalizeRow(
         ? columns.map((column) => normalizeColumn(column, normalizeBlocksFn))
         : [createColumn()],
   };
+}
+
+/**
+ * The layout with everything this viewer may not see taken out.
+ *
+ * Taken out, not hidden. A row that reaches the browser has been sent to the
+ * browser and anybody can read it there, so the restricted parts never leave
+ * the server — which also means the sources they need are never loaded, and a
+ * members-only story on a hidden row is not fetched for a stranger.
+ *
+ * A row that loses every column is dropped with them: an empty row is its own
+ * padding, its own background and a gap on the page for something nobody may
+ * see, which reads as a mistake rather than as a restriction.
+ */
+export function filterLayoutForViewer(layout: PageLayout, viewer: MenuViewer): PageLayout {
+  const rows: PageLayout = [];
+
+  for (const row of layout) {
+    if (!visibilityAllows(row.settings.visibility, viewer)) continue;
+
+    const columns = row.columns.filter((column) =>
+      visibilityAllows(column.settings.visibility, viewer)
+    );
+    if (row.columns.length > 0 && columns.length === 0) continue;
+
+    rows.push(columns.length === row.columns.length ? row : { ...row, columns });
+  }
+
+  return rows;
+}
+
+/** Whether anything in this layout is restricted at all. */
+export function layoutHasVisibilityRules(layout: PageLayout): boolean {
+  return layout.some(
+    (row) =>
+      row.settings.visibility.mode !== "public" ||
+      row.columns.some((column) => column.settings.visibility.mode !== "public")
+  );
 }
 
 /** Entry point used by every save action and every renderer. */

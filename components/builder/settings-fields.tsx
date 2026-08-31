@@ -29,6 +29,107 @@ import {
   BORDER_SIDE_LABELS,
   type BorderSides,
 } from "@/lib/style-values";
+import {
+  MENU_VISIBILITY_LABELS,
+  MENU_VISIBILITY_MODES,
+  type MenuVisibility,
+  type MenuVisibilityMode,
+} from "@/lib/menu-types";
+
+/** A role as the visibility picker offers it. */
+export type VisibilityRole = { _id: string; name: string; kind: string };
+
+/**
+ * Who a row or a column is for.
+ *
+ * The same three answers a menu item gives, and deliberately the same words:
+ * a members-only strip of a page and a members-only link are one idea, and
+ * naming them differently would make them read as two.
+ *
+ * Choosing "only these roles" and naming nobody would hide it from everybody,
+ * which is never what was meant — the normalizer reads that back as public,
+ * and the note here says so before it happens.
+ */
+export function VisibilityFields({
+  visibility,
+  roles,
+  onChange,
+}: {
+  visibility: MenuVisibility;
+  roles: VisibilityRole[];
+  onChange: (visibility: MenuVisibility) => void;
+}) {
+  const community = roles.filter((role) => role.kind === "community");
+  const management = roles.filter((role) => role.kind !== "community");
+
+  const toggle = (roleId: string, on: boolean) =>
+    onChange({
+      mode: "roles",
+      roleIds: on
+        ? [...new Set([...visibility.roleIds, roleId])]
+        : visibility.roleIds.filter((id) => id !== roleId),
+    });
+
+  const group = (label: string, list: VisibilityRole[]) =>
+    list.length === 0 ? null : (
+      <>
+        <span className="field-label" style={{ marginTop: "0.5rem" }}>
+          {label}
+        </span>
+        <div className="chip-picker">
+          {list.map((role) => (
+            <label key={role._id} className="chip-option">
+              <input
+                type="checkbox"
+                checked={visibility.roleIds.includes(role._id)}
+                onChange={(event) => toggle(role._id, event.target.checked)}
+              />
+              {role.name}
+            </label>
+          ))}
+        </div>
+      </>
+    );
+
+  return (
+    <div className="field">
+      <label>Visible to</label>
+      <select
+        value={visibility.mode}
+        onChange={(event) =>
+          onChange({
+            mode: event.target.value as MenuVisibilityMode,
+            roleIds: visibility.roleIds,
+          })
+        }
+      >
+        {MENU_VISIBILITY_MODES.map((mode) => (
+          <option key={mode} value={mode}>
+            {MENU_VISIBILITY_LABELS[mode]}
+          </option>
+        ))}
+      </select>
+
+      {visibility.mode === "roles" ? (
+        <>
+          {group("Membership levels", community)}
+          {group("Management roles", management)}
+          {visibility.roleIds.length === 0 ? (
+            <span className="help-text">
+              Naming nobody would hide this from everyone, so it stays visible
+              to all until a role is ticked.
+            </span>
+          ) : null}
+        </>
+      ) : null}
+
+      <span className="help-text">
+        Anything restricted is left out of the page before it is sent, not
+        hidden once it arrives — so it is a rule, not a suggestion.
+      </span>
+    </div>
+  );
+}
 
 /** Numeric input for a rem-valued setting — no pixel conversion. */
 export function RemField({
@@ -448,9 +549,18 @@ export function BorderFields({
 export function RowSettingsFields({
   row,
   onChange,
+  visibilityRoles,
 }: {
   row: PageRow;
   onChange: (patch: Partial<RowSettings>) => void;
+  /**
+   * Offered only where it is honoured.
+   *
+   * Rows are shared with the form, document, story and calendar builders, and
+   * only a page filters its layout by who is looking. A control in the others
+   * would be a promise nothing keeps.
+   */
+  visibilityRoles?: VisibilityRole[];
 }) {
   return (
     <>
@@ -492,6 +602,17 @@ export function RowSettingsFields({
         </div>
       </div>
 
+      {visibilityRoles ? (
+        <div className="inspector-section">
+          <h4 className="inspector-title">Visibility</h4>
+          <VisibilityFields
+            visibility={row.settings.visibility}
+            roles={visibilityRoles}
+            onChange={(visibility) => onChange({ visibility })}
+          />
+        </div>
+      ) : null}
+
       <div className="inspector-section">
         <h4 className="inspector-title">Background</h4>
         <BackgroundFields settings={row.settings} onChange={onChange} />
@@ -521,11 +642,20 @@ export function ColumnSettingsFields({
   column,
   onChange,
   onSpanChange,
+  visibilityRoles,
 }: {
   column: PageColumn;
   onChange: (patch: Partial<ColumnSettings>) => void;
   /** Omitted for container cells, whose size comes from their grid placement. */
   onSpanChange?: (span: number) => void;
+  /**
+   * Offered only where it is honoured.
+   *
+   * Rows and columns are shared with the form, document, story and calendar
+   * builders, and only a page filters its layout by who is looking. A control
+   * in the others would be a promise nothing keeps.
+   */
+  visibilityRoles?: VisibilityRole[];
 }) {
   return (
     <>
@@ -563,6 +693,17 @@ export function ColumnSettingsFields({
           />
         </div>
       </div>
+
+      {visibilityRoles ? (
+        <div className="inspector-section">
+          <h4 className="inspector-title">Visibility</h4>
+          <VisibilityFields
+            visibility={column.settings.visibility}
+            roles={visibilityRoles}
+            onChange={(visibility) => onChange({ visibility })}
+          />
+        </div>
+      ) : null}
 
       <div className="inspector-section">
         <h4 className="inspector-title">Background</h4>

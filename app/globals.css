@@ -10412,3 +10412,13 @@ html:has(.admin-shell) body::-webkit-scrollbar {
   flex: 1 1 8rem;
   min-width: 0;
 }
+
+/* A row or column that is not for everybody. Quiet: the canvas draws it like
+   any other, and this only says why a visitor may not find it there. */
+.outline-restricted {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 0.35rem;
+  opacity: 0.7;
+  vertical-align: -0.1em;
+}

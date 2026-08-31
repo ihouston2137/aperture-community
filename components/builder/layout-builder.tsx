@@ -47,7 +47,13 @@ import {
 } from "@/lib/page-layout";
 import { layoutResponsiveCss } from "@/lib/responsive-style";
 
-import { ColumnSettingsFields, RowSettingsFields } from "./settings-fields";
+import { EyeOff } from "lucide-react";
+
+import {
+  ColumnSettingsFields,
+  RowSettingsFields,
+  type VisibilityRole,
+} from "./settings-fields";
 
 export type PaletteItem = {
   type: string;
@@ -135,6 +141,15 @@ export type LayoutBuilderProps = {
    * thrown out by padding it did not ask for. Unset means none, as before.
    */
   newContainerPadding?: number;
+  /**
+   * The roles a row or column may be restricted to, where that is honoured.
+   *
+   * Passed only by the page builder: a page filters its layout by who is
+   * looking, and the other builders that share this chrome do not. Left unset,
+   * no visibility control is offered, which is the honest thing to show for a
+   * setting nothing would read.
+   */
+  visibilityRoles?: VisibilityRole[];
 };
 
 export type Viewport = "desktop" | "tablet" | "mobile";
@@ -216,6 +231,7 @@ export function LayoutBuilder({
   documentSettings,
   boundBackgroundMedia,
   newContainerPadding,
+  visibilityRoles,
 }: LayoutBuilderProps) {
   const [selection, setSelection] = useState<Selection>(null);
   const [tab, setTab] = useState<"outline" | "blocks">("outline");
@@ -683,6 +699,7 @@ export function LayoutBuilder({
                   })
                 )
               }
+              visibilityRoles={visibilityRoles}
             />
           ) : null}
 
@@ -701,6 +718,7 @@ export function LayoutBuilder({
                   })
                 )
               }
+              visibilityRoles={visibilityRoles}
               onSpanChange={(span) =>
                 onChange(
                   updateColumn(layout, selection.rowIndex, selection.columnIndex, { span })
@@ -780,6 +798,37 @@ export function LayoutBuilder({
  * builder — otherwise every `dragover` re-renders the canvas preview underneath
  * the pointer, which is enough to kill a native drag mid-flight.
  */
+/**
+ * Says a row or column is not for everybody.
+ *
+ * The canvas draws restricted parts like any other — an author has to be able
+ * to see and edit what they are hiding — so the outline is where it is said,
+ * and it has to be said somewhere or a page would look wrong to its author for
+ * reasons only the visitor's account explains.
+ */
+function RestrictedMark({
+  settings,
+}: {
+  settings: { visibility?: { mode: string; roleIds: string[] } };
+}) {
+  const mode = settings.visibility?.mode ?? "public";
+  if (mode === "public") return null;
+
+  const label =
+    mode === "signedIn"
+      ? "Signed-in visitors only"
+      : `Restricted to ${settings.visibility?.roleIds.length ?? 0} role${
+          settings.visibility?.roleIds.length === 1 ? "" : "s"
+        }`;
+
+  return (
+    <span className="outline-restricted" title={label}>
+      <EyeOff size={12} aria-hidden="true" />
+      <span className="visually-hidden">{label}</span>
+    </span>
+  );
+}
+
 function OutlineTree({
   layout,
   onChange,
@@ -928,6 +977,7 @@ function OutlineTree({
                       onClick={() => select({ kind: "row", rowIndex })}
                     >
                       Row {rowIndex + 1}
+                      <RestrictedMark settings={row.settings} />
                     </button>
                     <div className="outline-row-actions">
                       <button type="button" onClick={() => onChange(moveRow(layout, rowIndex, -1))}>
@@ -966,6 +1016,7 @@ function OutlineTree({
                             }
                           >
                             Column {columnIndex + 1} ({column.span}/12)
+                            <RestrictedMark settings={column.settings} />
                           </button>
                           <div className="outline-row-actions">
                             <button
