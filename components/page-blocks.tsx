@@ -15,6 +15,7 @@ import {
 import {
   blockFillsWidth,
   normalizeFeaturedSponsor,
+  normalizeSponsorHighlight,
   normalizeSponsorScroll,
   type PageBlock,
   type PageColumn,
@@ -67,6 +68,7 @@ import { QrCode } from "./qr-code";
 import { CustomShapeView, Shape } from "./shape";
 import { FormShell } from "./form-shell";
 import { FeaturedSponsor } from "./featured-sponsor";
+import { SponsorHighlight } from "./sponsor-highlight";
 import { SponsorScroll } from "./sponsor-scroll";
 import { MenuBlockView } from "./menu-block";
 
@@ -444,6 +446,15 @@ export function BlockView({
           // a named style saved anywhere on the site can dress one.
           logoColumn={styleSlotProps(block, "logoColumnStyle")}
           detailColumn={styleSlotProps(block, "detailColumnStyle")}
+          designTime={!interactive}
+        />
+      );
+
+    case "sponsorHighlight":
+      return (
+        <SponsorHighlight
+          settings={normalizeSponsorHighlight(block.sponsorHighlight)}
+          sponsor={sources.featuredSponsors[block.id]}
           designTime={!interactive}
         />
       );

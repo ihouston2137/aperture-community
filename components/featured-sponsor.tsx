@@ -43,7 +43,10 @@ export function FeaturedSponsor({
   }
 
   const rows = settings.fields
-    .map((field) => ({ field, node: fieldNode(field, sponsor, settings) }))
+    .map((field) => ({
+      field,
+      node: sponsorFieldNode(field, sponsor, settings.websiteText),
+    }))
     .filter((row) => row.node !== null);
 
   return (
@@ -107,10 +110,11 @@ export function FeaturedSponsor({
  * Returns `null` for a field the sponsor has nothing in, so an empty phone
  * number does not leave a blank row somebody has to explain.
  */
-function fieldNode(
+export function sponsorFieldNode(
   field: SponsorField,
   sponsor: FeaturedSponsorView,
-  settings: FeaturedSponsorSettings
+  /** What the website link says. Empty prints the address without its scheme. */
+  websiteText: string
 ): ReactNode {
   switch (field) {
     case "name":
@@ -139,7 +143,7 @@ function fieldNode(
        * word that would have meant something.
        */
       const text =
-        settings.websiteText.trim() ||
+        websiteText.trim() ||
         sponsor.website.replace(/^https?:\/\//i, "").replace(/\/$/, "");
 
       return (

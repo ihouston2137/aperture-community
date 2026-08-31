@@ -90,7 +90,10 @@ export type PageSources = {
    */
   sponsorLogos: Record<string, { id: string; name: string; src: string }[]>;
   /**
-   * The sponsor each featured-sponsor block is showing, keyed by block id.
+   * The sponsor each sponsor block is showing, keyed by block id.
+   *
+   * Both the featured-sponsor and sponsor-highlight blocks read from here:
+   * they differ in how one sponsor is laid out, not in which one it is.
    *
    * Resolved on the server, which is also where the random draw happens — two
    * blocks set to draw at random should be able to land on different sponsors,

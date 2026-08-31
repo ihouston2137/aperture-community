@@ -71,6 +71,8 @@ export const PAGE_BLOCK_TYPES = [
   "sponsorScroll",
   // One sponsor at length: the logo beside whatever is worth saying about them.
   "featuredSponsor",
+  // The same, read down a single column with the logo among the fields.
+  "sponsorHighlight",
   "container",
 ] as const;
 
@@ -162,6 +164,92 @@ export const SPONSOR_FIELD_LABELS: Record<SponsorField, string> = {
   address: "Address",
   links: "Links",
 };
+
+/**
+ * The same fields, plus the logo, for the blocks that set one column.
+ *
+ * The logo is a field here rather than a column of its own, which is the whole
+ * difference between this and a featured sponsor: down one column it is one
+ * more thing in the order, and an author may well want it under the name
+ * rather than over it.
+ */
+export const HIGHLIGHT_FIELDS = ["logo", ...SPONSOR_FIELDS] as const;
+
+export type HighlightField = (typeof HIGHLIGHT_FIELDS)[number];
+
+export const HIGHLIGHT_FIELD_LABELS: Record<HighlightField, string> = {
+  logo: "Logo",
+  ...SPONSOR_FIELD_LABELS,
+};
+
+/** How a sponsor highlight block is set up. */
+export type SponsorHighlightSettings = {
+  /** As on a featured sponsor: a named one, or a draw from the levels below. */
+  source: "one" | "random";
+  sponsorId: string;
+  levelIds: string[];
+  /** What is shown, in the order it is shown. The logo is one of these. */
+  fields: HighlightField[];
+  /** What the website link says. Empty prints the address without its scheme. */
+  websiteText: string;
+  /** How tall the logo is drawn, in rem, where the list includes it. */
+  logoHeight: number;
+  fieldStyles: Partial<Record<HighlightField, StyleSlot>>;
+};
+
+export const defaultSponsorHighlight: SponsorHighlightSettings = {
+  source: "one",
+  sponsorId: "",
+  levelIds: [],
+  fields: ["logo", "name", "recognitionLevel", "description"],
+  websiteText: "",
+  logoHeight: 6,
+  fieldStyles: {},
+};
+
+export function normalizeSponsorHighlight(input: unknown): SponsorHighlightSettings {
+  const raw = (input ?? {}) as Record<string, unknown>;
+  const base = defaultSponsorHighlight;
+
+  const fields = Array.isArray(raw.fields)
+    ? raw.fields
+        .map(String)
+        .filter((field): field is HighlightField =>
+          (HIGHLIGHT_FIELDS as readonly string[]).includes(field)
+        )
+    : base.fields;
+
+  return {
+    source: raw.source === "random" ? "random" : "one",
+    sponsorId: str(raw.sponsorId),
+    levelIds: Array.isArray(raw.levelIds)
+      ? [...new Set(raw.levelIds.map(String).filter(Boolean))].slice(0, 50)
+      : [],
+    fields: [...new Set(fields)],
+    websiteText: str(raw.websiteText).slice(0, 120),
+    logoHeight: Math.min(30, Math.max(2, num(raw.logoHeight, base.logoHeight))),
+    fieldStyles: normalizeHighlightFieldStyles(raw.fieldStyles),
+  };
+}
+
+/** Only the fields that exist, each read as a style slot. */
+function normalizeHighlightFieldStyles(
+  input: unknown
+): Partial<Record<HighlightField, StyleSlot>> {
+  const raw = (input ?? {}) as Record<string, unknown>;
+  const out: Partial<Record<HighlightField, StyleSlot>> = {};
+
+  for (const field of HIGHLIGHT_FIELDS) {
+    const slot = raw[field];
+    if (!slot || typeof slot !== "object") continue;
+
+    const normalized = normalizeStyleSlot(slot);
+    if (!normalized.styleSlug && Object.keys(normalized.style).length === 0) continue;
+    out[field] = normalized;
+  }
+
+  return out;
+}
 
 /** How a featured sponsor block is set up. */
 export type FeaturedSponsorSettings = {
@@ -445,6 +533,8 @@ export type PageBlock = ResponsiveStyleFields & {
    * dresses the box around both.
    */
   featuredSponsor?: FeaturedSponsorSettings;
+  /** One sponsor down one column, the logo among the fields. */
+  sponsorHighlight?: SponsorHighlightSettings;
   logoColumnStyleSlug?: string;
   logoColumnStyle?: StyleValues;
   detailColumnStyleSlug?: string;
@@ -688,6 +778,12 @@ export function createBlock(type: PageBlockType): PageBlock {
   if (type === "sponsorScroll") block.sponsorScroll = { ...defaultSponsorScroll };
   if (type === "featuredSponsor") {
     block.featuredSponsor = { ...defaultFeaturedSponsor, fields: [...defaultFeaturedSponsor.fields] };
+  }
+  if (type === "sponsorHighlight") {
+    block.sponsorHighlight = {
+      ...defaultSponsorHighlight,
+      fields: [...defaultSponsorHighlight.fields],
+    };
   }
 
   switch (type) {
@@ -1082,6 +1178,9 @@ export function normalizeBlock(
       break;
     case "sponsorScroll":
       block.sponsorScroll = normalizeSponsorScroll(raw.sponsorScroll);
+      break;
+    case "sponsorHighlight":
+      block.sponsorHighlight = normalizeSponsorHighlight(raw.sponsorHighlight);
       break;
     case "featuredSponsor":
       block.featuredSponsor = normalizeFeaturedSponsor(raw.featuredSponsor);
@@ -1480,6 +1579,9 @@ export function blockFillsWidth(block: WidthAwareBlock): boolean {
     // Two columns across the page. There is no width control on it and
     // nothing to shrink to — a featured sponsor is a band, not a card.
     case "featuredSponsor":
+    // One column of somebody's details. There is no width control on it, and
+    // shrinking it to its longest line would be a column nobody chose.
+    case "sponsorHighlight":
       return true;
     default:
       return false;

@@ -57,9 +57,9 @@ import type { StoryView } from "@/components/story-blocks";
 import { getSiteContent } from "./site-settings";
 import {
   normalizeFeaturedSponsor,
+  normalizeSponsorHighlight,
   normalizeSponsorScroll,
   walkBlocks,
-  type FeaturedSponsorSettings,
   type PageLayout,
   type PageRow,
 } from "./page-layout";
@@ -131,7 +131,13 @@ export async function loadPageSources(layout: PageLayout): Promise<PageSources> 
   const calendarLayoutIds = new Set<string>();
   const eventListBlocks: { id: string; settings: EventListSettings }[] = [];
   const sponsorScrollBlocks: { id: string; levelIds: string[] }[] = [];
-  const featuredSponsorBlocks: { id: string; settings: FeaturedSponsorSettings }[] = [];
+  /** Both sponsor blocks: one sponsor each, chosen the same way. */
+  const sponsorBlocks: {
+    id: string;
+    source: "one" | "random";
+    sponsorId: string;
+    levelIds: string[];
+  }[] = [];
 
   walkBlocks(layout, (block) => {
     if (block.type === "bio" && block.bioId) bioIds.add(block.bioId);
@@ -157,10 +163,16 @@ export async function loadPageSources(layout: PageLayout): Promise<PageSources> 
       sponsorScrollBlocks.push({ id: block.id, levelIds: settings.levelIds });
     }
     if (block.type === "featuredSponsor") {
-      featuredSponsorBlocks.push({
-        id: block.id,
-        settings: normalizeFeaturedSponsor(block.featuredSponsor),
-      });
+      const { source, sponsorId, levelIds } = normalizeFeaturedSponsor(
+        block.featuredSponsor
+      );
+      sponsorBlocks.push({ id: block.id, source, sponsorId, levelIds });
+    }
+    if (block.type === "sponsorHighlight") {
+      const { source, sponsorId, levelIds } = normalizeSponsorHighlight(
+        block.sponsorHighlight
+      );
+      sponsorBlocks.push({ id: block.id, source, sponsorId, levelIds });
     }
     if (block.type === "customShape" && block.shapeSlug) shapeSlugs.add(block.shapeSlug);
 
@@ -438,7 +450,7 @@ export async function loadPageSources(layout: PageLayout): Promise<PageSources> 
    * listing them all.
    */
   const featuredSponsors: Record<string, FeaturedSponsorView> = {};
-  if (featuredSponsorBlocks.length > 0) {
+  if (sponsorBlocks.length > 0) {
     const [levels, sponsors] = await Promise.all([
       getRecognitionLevels(),
       getSponsors(),
@@ -446,9 +458,7 @@ export async function loadPageSources(layout: PageLayout): Promise<PageSources> 
     const levelName = (id: string) =>
       levels.find((level) => level._id === id)?.name ?? "";
 
-    for (const entry of featuredSponsorBlocks) {
-      const { settings } = entry;
-
+    for (const settings of sponsorBlocks) {
       let chosen: SponsorSummary | undefined;
       if (settings.source === "one") {
         chosen = sponsors.find((sponsor) => sponsor._id === settings.sponsorId);
@@ -470,7 +480,7 @@ export async function loadPageSources(layout: PageLayout): Promise<PageSources> 
       // chosen them by hand, which is a decision the record cannot overrule.
       if (!chosen) continue;
 
-      featuredSponsors[entry.id] = {
+      featuredSponsors[settings.id] = {
         id: chosen._id,
         name: chosen.name,
         logoSrc: sponsorLogoSrc(primaryLogo(chosen.logos)),

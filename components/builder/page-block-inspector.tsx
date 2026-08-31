@@ -15,7 +15,10 @@ import { InlineStyleEditor, type SavedStyle } from "@/components/style-editor";
 import type { StyleSlot } from "@/lib/display-templates";
 import type { BuilderSources } from "@/lib/builder-sources";
 import {
+  HIGHLIGHT_FIELDS,
+  HIGHLIGHT_FIELD_LABELS,
   normalizeFeaturedSponsor,
+  normalizeSponsorHighlight,
   normalizeSponsorScroll,
   PAGE_BLOCK_TYPES,
   PAGE_LINK_TYPES,
@@ -26,7 +29,9 @@ import {
   SPONSOR_FIELDS,
   SPONSOR_FIELD_LABELS,
   type FeaturedSponsorSettings,
+  type HighlightField,
   type PageBlock,
+  type SponsorHighlightSettings,
   type SponsorField,
   type SponsorScrollSettings,
 } from "@/lib/page-layout";
@@ -188,6 +193,7 @@ const BLOCK_LABELS: Record<string, string> = {
   menu: "Menu",
   sponsorScroll: "Sponsor scroll",
   featuredSponsor: "Featured sponsor",
+  sponsorHighlight: "Sponsor highlight",
   container: "Container",
 
   // Story slots. Not in the palette — they are added from a story-bound
@@ -225,6 +231,7 @@ const BLOCK_ICONS: Record<string, string> = {
   bio: "Contact",
   sponsorScroll: "GalleryHorizontal",
   featuredSponsor: "BadgeCheck",
+  sponsorHighlight: "AlignVerticalSpaceAround",
   collection: "Images",
   calendar: "Calendar",
   eventList: "Rows",
@@ -889,6 +896,17 @@ export function PageBlockInspector({
           </>
         ) : null}
 
+        {block.type === "sponsorHighlight" ? (
+          <SponsorHighlightFields
+            settings={normalizeSponsorHighlight(block.sponsorHighlight)}
+            sponsors={sources.sponsors}
+            levels={sources.recognitionLevels}
+            fonts={sources.fonts}
+            savedStyles={sources.styles}
+            onChange={(sponsorHighlight) => update({ sponsorHighlight })}
+          />
+        ) : null}
+
         {block.type === "featuredSponsor" ? (
           <FeaturedSponsorFields
             settings={normalizeFeaturedSponsor(block.featuredSponsor)}
@@ -1310,4 +1328,208 @@ function FeaturedSponsorFields({
 function styleSummary(slot: StyleSlot | undefined): string {
   if (slot?.styleSlug) return slot.styleSlug;
   return Object.keys(slot?.style ?? {}).length > 0 ? "set" : "unset";
+}
+
+/**
+ * A sponsor highlight: who, and what is said about them, down one column.
+ *
+ * The source picker and the field list are the featured sponsor's, because
+ * they are the same two questions — which sponsor, and what about them. Only
+ * the field list differs, and only by holding the logo.
+ */
+function SponsorHighlightFields({
+  settings,
+  sponsors,
+  levels,
+  fonts,
+  savedStyles,
+  onChange,
+}: {
+  settings: SponsorHighlightSettings;
+  sponsors: { _id: string; label: string }[];
+  levels: { _id: string; name: string }[];
+  fonts: string[];
+  savedStyles: SavedStyle[];
+  onChange: (settings: SponsorHighlightSettings) => void;
+}) {
+  const patch = (next: Partial<SponsorHighlightSettings>) =>
+    onChange({ ...settings, ...next });
+
+  /** Chosen fields first, in their order, then the ones left out. */
+  const rows = [
+    ...settings.fields,
+    ...HIGHLIGHT_FIELDS.filter((field) => !settings.fields.includes(field)),
+  ];
+
+  const move = (field: HighlightField, direction: -1 | 1) => {
+    const index = settings.fields.indexOf(field);
+    const target = index + direction;
+    if (index < 0 || target < 0 || target >= settings.fields.length) return;
+    const next = [...settings.fields];
+    [next[index], next[target]] = [next[target], next[index]];
+    patch({ fields: next });
+  };
+
+  return (
+    <>
+      <SelectField
+        label="Shows"
+        value={settings.source}
+        options={[
+          { value: "one", label: "A sponsor you choose" },
+          { value: "random", label: "A different one each time" },
+        ]}
+        onChange={(value) =>
+          patch({ source: value as SponsorHighlightSettings["source"] })
+        }
+      />
+
+      {settings.source === "one" ? (
+        <SelectField
+          label="Sponsor"
+          value={settings.sponsorId}
+          options={[
+            { value: "", label: "Select a sponsor\u2026" },
+            ...sponsors.map((sponsor) => ({
+              value: sponsor._id,
+              label: sponsor.label,
+            })),
+          ]}
+          onChange={(sponsorId) => patch({ sponsorId })}
+        />
+      ) : (
+        <div className="field">
+          <label>Drawn from</label>
+          {levels.length === 0 ? (
+            <span className="help-text">
+              No recognition levels are defined yet, so there is nobody to draw
+              from.
+            </span>
+          ) : (
+            <>
+              <div className="chip-picker">
+                {levels.map((level) => (
+                  <label key={level._id} className="chip-option">
+                    <input
+                      type="checkbox"
+                      checked={settings.levelIds.includes(level._id)}
+                      onChange={(event) =>
+                        patch({
+                          levelIds: event.target.checked
+                            ? [...settings.levelIds, level._id]
+                            : settings.levelIds.filter((id) => id !== level._id),
+                        })
+                      }
+                    />
+                    {level.name}
+                  </label>
+                ))}
+              </div>
+              <span className="help-text">
+                {settings.levelIds.length === 0
+                  ? "Every level, since none is named."
+                  : "Only sponsors at these levels."}{" "}
+                Drawn afresh each time the page is loaded. A level marked
+                anonymous is never drawn from.
+              </span>
+            </>
+          )}
+        </div>
+      )}
+
+      <RemField
+        label="Logo height"
+        value={settings.logoHeight}
+        onChange={(value) => patch({ logoHeight: Math.max(2, value) })}
+      />
+      <span className="help-text">
+        How tall the logo is drawn, where the list holds one. Its width follows
+        the artwork.
+      </span>
+
+      <h4 className="inspector-title">What it says</h4>
+      <p className="help-text" style={{ marginTop: "-0.35rem" }}>
+        Ticked items are shown, in this order — the logo among them. An item
+        the sponsor has nothing in is left out rather than printed empty.
+      </p>
+
+      <ul className="admin-list featured-field-list">
+        {rows.map((field) => {
+          const on = settings.fields.includes(field);
+          const slot = settings.fieldStyles[field];
+          return (
+            <li key={field} className="admin-list-item">
+              <label className="checkbox-row">
+                <input
+                  type="checkbox"
+                  checked={on}
+                  onChange={(event) =>
+                    patch({
+                      fields: event.target.checked
+                        ? [...settings.fields, field]
+                        : settings.fields.filter((entry) => entry !== field),
+                    })
+                  }
+                />
+                {HIGHLIGHT_FIELD_LABELS[field]}
+              </label>
+
+              {on ? (
+                <div className="admin-list-actions">
+                  <button type="button" className="btn btn-sm" onClick={() => move(field, -1)}>
+                    ↑
+                  </button>
+                  <button type="button" className="btn btn-sm" onClick={() => move(field, 1)}>
+                    ↓
+                  </button>
+                </div>
+              ) : null}
+
+              {on && field === "website" ? (
+                <div className="featured-field-extra">
+                  <TextField
+                    label="Link text"
+                    value={settings.websiteText}
+                    onChange={(websiteText) => patch({ websiteText })}
+                  />
+                  <span className="help-text">
+                    Left blank, the link says the address itself without its
+                    scheme.
+                  </span>
+                </div>
+              ) : null}
+
+              {on ? (
+                <details className="inspector-fold is-sub featured-field-style">
+                  <summary>
+                    Style
+                    <span className="help-text">{styleSummary(slot)}</span>
+                  </summary>
+                  <div className="inspector-fold-body">
+                    <InlineStyleEditor
+                      values={slot?.style}
+                      styleSlug={slot?.styleSlug ?? ""}
+                      fonts={fonts}
+                      savedStyles={savedStyles}
+                      onChange={({ values, styleSlug }) =>
+                        patch({
+                          fieldStyles: {
+                            ...settings.fieldStyles,
+                            [field]: {
+                              styleSlug,
+                              style: styleSlug ? {} : values,
+                            },
+                          },
+                        })
+                      }
+                    />
+                  </div>
+                </details>
+              ) : null}
+            </li>
+          );
+        })}
+      </ul>
+    </>
+  );
 }
