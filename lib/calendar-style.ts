@@ -54,6 +54,15 @@ export const CALENDAR_STYLE_VIEW_LABELS: Record<CalendarStyleView, string> = {
  * equal specificity, so the later rule wins. `today` has to come last or it
  * could never override an ordinary day.
  */
+/*
+ * Every part of a calendar a style can dress, in the order the editor lists
+ * them: the frame, then the grid, then each kind of day box with the date text
+ * inside it, then today over the top of all of them.
+ *
+ * `today` and `todayLabel` come last because several of these selectors tie
+ * with theirs on specificity, and a tie is settled by which rule was written
+ * later — today has to win, whatever else the day is.
+ */
 export const CALENDAR_PARTS = [
   "container",
   "navButton",
@@ -61,10 +70,13 @@ export const CALENDAR_PARTS = [
   "grid",
   "weekdayHeader",
   "dayInMonth",
+  "dateInMonth",
   "dayOutsideMonth",
+  "dateOutsideMonth",
   "weekDayBox",
+  "weekDate",
   "listDayBox",
-  "listDayBox",
+  "listDate",
   "today",
   "todayLabel",
 ] as const;
@@ -78,9 +90,13 @@ export const CALENDAR_PART_LABELS: Record<CalendarPart, string> = {
   grid: "Calendar",
   weekdayHeader: "Day of week header",
   dayInMonth: "Days in month",
+  dateInMonth: "Date text, days in month",
   dayOutsideMonth: "Days not in month",
+  dateOutsideMonth: "Date text, days not in month",
   weekDayBox: "Day boxes",
+  weekDate: "Date text, week view",
   listDayBox: "List day groups",
+  listDate: "Date text, list view",
   today: "Today box",
   todayLabel: "Today highlight",
 };
@@ -93,9 +109,14 @@ export const CALENDAR_PART_NOTES: Record<CalendarPart, string> = {
   grid: "The grid itself, inside the container.",
   weekdayHeader: "Sun–Sat column headings. Month view only.",
   dayInMonth: "A day cell belonging to the month shown.",
+  dateInMonth: "The day number itself, inside those cells.",
   dayOutsideMonth: "The neighbouring days padding the first and last rows.",
+  dateOutsideMonth:
+    "The day number on those padding days — usually quieter than the rest.",
   weekDayBox: "A day in the week list. Week view only.",
+  weekDate: "The date heading above each day. Week view only.",
   listDayBox: "A date and the events under it. List view only.",
+  listDate: "The date heading above each group. List view only.",
   today: "Overrides whichever day box today falls in.",
   todayLabel:
     "The date itself on today — the number in month view, the heading in the week and list views.",
@@ -109,9 +130,13 @@ export const CALENDAR_PART_VIEWS: Record<CalendarPart, CalendarStyleView[]> = {
   grid: ["month", "week", "list"],
   weekdayHeader: ["month"],
   dayInMonth: ["month"],
+  dateInMonth: ["month"],
   dayOutsideMonth: ["month"],
+  dateOutsideMonth: ["month"],
   weekDayBox: ["week"],
+  weekDate: ["week"],
   listDayBox: ["list"],
+  listDate: ["list"],
   today: ["month", "week", "list"],
   todayLabel: ["month", "week", "list"],
 };
@@ -271,9 +296,17 @@ const PART_SELECTORS: Record<CalendarPart, string[]> = {
   grid: [".calendar-grid"],
   weekdayHeader: [".calendar-weekday"],
   dayInMonth: [".calendar-grid.is-month .calendar-day:not(.is-outside)"],
+  dateInMonth: [
+    ".calendar-grid.is-month .calendar-day:not(.is-outside) .calendar-day-number",
+  ],
   dayOutsideMonth: [".calendar-grid.is-month .calendar-day.is-outside"],
+  dateOutsideMonth: [
+    ".calendar-grid.is-month .calendar-day.is-outside .calendar-day-number",
+  ],
   weekDayBox: [".calendar-grid.is-week .calendar-day"],
+  weekDate: [".calendar-grid.is-week .calendar-day .calendar-day-heading"],
   listDayBox: [".calendar-grid.is-list .calendar-day"],
+  listDate: [".calendar-grid.is-list .calendar-day .calendar-day-heading"],
   today: [".calendar-day.is-today"],
   // Month shows a number, week a heading; one part dresses whichever is there.
   // The view class is carried so these outrank the built-in highlight rules on
