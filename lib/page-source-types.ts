@@ -66,6 +66,14 @@ export type PageSources = {
   eventLists: Record<string, { events: CalendarEventRecord[]; hasMore: boolean }>;
   shapes: Record<string, { viewBox: string; paths: string[] }>;
   /**
+   * Logos for each sponsor scroll block, keyed by block id.
+   *
+   * Keyed by block rather than by level, because two scrolls can draw on the
+   * same levels and each is filtered and ordered for itself. Already through
+   * the media route, so the browser has nothing to resolve.
+   */
+  sponsorLogos: Record<string, { id: string; name: string; src: string }[]>;
+  /**
    * Paths for the pages and collections that blocks link to, keyed by record
    * id. Resolved here rather than stored on the block so renaming a slug moves
    * every link that points at it.
@@ -75,6 +83,7 @@ export type PageSources = {
 };
 
 export const emptyPageSources: PageSources = {
+  sponsorLogos: {},
   storyViews: {},
   latestStoryView: null,
   bios: {},

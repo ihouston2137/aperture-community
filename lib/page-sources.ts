@@ -13,6 +13,8 @@ import {
   Story,
 } from "./models";
 import { normalizeCalendarTemplateLayout } from "./calendar-slot-layout";
+import { getRecognitionLevels, getSponsors } from "./sponsorships";
+import { isPubliclyNamed, primaryLogo, sponsorLogoSrc } from "./sponsorship-types";
 import {
   eventListQuery,
   normalizeEventListSettings,
@@ -47,7 +49,12 @@ import { getSafeMode } from "./safe-mode";
 import { toStoryView } from "./stories";
 import type { StoryView } from "@/components/story-blocks";
 import { getSiteContent } from "./site-settings";
-import { walkBlocks, type PageLayout, type PageRow } from "./page-layout";
+import {
+  normalizeSponsorScroll,
+  walkBlocks,
+  type PageLayout,
+  type PageRow,
+} from "./page-layout";
 
 export { emptyPageSources };
 export type { BioSummary, FormSummary, PageSources };
@@ -115,6 +122,7 @@ export async function loadPageSources(layout: PageLayout): Promise<PageSources> 
   const calendarStyleIds = new Set<string>();
   const calendarLayoutIds = new Set<string>();
   const eventListBlocks: { id: string; settings: EventListSettings }[] = [];
+  const sponsorScrollBlocks: { id: string; levelIds: string[] }[] = [];
 
   walkBlocks(layout, (block) => {
     if (block.type === "bio" && block.bioId) bioIds.add(block.bioId);
@@ -134,6 +142,10 @@ export async function loadPageSources(layout: PageLayout): Promise<PageSources> 
       const settings = normalizeEventListSettings(block.eventList);
       eventListBlocks.push({ id: block.id, settings });
       if (settings.templateId) calendarLayoutIds.add(settings.templateId);
+    }
+    if (block.type === "sponsorScroll") {
+      const settings = normalizeSponsorScroll(block.sponsorScroll);
+      sponsorScrollBlocks.push({ id: block.id, levelIds: settings.levelIds });
     }
     if (block.type === "customShape" && block.shapeSlug) shapeSlugs.add(block.shapeSlug);
 
@@ -359,6 +371,49 @@ export async function loadPageSources(layout: PageLayout): Promise<PageSources> 
     };
   }
 
+  /*
+   * Sponsor logos per scroll block.
+   *
+   * The sponsors and levels are read once however many scrolls a page holds,
+   * and each block filtered from the same lists. A sponsor whose level is
+   * anonymous never appears: the level says the site does not name them, and
+   * a logo names them louder than a line of type would.
+   */
+  const sponsorLogos: Record<string, { id: string; name: string; src: string }[]> = {};
+  if (sponsorScrollBlocks.length > 0) {
+    const [levels, sponsors] = await Promise.all([
+      getRecognitionLevels(),
+      getSponsors(),
+    ]);
+
+    // Highest recognition first, then alphabetically — the order the rest of
+    // the site lists sponsors in, so a scroll agrees with a wall of them.
+    const rank = new Map(levels.map((level, index) => [level._id, index]));
+    const ordered = [...sponsors].sort(
+      (a, b) =>
+        (rank.get(a.recognitionLevelId) ?? 999) - (rank.get(b.recognitionLevelId) ?? 999) ||
+        a.name.localeCompare(b.name)
+    );
+
+    for (const entry of sponsorScrollBlocks) {
+      sponsorLogos[entry.id] = ordered
+        .filter((sponsor) => {
+          if (!isPubliclyNamed(sponsor, levels)) return false;
+          // No levels named means every level, which is what a scroll dropped
+          // on a page with nothing configured should show.
+          if (entry.levelIds.length === 0) return Boolean(sponsor.recognitionLevelId);
+          return entry.levelIds.includes(sponsor.recognitionLevelId);
+        })
+        .map((sponsor) => ({
+          id: sponsor._id,
+          name: sponsor.name,
+          src: sponsorLogoSrc(primaryLogo(sponsor.logos)),
+        }))
+        // A sponsor with no artwork has nothing to put in a run of logos.
+        .filter((sponsor) => Boolean(sponsor.src));
+    }
+  }
+
   /**
    * Menu items per block, filtered to whoever is asking.
    *
@@ -382,6 +437,7 @@ export async function loadPageSources(layout: PageLayout): Promise<PageSources> 
   }
 
   return {
+    sponsorLogos,
     storyViews,
     latestStoryView,
     bios,

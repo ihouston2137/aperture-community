@@ -14,6 +14,7 @@ import {
 } from "@/lib/page-container-layout";
 import {
   blockFillsWidth,
+  normalizeSponsorScroll,
   type PageBlock,
   type PageColumn,
   type PageRow,
@@ -64,6 +65,7 @@ import { Panorama } from "./panorama";
 import { QrCode } from "./qr-code";
 import { CustomShapeView, Shape } from "./shape";
 import { FormShell } from "./form-shell";
+import { SponsorScroll } from "./sponsor-scroll";
 import { MenuBlockView } from "./menu-block";
 
 /**
@@ -417,6 +419,17 @@ export function BlockView({
           block={block}
           items={sources.menus[block.id] ?? []}
           interactive={interactive}
+        />
+      );
+
+    case "sponsorScroll":
+      return (
+        <SponsorScroll
+          settings={normalizeSponsorScroll(block.sponsorScroll)}
+          logos={sources.sponsorLogos[block.id] ?? []}
+          // The canvas holds it still: a block that will not stay put is
+          // hard to select, and its movement is not what is being arranged.
+          designTime={!interactive}
         />
       );
 

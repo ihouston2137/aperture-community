@@ -13,6 +13,7 @@ import {
 import { ICON_NAMES } from "@/components/icons";
 import type { BuilderSources } from "@/lib/builder-sources";
 import {
+  normalizeSponsorScroll,
   PAGE_BLOCK_TYPES,
   PAGE_LINK_TYPES,
   PAGE_LINK_TYPE_LABELS,
@@ -20,6 +21,7 @@ import {
   SHAPE_TEXT_PLACEMENTS,
   SHAPE_TEXT_PLACEMENT_LABELS,
   type PageBlock,
+  type SponsorScrollSettings,
 } from "@/lib/page-layout";
 import {
   MEDIA_CLICK_ACTIONS,
@@ -177,6 +179,7 @@ const BLOCK_LABELS: Record<string, string> = {
   eventList: "Event list",
   form: "Form",
   menu: "Menu",
+  sponsorScroll: "Sponsor scroll",
   container: "Container",
 
   // Story slots. Not in the palette — they are added from a story-bound
@@ -212,6 +215,7 @@ const BLOCK_ICONS: Record<string, string> = {
   qrCode: "QrCode",
   button: "MousePointerClick",
   bio: "Contact",
+  sponsorScroll: "GalleryVertical",
   collection: "Images",
   calendar: "Calendar",
   eventList: "Rows",
@@ -875,6 +879,14 @@ export function PageBlockInspector({
             )}
           </>
         ) : null}
+
+        {block.type === "sponsorScroll" ? (
+          <SponsorScrollFields
+            settings={normalizeSponsorScroll(block.sponsorScroll)}
+            levels={sources.recognitionLevels}
+            onChange={(sponsorScroll) => update({ sponsorScroll })}
+          />
+        ) : null}
       </div>
 
       <div className="inspector-section">
@@ -889,6 +901,110 @@ export function PageBlockInspector({
           ]}
           onChange={(value) => update({ align: value })}
         />
+      </div>
+    </>
+  );
+}
+
+
+/**
+ * A sponsor scroll's settings.
+ *
+ * The height is first because it decides the rest: it is the window the logos
+ * move through and what each one is sized against, so it is the number the
+ * block is judged by.
+ */
+function SponsorScrollFields({
+  settings,
+  levels,
+  onChange,
+}: {
+  settings: SponsorScrollSettings;
+  levels: { _id: string; name: string }[];
+  onChange: (settings: SponsorScrollSettings) => void;
+}) {
+  const patch = (next: Partial<SponsorScrollSettings>) =>
+    onChange({ ...settings, ...next });
+
+  return (
+    <>
+      <RemField
+        label="Height"
+        value={settings.height}
+        onChange={(value) => patch({ height: value })}
+      />
+      <span className="help-text">
+        The window the logos travel through, and what each one is sized against
+        \u2014 a taller block shows bigger logos rather than more of them.
+      </span>
+
+      <NumField
+        label="Seconds per logo"
+        value={settings.secondsPerLogo}
+        min={0.5}
+        max={60}
+        step={0.5}
+        onChange={(value) => patch({ secondsPerLogo: value })}
+      />
+      <span className="help-text">
+        How long one logo takes to cross the window. Set per logo, so adding a
+        sponsor makes the run longer rather than making everything faster.
+      </span>
+
+      <SelectField
+        label="Travels"
+        value={settings.direction}
+        options={[
+          { value: "up", label: "Upwards" },
+          { value: "down", label: "Downwards" },
+        ]}
+        onChange={(value) =>
+          patch({ direction: value as SponsorScrollSettings["direction"] })
+        }
+      />
+
+      <CheckField
+        label="Stop while the pointer is over it"
+        value={settings.pauseOnHover}
+        onChange={(value) => patch({ pauseOnHover: value })}
+      />
+
+      <div className="field">
+        <label>Recognition levels</label>
+        {levels.length === 0 ? (
+          <span className="help-text">
+            No recognition levels are defined yet, so there are no logos to
+            draw on.
+          </span>
+        ) : (
+          <>
+            <div className="chip-picker">
+              {levels.map((level) => (
+                <label key={level._id} className="chip-option">
+                  <input
+                    type="checkbox"
+                    checked={settings.levelIds.includes(level._id)}
+                    onChange={(event) =>
+                      patch({
+                        levelIds: event.target.checked
+                          ? [...settings.levelIds, level._id]
+                          : settings.levelIds.filter((id: string) => id !== level._id),
+                      })
+                    }
+                  />
+                  {level.name}
+                </label>
+              ))}
+            </div>
+            <span className="help-text">
+              {settings.levelIds.length === 0
+                ? "Every level, since none is named."
+                : "Only sponsors at these levels."}{" "}
+              A level marked anonymous is never included \u2014 a logo names
+              somebody more loudly than a line of type would.
+            </span>
+          </>
+        )}
       </div>
     </>
   );

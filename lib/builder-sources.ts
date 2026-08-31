@@ -19,6 +19,7 @@ import {
   FontFamily,
   FormDefinition,
   Menu,
+  RecognitionLevel,
   Role,
   SitePage,
   Story,
@@ -76,6 +77,8 @@ export type BuilderSources = {
    * members, so neither list is left out.
    */
   roles: { _id: string; name: string; kind: string }[];
+  /** Sponsor recognition levels, for the sponsor scroll's level picker. */
+  recognitionLevels: { _id: string; name: string }[];
 };
 
 export async function loadBuilderSources(): Promise<BuilderSources> {
@@ -96,6 +99,7 @@ export async function loadBuilderSources(): Promise<BuilderSources> {
     calendarStyles,
     savedBlocks,
     roles,
+    recognitionLevels,
   ] = await Promise.all([
     FontFamily.find().select("family").sort({ family: 1 }).lean<any[]>(),
     CustomStyle.find().select("name slug").sort({ name: 1 }).lean<any[]>(),
@@ -113,6 +117,7 @@ export async function loadBuilderSources(): Promise<BuilderSources> {
     CalendarStyle.find().sort({ name: 1 }).lean<any[]>(),
     CustomPageBlock.find().sort({ name: 1 }).lean<any[]>(),
     Role.find().select("name kind").sort({ kind: 1, name: 1 }).lean<any[]>(),
+    RecognitionLevel.find().select("name rank").sort({ rank: -1, name: 1 }).lean<any[]>(),
   ]);
 
   const styleRecords: CalendarStyleRecord[] = calendarStyles.map((doc) => ({
@@ -214,6 +219,10 @@ export async function loadBuilderSources(): Promise<BuilderSources> {
       _id: String(role._id),
       name: role.name ?? "",
       kind: role.kind ?? "management",
+    })),
+    recognitionLevels: recognitionLevels.map((level) => ({
+      _id: String(level._id),
+      name: level.name ?? "",
     })),
   };
 }

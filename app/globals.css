@@ -10652,3 +10652,130 @@ html:has(.admin-shell) body::-webkit-scrollbar {
   opacity: 0.7;
   vertical-align: -0.1em;
 }
+
+/* ------------------------------------------------------ Sponsor scroll */
+
+/*
+ * A slow vertical run of sponsor logos.
+ *
+ * The height is the window, and the logos are sized against it rather than
+ * carrying a size of their own — one number decides both how much of the page
+ * this takes and how big the marks in it are, and the two can never disagree.
+ */
+.sponsor-scroll {
+  height: var(--sponsor-scroll-height, 18rem);
+  overflow: hidden;
+  position: relative;
+  width: 100%;
+  /* The run fades out at both ends rather than being cut off square, so a logo
+     leaves the window instead of being chopped by it. */
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 8%,
+    #000 92%,
+    transparent 100%
+  );
+}
+
+/*
+ * The track holds the run twice and travels exactly half its own height, so
+ * the second copy sits where the first was when the loop restarts. That is
+ * what makes the scroll continuous: nothing jumps, because the frame after the
+ * last is identical to the frame before the first.
+ */
+.sponsor-scroll-track {
+  display: flex;
+  flex-direction: column;
+  animation: sponsor-scroll-up var(--sponsor-scroll-seconds, 30s) linear infinite;
+  will-change: transform;
+}
+
+.sponsor-scroll[data-direction="down"] .sponsor-scroll-track {
+  animation-name: sponsor-scroll-down;
+}
+
+/* Held still on the builder canvas, where a block that will not stay put is
+   hard to select and its movement is not what is being arranged. */
+.sponsor-scroll[data-paused="true"] .sponsor-scroll-track {
+  animation-play-state: paused;
+}
+
+.sponsor-scroll[data-pause-on-hover="true"]:hover .sponsor-scroll-track {
+  animation-play-state: paused;
+}
+
+.sponsor-scroll-run {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/*
+ * One logo, sized against the window rather than against itself.
+ *
+ * A third of the height keeps two whole logos and part of a third in view,
+ * which reads as a moving run; at half the height it reads as a slideshow, and
+ * at a fifth as a list.
+ */
+.sponsor-scroll-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: calc(var(--sponsor-scroll-height, 18rem) / 3);
+  padding: 0.5rem;
+  box-sizing: border-box;
+}
+
+.sponsor-scroll-item img {
+  max-width: 100%;
+  max-height: 100%;
+  /* Whole and undistorted: a sponsor's mark is the one image on a site that
+     must not be cropped or stretched to fit. */
+  object-fit: contain;
+}
+
+.sponsor-scroll.is-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--admin-border, rgba(128, 128, 128, 0.4));
+  border-radius: var(--radius, 0.5rem);
+  font-size: 0.875rem;
+  opacity: 0.7;
+  text-align: center;
+  padding: 1rem;
+}
+
+@keyframes sponsor-scroll-up {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-50%);
+  }
+}
+
+@keyframes sponsor-scroll-down {
+  from {
+    transform: translateY(-50%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+/* Somebody who has asked their system for less movement gets a still list of
+   the same logos rather than a page that will not settle. */
+@media (prefers-reduced-motion: reduce) {
+  .sponsor-scroll-track {
+    animation: none;
+  }
+
+  .sponsor-scroll {
+    overflow-y: auto;
+    mask-image: none;
+  }
+}

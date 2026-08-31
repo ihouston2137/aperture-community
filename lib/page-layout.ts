@@ -63,6 +63,8 @@ export const PAGE_BLOCK_TYPES = [
   "form",
   // A named menu, placed on a page as a list or a dropdown.
   "menu",
+  // A slow vertical scroll of sponsor logos, drawn from recognition levels.
+  "sponsorScroll",
   "container",
 ] as const;
 
@@ -120,6 +122,53 @@ export const PAGE_LINK_TYPE_LABELS: Record<PageLinkType, string> = {
   collection: "Collection",
   url: "Custom URL",
 };
+
+/** How a sponsor scroll is set up. */
+export type SponsorScrollSettings = {
+  /** The window's height in rem, and what each logo is sized against. */
+  height: number;
+  /**
+   * Seconds for one logo to travel the height of the window.
+   *
+   * Per logo rather than per loop, so adding a sponsor lengthens the run
+   * instead of speeding the whole thing up to keep the same lap time — a
+   * carousel that got faster every time somebody was thanked would be a
+   * strange thing to have built.
+   */
+  secondsPerLogo: number;
+  /** Which recognition levels supply the logos. Empty means every level. */
+  levelIds: string[];
+  /** Bottom to top, or top to bottom. */
+  direction: "up" | "down";
+  /** Stops the scroll while the pointer is over it, so a logo can be read. */
+  pauseOnHover: boolean;
+};
+
+export const defaultSponsorScroll: SponsorScrollSettings = {
+  height: 18,
+  secondsPerLogo: 3,
+  levelIds: [],
+  direction: "up",
+  pauseOnHover: true,
+};
+
+export function normalizeSponsorScroll(input: unknown): SponsorScrollSettings {
+  const raw = (input ?? {}) as Record<string, unknown>;
+  const base = defaultSponsorScroll;
+
+  return {
+    // Bounded either side: a scroll shorter than a logo shows nothing, and one
+    // taller than a screen is a page of its own.
+    height: Math.min(80, Math.max(4, num(raw.height, base.height))),
+    // A tenth of a second per logo is a blur; a minute is not moving.
+    secondsPerLogo: Math.min(60, Math.max(0.5, num(raw.secondsPerLogo, base.secondsPerLogo))),
+    levelIds: Array.isArray(raw.levelIds)
+      ? [...new Set(raw.levelIds.map(String).filter(Boolean))].slice(0, 50)
+      : [],
+    direction: raw.direction === "down" ? "down" : "up",
+    pauseOnHover: raw.pauseOnHover === undefined ? true : Boolean(raw.pauseOnHover),
+  };
+}
 
 export type PageBlock = ResponsiveStyleFields & {
   id: string;
@@ -215,6 +264,15 @@ export type PageBlock = ResponsiveStyleFields & {
   menuDirection?: MenuBlockDirection;
   /** Closed until opened, for the dropdown form. */
   menuButtonText?: string;
+
+  /*
+   * A vertical run of sponsor logos, scrolling on its own.
+   *
+   * The height is the setting that matters: it is both the window the logos
+   * scroll through and what each logo is sized against, so one number decides
+   * how much of the page this takes and how big the marks are in it.
+   */
+  sponsorScroll?: SponsorScrollSettings;
 
   // container
   container?: ContainerLayout;
@@ -450,6 +508,8 @@ export function makeId(prefix: string): string {
 
 export function createBlock(type: PageBlockType): PageBlock {
   const block: PageBlock = { id: makeId("block"), type };
+
+  if (type === "sponsorScroll") block.sponsorScroll = { ...defaultSponsorScroll };
 
   switch (type) {
     case "headline":
@@ -841,6 +901,9 @@ export function normalizeBlock(
       block.menuDirection = menuBlockDirection(raw.menuDirection);
       block.menuButtonText = str(raw.menuButtonText);
       break;
+    case "sponsorScroll":
+      block.sponsorScroll = normalizeSponsorScroll(raw.sponsorScroll);
+      break;
     case "container":
       // `normalizeContainerLayout` already runs the normalizer over every
       // cell's blocks. Running the plain one again here would drop the story
@@ -1220,6 +1283,10 @@ export function blockFillsWidth(block: WidthAwareBlock): boolean {
     // out, its own `width: 100%` resolved against a shrink-wrapped box and it
     // came out as narrow as its longest name.
     case "calAttendance":
+    // A run of logos in a window of a set height. Its width is whatever it is
+    // given, and shrink-wrapping it to the widest logo would leave the window
+    // narrower than the block it is in.
+    case "sponsorScroll":
       return true;
     default:
       return false;
