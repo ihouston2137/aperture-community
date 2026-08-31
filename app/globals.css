@@ -11028,6 +11028,10 @@ html:has(.admin-shell) body::-webkit-scrollbar {
   flex-direction: column;
   gap: 0.5rem;
   width: 100%;
+  /* Whatever the container style says about the box lands here: padding, a
+     background, a border, corners. Nothing is set by default, so an unstyled
+     block is the items and nothing around them. */
+  box-sizing: border-box;
 }
 
 /* Each item carries its own style, so it needs its own box to wear it on —
@@ -11043,9 +11047,17 @@ html:has(.admin-shell) body::-webkit-scrollbar {
   font: inherit;
 }
 
-/* Whole and undistorted, at the height the block was given. Width follows the
-   artwork, which is the only way a crest and a wordmark both read. */
-.sponsor-highlight-logo {
+/*
+ * Whole and undistorted, at the height the block was given.
+ *
+ * Written against the block as well as the image, so it outranks the page
+ * builder's `.pb-block img { height: auto }` — which is one class and one
+ * element to this rule's one class, and was quietly winning. The height
+ * setting did nothing and the logo drew at its natural size, which is where
+ * the room above and below it was coming from.
+ */
+.sponsor-highlight .sponsor-highlight-logo {
+  display: block;
   height: var(--highlight-logo-height, 6rem);
   width: auto;
   max-width: 100%;

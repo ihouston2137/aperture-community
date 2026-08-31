@@ -252,15 +252,30 @@ export function StyleSlotButton({
   block,
   update,
   onEditStyle,
+  showTypography = false,
 }: {
   label: string;
   note: string;
+  /**
+   * Whether the popup offers type as well as the box.
+   *
+   * Off by default: most of these dress a container whose contents carry their
+   * own type, and offering a font there is offering a setting that loses. On
+   * for the boxes whose type is inherited by what is inside them.
+   */
+  showTypography?: boolean;
   slugKey:
     | "listStyleSlug"
     | "itemStyleSlug"
     | "logoColumnStyleSlug"
-    | "detailColumnStyleSlug";
-  valuesKey: "listStyle" | "itemStyle" | "logoColumnStyle" | "detailColumnStyle";
+    | "detailColumnStyleSlug"
+    | "containerStyleSlug";
+  valuesKey:
+    | "listStyle"
+    | "itemStyle"
+    | "logoColumnStyle"
+    | "detailColumnStyle"
+    | "containerStyle";
   block: PageBlock;
   update: (patch: Partial<PageBlock>) => void;
   onEditStyle: OpenStyleEditor;
@@ -283,8 +298,7 @@ export function StyleSlotButton({
               valuesKey,
               slug,
               values,
-              // A container holds no text of its own; the item layout does.
-              showTypography: false,
+              showTypography,
             },
             update
           )

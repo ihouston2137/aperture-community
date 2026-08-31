@@ -455,6 +455,7 @@ export function BlockView({
         <SponsorHighlight
           settings={normalizeSponsorHighlight(block.sponsorHighlight)}
           sponsor={sources.featuredSponsors[block.id]}
+          container={styleSlotProps(block, "containerStyle")}
           designTime={!interactive}
         />
       );

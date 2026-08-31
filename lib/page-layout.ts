@@ -535,6 +535,16 @@ export type PageBlock = ResponsiveStyleFields & {
   featuredSponsor?: FeaturedSponsorSettings;
   /** One sponsor down one column, the logo among the fields. */
   sponsorHighlight?: SponsorHighlightSettings;
+  /**
+   * The box around a sponsor highlight.
+   *
+   * Its own slot rather than the block's general style, because this block is
+   * not in `STYLEABLE_BLOCKS` — every item inside it carries a style of its
+   * own, and a block-wide text style over the top of nine of those would be a
+   * tenth thing to reason about.
+   */
+  containerStyleSlug?: string;
+  containerStyle?: StyleValues;
   logoColumnStyleSlug?: string;
   logoColumnStyle?: StyleValues;
   detailColumnStyleSlug?: string;
@@ -1181,6 +1191,9 @@ export function normalizeBlock(
       break;
     case "sponsorHighlight":
       block.sponsorHighlight = normalizeSponsorHighlight(raw.sponsorHighlight);
+      if (raw.containerStyleSlug) block.containerStyleSlug = str(raw.containerStyleSlug);
+      if (raw.containerStyle) block.containerStyle = normalizeStyleValues(raw.containerStyle);
+      normalizeResponsiveStyle(raw, block, "containerStyle");
       break;
     case "featuredSponsor":
       block.featuredSponsor = normalizeFeaturedSponsor(raw.featuredSponsor);

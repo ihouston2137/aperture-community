@@ -20,10 +20,13 @@ import { sponsorFieldNode } from "./featured-sponsor";
 export function SponsorHighlight({
   settings,
   sponsor,
+  container,
   designTime = false,
 }: {
   settings: SponsorHighlightSettings;
   sponsor: FeaturedSponsorView | undefined;
+  /** The box around the lot, resolved by the caller. */
+  container: { className: string; style: CSSProperties | undefined };
   designTime?: boolean;
 }) {
   if (!sponsor) {
@@ -44,9 +47,15 @@ export function SponsorHighlight({
 
   return (
     <div
-      className="sponsor-highlight"
-      // How tall the logo is drawn, where the list holds one.
-      style={{ "--highlight-logo-height": `${settings.logoHeight}rem` } as CSSProperties}
+      className={`sponsor-highlight ${container.className}`.trim()}
+      // How tall the logo is drawn, where the list holds one. Spread after the
+      // container's own style so a stylesheet cannot take the setting away.
+      style={
+        {
+          ...container.style,
+          "--highlight-logo-height": `${settings.logoHeight}rem`,
+        } as CSSProperties
+      }
     >
       {rows.map((row) => {
         // Each field's own look. A field nobody has styled resolves to nothing

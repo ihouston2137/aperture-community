@@ -927,6 +927,29 @@ export function PageBlockInspector({
         ) : null}
       </div>
 
+      {block.type === "sponsorHighlight" ? (
+        <div className="inspector-section">
+          <h4 className="inspector-title">The box around it</h4>
+          <StyleSlotButton
+            label="Container"
+            note="Padding, a background, a border, corners — around the whole block."
+            slugKey="containerStyleSlug"
+            valuesKey="containerStyle"
+            block={block}
+            update={update}
+            onEditStyle={onEditStyle}
+            // Type included: what is set here is inherited by every item that
+            // has not set its own, which is the useful thing about it.
+            showTypography
+          />
+          <p className="help-text">
+            Type set here reaches every item that has not set its own, so a
+            face or a colour for the whole block belongs here rather than on
+            each of them.
+          </p>
+        </div>
+      ) : null}
+
       {block.type === "featuredSponsor" ? (
         <div className="inspector-section">
           <h4 className="inspector-title">The columns</h4>
