@@ -1,6 +1,7 @@
 import type { CSSProperties, ReactNode } from "react";
 
 import { sanitizeLinkUrl } from "@/lib/calendar";
+import { styleSlotProps } from "@/lib/display-templates";
 import type { FeaturedSponsorSettings, SponsorField } from "@/lib/page-layout";
 import type { FeaturedSponsorView } from "@/lib/page-source-types";
 
@@ -49,9 +50,15 @@ export function FeaturedSponsor({
     <div
       className="featured-sponsor"
       data-logo-side={settings.logoSide}
-      // The share the logo takes. Written as a custom property so the column
-      // rule can use it and the stacked layout can ignore it.
-      style={{ "--featured-logo-width": `${settings.logoWidth}%` } as CSSProperties}
+      // The share the logo takes and the space between the columns, written as
+      // custom properties so the column rules can use them and the stacked
+      // layout can ignore the first.
+      style={
+        {
+          "--featured-logo-width": `${settings.logoWidth}%`,
+          "--featured-column-gap": `${settings.columnGap}rem`,
+        } as CSSProperties
+      }
     >
       <div
         className={`featured-sponsor-logo ${logoColumn.className}`.trim()}
@@ -70,11 +77,21 @@ export function FeaturedSponsor({
         className={`featured-sponsor-detail ${detailColumn.className}`.trim()}
         style={detailColumn.style}
       >
-        {rows.map((row) => (
-          <div key={row.field} className="featured-sponsor-field" data-field={row.field}>
-            {row.node}
-          </div>
-        ))}
+        {rows.map((row) => {
+          // Each field's own look, laid over the column's. A field nobody has
+          // styled resolves to nothing and simply wears the column.
+          const own = styleSlotProps(settings.fieldStyles[row.field]);
+          return (
+            <div
+              key={row.field}
+              className={`featured-sponsor-field ${own.className}`.trim()}
+              style={own.style}
+              data-field={row.field}
+            >
+              {row.node}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

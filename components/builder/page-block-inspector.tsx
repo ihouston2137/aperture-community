@@ -11,6 +11,8 @@ import {
   TextField,
 } from "@/components/builder/settings-fields";
 import { ICON_NAMES } from "@/components/icons";
+import { InlineStyleEditor, type SavedStyle } from "@/components/style-editor";
+import type { StyleSlot } from "@/lib/display-templates";
 import type { BuilderSources } from "@/lib/builder-sources";
 import {
   normalizeFeaturedSponsor,
@@ -892,6 +894,8 @@ export function PageBlockInspector({
             settings={normalizeFeaturedSponsor(block.featuredSponsor)}
             sponsors={sources.sponsors}
             levels={sources.recognitionLevels}
+            fonts={sources.fonts}
+            savedStyles={sources.styles}
             onChange={(featuredSponsor) => update({ featuredSponsor })}
           />
         ) : null}
@@ -909,7 +913,7 @@ export function PageBlockInspector({
         <div className="inspector-section">
           <h4 className="inspector-title">The columns</h4>
           <p className="help-text" style={{ marginTop: "-0.35rem" }}>
-            The block\u2019s own style dresses the box around both. These dress
+            The block’s own style dresses the box around both. These dress
             each column inside it.
           </p>
           <StyleSlotButton
@@ -979,7 +983,7 @@ function SponsorScrollFields({
       />
       <span className="help-text">
         The band the logos travel through, and what each one is sized against
-        \u2014 a taller block shows bigger logos rather than more of them. Each
+        — a taller block shows bigger logos rather than more of them. Each
         logo is then as wide as its own artwork at that height.
       </span>
 
@@ -1045,7 +1049,7 @@ function SponsorScrollFields({
               {settings.levelIds.length === 0
                 ? "Every level, since none is named."
                 : "Only sponsors at these levels."}{" "}
-              A level marked anonymous is never included \u2014 a logo names
+              A level marked anonymous is never included — a logo names
               somebody more loudly than a line of type would.
             </span>
           </>
@@ -1068,11 +1072,16 @@ function FeaturedSponsorFields({
   settings,
   sponsors,
   levels,
+  fonts,
+  savedStyles,
   onChange,
 }: {
   settings: FeaturedSponsorSettings;
   sponsors: { _id: string; label: string }[];
   levels: { _id: string; name: string }[];
+  /** For the per-field style editors. */
+  fonts: string[];
+  savedStyles: SavedStyle[];
   onChange: (settings: FeaturedSponsorSettings) => void;
 }) {
   const patch = (next: Partial<FeaturedSponsorSettings>) =>
@@ -1187,6 +1196,16 @@ function FeaturedSponsorFields({
         where two columns of anything are one narrow column of two things.
       </span>
 
+      <RemField
+        label="Space between the columns"
+        value={settings.columnGap}
+        onChange={(value) => patch({ columnGap: Math.max(0, value) })}
+      />
+      <span className="help-text">
+        Zero closes it entirely, which is what a logo on a coloured panel butted
+        against the words needs.
+      </span>
+
       <h4 className="inspector-title">What it says</h4>
       <p className="help-text" style={{ marginTop: "-0.35rem" }}>
         Ticked fields are shown, in this order. A field the sponsor has nothing
@@ -1196,6 +1215,7 @@ function FeaturedSponsorFields({
       <ul className="admin-list featured-field-list">
         {rows.map((field) => {
           const on = settings.fields.includes(field);
+          const slot = settings.fieldStyles[field];
           return (
             <li key={field} className="admin-list-item">
               <label className="checkbox-row">
@@ -1216,12 +1236,48 @@ function FeaturedSponsorFields({
               {on ? (
                 <div className="admin-list-actions">
                   <button type="button" className="btn btn-sm" onClick={() => move(field, -1)}>
-                    \u2191
+                    ↑
                   </button>
                   <button type="button" className="btn btn-sm" onClick={() => move(field, 1)}>
-                    \u2193
+                    ↓
                   </button>
                 </div>
+              ) : null}
+
+              {/* Each field's own look, folded away until it is wanted. Nine
+                  fields with nine open style panels would be a screen of
+                  controls above the field list they belong to. */}
+              {on ? (
+                <details className="inspector-fold is-sub featured-field-style">
+                  <summary>
+                    Style
+                    <span className="help-text">{styleSummary(slot)}</span>
+                  </summary>
+                  <div className="inspector-fold-body">
+                    <InlineStyleEditor
+                      values={slot?.style}
+                      styleSlug={slot?.styleSlug ?? ""}
+                      fonts={fonts}
+                      savedStyles={savedStyles}
+                      onChange={({ values, styleSlug }) =>
+                        patch({
+                          fieldStyles: {
+                            ...settings.fieldStyles,
+                            [field]: {
+                              styleSlug,
+                              style: styleSlug ? {} : values,
+                            },
+                          },
+                        })
+                      }
+                    />
+                    <p className="help-text">
+                      Laid over the details column’s own style, so a field
+                      that says only a colour keeps everything else the column
+                      gave it.
+                    </p>
+                  </div>
+                </details>
               ) : null}
             </li>
           );
@@ -1229,4 +1285,11 @@ function FeaturedSponsorFields({
       </ul>
     </>
   );
+}
+
+
+/** What a style slot is set to, for a fold that has to say something closed. */
+function styleSummary(slot: StyleSlot | undefined): string {
+  if (slot?.styleSlug) return slot.styleSlug;
+  return Object.keys(slot?.style ?? {}).length > 0 ? "set" : "unset";
 }

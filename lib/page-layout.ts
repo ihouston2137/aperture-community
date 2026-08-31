@@ -9,6 +9,10 @@ import {
 import { ASPECT_RATIOS, aspectRatioCss, type AspectRatio } from "./aspect-ratio";
 import { normalizeCalendarDisplay, type CalendarDisplay } from "./calendar";
 import { normalizeEventListSettings, type EventListSettings } from "./event-list";
+import {
+  normalizeStyleSlot,
+  type StyleSlot,
+} from "./display-templates";
 import { isFieldBlock } from "./form-block-types";
 import {
   normalizeVisibility,
@@ -186,6 +190,18 @@ export type FeaturedSponsorSettings = {
   logoWidth: number;
   /** Which side the logo sits on. */
   logoSide: "left" | "right";
+  /** The space between the two columns, in rem. Zero closes it entirely. */
+  columnGap: number;
+  /**
+   * A style per field, keyed by the field.
+   *
+   * Held here rather than as flat keys on the block, because there are nine of
+   * them and eighteen more block keys to carry two styles each would be a lot
+   * of vocabulary for one block. The trade is that these take no per-breakpoint
+   * overrides — the column's style does, and a name that needs to shrink on a
+   * phone is usually the whole column needing to.
+   */
+  fieldStyles: Partial<Record<SponsorField, StyleSlot>>;
 };
 
 export const defaultFeaturedSponsor: FeaturedSponsorSettings = {
@@ -195,6 +211,8 @@ export const defaultFeaturedSponsor: FeaturedSponsorSettings = {
   fields: ["name", "recognitionLevel", "description"],
   logoWidth: 35,
   logoSide: "left",
+  columnGap: 1.5,
+  fieldStyles: {},
 };
 
 export function normalizeFeaturedSponsor(input: unknown): FeaturedSponsorSettings {
@@ -221,7 +239,32 @@ export function normalizeFeaturedSponsor(input: unknown): FeaturedSponsorSetting
     // one-column block that still costs a gap.
     logoWidth: Math.min(75, Math.max(15, num(raw.logoWidth, base.logoWidth))),
     logoSide: raw.logoSide === "right" ? "right" : "left",
+    // Zero is a real answer: a logo on a coloured panel butted against the
+    // words is a look somebody may well want.
+    columnGap: Math.min(8, Math.max(0, num(raw.columnGap, base.columnGap))),
+    fieldStyles: normalizeSponsorFieldStyles(raw.fieldStyles),
   };
+}
+
+/** Only the fields that exist, each read as a style slot. */
+function normalizeSponsorFieldStyles(
+  input: unknown
+): Partial<Record<SponsorField, StyleSlot>> {
+  const raw = (input ?? {}) as Record<string, unknown>;
+  const out: Partial<Record<SponsorField, StyleSlot>> = {};
+
+  for (const field of SPONSOR_FIELDS) {
+    const slot = raw[field];
+    if (!slot || typeof slot !== "object") continue;
+
+    const normalized = normalizeStyleSlot(slot);
+    // An untouched slot is left out rather than stored empty, so a block that
+    // has never been styled carries nothing to read.
+    if (!normalized.styleSlug && Object.keys(normalized.style).length === 0) continue;
+    out[field] = normalized;
+  }
+
+  return out;
 }
 
 /** How a sponsor scroll is set up. */

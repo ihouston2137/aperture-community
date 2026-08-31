@@ -10837,7 +10837,9 @@ html:has(.admin-shell) body::-webkit-scrollbar {
   display: flex;
   flex-wrap: wrap;
   align-items: stretch;
-  gap: 1.5rem;
+  /* Set from the block rather than fixed here. Zero closes it entirely, which
+     is what a logo on a coloured panel butted against the words needs. */
+  gap: var(--featured-column-gap, 1.5rem);
   width: 100%;
 }
 
@@ -10891,6 +10893,8 @@ html:has(.admin-shell) body::-webkit-scrollbar {
   box-sizing: border-box;
 }
 
+/* Each field carries its own style, so it needs its own box to wear it on —
+   padding, a background or a border set on one lands here. */
 .featured-sponsor-field {
   min-width: 0;
   overflow-wrap: anywhere;
@@ -10950,4 +10954,11 @@ html:has(.admin-shell) body::-webkit-scrollbar {
 .featured-field-list .checkbox-row {
   flex: 1;
   margin: 0;
+}
+
+/* A field's own style, folded inside its row. Full width so the fold sits
+   under the tick and the arrows rather than beside them. */
+.featured-field-style {
+  flex-basis: 100%;
+  margin: 0.35rem 0 0;
 }

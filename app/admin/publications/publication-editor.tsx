@@ -2518,7 +2518,7 @@ function SponsorScrollFields({
       <span className="help-text">
         How long one logo takes to cross the block. Set per logo, so adding a
         sponsor makes the run longer rather than making everything faster. The
-        block\u2019s own height sizes the logos.
+        block’s own height sizes the logos.
       </span>
 
       <SelectField
