@@ -2321,8 +2321,17 @@ input, select, textarea {
   opacity: 0.75;
 }
 
+/*
+ * The event's link, undecorated.
+ *
+ * `none` rather than nothing at all: the browser's own sheet underlines an
+ * anchor, so leaving this out would not leave the decision open — it would
+ * just move it somewhere a Calendar Style cannot reach. Set here at a single
+ * class, so the slot's own style wins whether it arrives inline or as a named
+ * style's class, and "Underline" in that panel turns it back on.
+ */
 .cal-slot-link {
-  text-decoration: underline;
+  text-decoration: none;
 }
 
 /* A templated event fills the day cell; the template owns everything inside. */
