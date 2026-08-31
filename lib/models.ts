@@ -1710,6 +1710,15 @@ const CalendarSettingsSchema = new Schema<any>(
     /** The Calendar Style a block wears when it names none. */
     defaultStyleId: { type: String, default: "" },
     /**
+     * The Calendar Style the admin screen wears.
+     *
+     * Its own setting rather than the site default: the management screen is
+     * read to work on the events, not to admire them, and a style built for a
+     * dark public page can make a working grid hard to read. Empty keeps the
+     * plain admin look it has always had.
+     */
+    adminStyleId: { type: String, default: "" },
+    /**
      * The site's own calendar page at `/calendar` — whether it exists, what it
      * says, and how it displays. Mixed and normalized on read, the same way a
      * page block stores its display.

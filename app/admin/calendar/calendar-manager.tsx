@@ -6,7 +6,15 @@ import { useState } from "react";
 
 import { AdminHeader } from "@/components/admin-ui";
 import { CalendarGrid } from "@/components/calendar-grid";
-import { CALENDAR_SIZES, type EventBoxVariant } from "@/lib/calendar-style";
+import {
+  CALENDAR_SIZES,
+  calendarStyleClass,
+  calendarStyleCss,
+  type CalendarStyleRecord,
+  type EventBoxVariant,
+} from "@/lib/calendar-style";
+import { layoutResponsiveCss } from "@/lib/responsive-style";
+import type { PageRow } from "@/lib/page-layout";
 import { emptyPageSources } from "@/lib/page-source-types";
 import {
   monthKeyFromDateKey,
@@ -28,7 +36,7 @@ import { CalendarSettingsPanel } from "./calendar-settings";
 import { EventDialog } from "./event-dialog";
 import { RepeatDialog } from "./repeat-dialog";
 
-/** The admin grid is one arrangement at every size — no style applies here. */
+/** The plain look: one arrangement at every size, and nothing dressing it. */
 const ADMIN_EVENT_BOX = Object.fromEntries(
   CALENDAR_SIZES.map((size) => [size, { layoutId: "", style: {} }])
 ) as Record<(typeof CALENDAR_SIZES)[number], EventBoxVariant>;
@@ -57,6 +65,8 @@ export function CalendarManager({
   tagUsage,
   pageSettings,
   styles,
+  adminStyle,
+  adminLayouts,
   defaultStyleId,
 }: {
   view: CalendarView;
@@ -74,10 +84,18 @@ export function CalendarManager({
   pageSettings: CalendarPageSettings;
   /** Saved Calendar Styles, for the page's style picker. */
   styles: { _id: string; name: string }[];
+  /** The style this screen wears. An empty one is the plain admin look. */
+  adminStyle: CalendarStyleRecord;
+  /** Layouts that style reaches for, keyed by id. */
+  adminLayouts: Record<string, PageRow[]>;
   defaultStyleId: string;
 }) {
   const router = useRouter();
   const [dialog, setDialog] = useState<DialogState>(null);
+
+  // A style with no slug is the empty stand-in the page builds when none is
+  // chosen — there is nothing to emit and nothing to wear.
+  const styled = Boolean(adminStyle.slug);
 
   const monthKey = monthKeyFromDateKey(anchorDate);
 
@@ -174,19 +192,42 @@ export function CalendarManager({
         </div>
       </div>
 
-      <CalendarGrid
-        view={view}
-        anchorDate={anchorDate}
-        events={events}
-        todayKey={todayKey}
-        // The admin always uses the built-in arrangement at one size — it is a
-        // management screen, not a page, so a Calendar Style never applies here.
-        eventBox={ADMIN_EVENT_BOX}
-        layouts={{}}
-        sources={emptyPageSources}
-        onSelectEvent={(event) => setDialog({ mode: "edit", event })}
-        onAddDay={(date) => setDialog({ mode: "create", date })}
-      />
+      {/*
+        * The chosen style's own sheet.
+        *
+        * The admin is not a page-builder page, so nothing else emits these
+        * rules here — without them the class below would match nothing and
+        * choosing a style would appear to do nothing at all. The same trick
+        * the public calendar page uses for the same reason.
+        */}
+      {styled ? (
+        <style
+          dangerouslySetInnerHTML={{
+            __html: [
+              calendarStyleCss(adminStyle),
+              ...Object.values(adminLayouts).map(layoutResponsiveCss),
+            ]
+              .filter(Boolean)
+              .join("\n"),
+          }}
+        />
+      ) : null}
+
+      <div className={styled ? `pb-calendar ${calendarStyleClass(adminStyle.slug)}` : undefined}>
+        <CalendarGrid
+          view={view}
+          anchorDate={anchorDate}
+          events={events}
+          todayKey={todayKey}
+          // Unstyled by default: this is a management screen, and the plain
+          // grid is the one that reads fastest when the job is fixing a date.
+          eventBox={styled ? adminStyle.eventBox[view] : ADMIN_EVENT_BOX}
+          layouts={styled ? adminLayouts : {}}
+          sources={emptyPageSources}
+          onSelectEvent={(event) => setDialog({ mode: "edit", event })}
+          onAddDay={(date) => setDialog({ mode: "create", date })}
+        />
+      </div>
 
       <p className="help-text calendar-legend">
         <span className="calendar-swatch is-published" /> Published
@@ -205,6 +246,7 @@ export function CalendarManager({
         categoryUsage={categoryUsage}
         whoUsage={whoUsage}
         tagUsage={tagUsage}
+        styles={styles}
       />
 
       <CalendarPageSettingsPanel

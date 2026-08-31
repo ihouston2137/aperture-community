@@ -66,6 +66,15 @@ export type CalendarSettingsValues = {
   categories: string[];
   who: string[];
   tags: string[];
+  /**
+   * The Calendar Style the admin screen wears.
+   *
+   * Its own setting rather than the site default: the management screen is
+   * read to work on the events, not to admire them, and a style built for a
+   * dark public page can make a working grid hard to read. Empty keeps the
+   * plain admin look it has always had.
+   */
+  adminStyleId: string;
 };
 
 export const defaultCalendarSettings: CalendarSettingsValues = {
@@ -73,6 +82,7 @@ export const defaultCalendarSettings: CalendarSettingsValues = {
   categories: [],
   who: [],
   tags: [],
+  adminStyleId: "",
 };
 
 /* ------------------------------------------------------------- Display */
@@ -224,6 +234,14 @@ export type CalendarPageSettings = {
   title: string;
   /** A line under the title. Plain text; empty shows nothing. */
   intro: string;
+  /**
+   * What the page sits on. Empty follows the site's content background.
+   *
+   * The page's own rather than the calendar's: a Calendar Style dresses the
+   * grid, its boxes and its detail panel, and the paper behind all of that is
+   * a decision about this page — which is why it is here and not in the style.
+   */
+  backgroundColor: string;
   display: CalendarDisplay;
 };
 
@@ -231,6 +249,7 @@ export const defaultCalendarPageSettings: CalendarPageSettings = {
   enabled: false,
   title: "Calendar",
   intro: "",
+  backgroundColor: "",
   display: defaultCalendarDisplay,
 };
 
@@ -244,6 +263,9 @@ export function normalizeCalendarPageSettings(raw: unknown): CalendarPageSetting
     // default stands in rather than the page rendering headless.
     title: str(source.title).slice(0, 120) || base.title,
     intro: str(source.intro).slice(0, 500),
+    // Pages saved before this carry nothing, which means "the site's own" —
+    // exactly what they have always shown.
+    backgroundColor: str(source.backgroundColor).slice(0, 40),
     display: normalizeCalendarDisplay(source.display),
   };
 }

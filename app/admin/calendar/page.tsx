@@ -16,8 +16,21 @@ import {
   type CalendarEventRecord,
   type CalendarSettingsValues,
 } from "@/lib/calendar";
+import {
+  calendarStyleLayoutIds,
+  emptyCalendarStyle,
+  normalizeCalendarStyle,
+  type CalendarStyleRecord,
+} from "@/lib/calendar-style";
+import { normalizeCalendarTemplateLayout } from "@/lib/calendar-slot-layout";
 import { connectDB } from "@/lib/db";
-import { CalendarEvent, CalendarSettings, CalendarStyle } from "@/lib/models";
+import type { PageRow } from "@/lib/page-layout";
+import {
+  CalendarEvent,
+  CalendarSettings,
+  CalendarStyle,
+  CalendarTemplate,
+} from "@/lib/models";
 
 import { CalendarManager } from "./calendar-manager";
 
@@ -37,7 +50,35 @@ export default async function CalendarPage({
     categories: normalizeVocabulary(settingsDoc?.categories),
     who: normalizeVocabulary(settingsDoc?.who),
     tags: normalizeVocabulary(settingsDoc?.tags),
+    adminStyleId: String(settingsDoc?.adminStyleId ?? ""),
   };
+
+  /*
+   * The style the admin grid wears, and the layouts it reaches for.
+   *
+   * Loaded the same way the public page loads its own — an empty style when
+   * none is chosen, which generates nothing and leaves the plain admin look.
+   */
+  const adminStyleDoc = settings.adminStyleId
+    ? await CalendarStyle.findById(settings.adminStyleId).lean<any>()
+    : null;
+
+  const adminStyle: CalendarStyleRecord = adminStyleDoc
+    ? {
+        ...normalizeCalendarStyle(adminStyleDoc),
+        _id: String(adminStyleDoc._id),
+        slug: adminStyleDoc.slug ?? "",
+      }
+    : { ...emptyCalendarStyle(), _id: "", slug: "" };
+
+  const adminLayouts: Record<string, PageRow[]> = {};
+  const adminLayoutIds = calendarStyleLayoutIds(adminStyle);
+  if (adminLayoutIds.length > 0) {
+    const docs = await CalendarTemplate.find({ _id: { $in: adminLayoutIds } }).lean<any[]>();
+    for (const doc of docs) {
+      adminLayouts[String(doc._id)] = normalizeCalendarTemplateLayout(doc.layout);
+    }
+  }
 
   const timeZone = resolveTimeZone(settings.timeZone);
   const todayKey = todayDateKey(settings.timeZone);
@@ -122,6 +163,8 @@ export default async function CalendarPage({
       pageSettings={pageSettings}
       styles={styles}
       defaultStyleId={String(settingsDoc?.defaultStyleId ?? "")}
+      adminStyle={adminStyle}
+      adminLayouts={adminLayouts}
     />
   );
 }

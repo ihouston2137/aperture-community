@@ -70,7 +70,15 @@ export default async function CalendarPage() {
   }
 
   return (
-    <SiteChrome>
+    <SiteChrome
+      // Redeclared for this page only, so the calendar's own paper reaches the
+      // chrome around it rather than stopping at the content box.
+      contentStyle={
+        view.settings.backgroundColor
+          ? { background: view.settings.backgroundColor }
+          : undefined
+      }
+    >
       <div className="page-shell calendar-page">
         {/*
          * The style's own sheet.

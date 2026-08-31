@@ -218,6 +218,8 @@ export async function saveCalendarSettingsAction(
     categories: normalizeVocabulary(formData.getAll("categories")),
     who: normalizeVocabulary(formData.getAll("who")),
     tags: normalizeVocabulary(formData.getAll("tags")),
+    // The look this screen wears. Empty is the plain admin grid.
+    adminStyleId: String(formData.get("adminStyleId") ?? "").trim(),
   };
 
   if (payload.timeZone && resolveTimeZone(payload.timeZone) !== payload.timeZone) {
@@ -257,6 +259,7 @@ export async function saveCalendarPageAction(
     enabled: formData.get("enabled") === "on",
     title: String(formData.get("title") ?? ""),
     intro: String(formData.get("intro") ?? ""),
+    backgroundColor: String(formData.get("backgroundColor") ?? ""),
     display,
   });
 

@@ -24,8 +24,11 @@ export function CalendarSettingsPanel({
   categoryUsage,
   whoUsage,
   tagUsage,
+  styles,
 }: {
   settings: CalendarSettingsValues;
+  /** Saved Calendar Styles, for the look this screen wears. */
+  styles: { _id: string; name: string }[];
   /** The zone the calendar is currently reading today in. */
   resolvedTimeZone: string;
   /** What an empty `timeZone` falls back to — the server's own zone. */
@@ -39,6 +42,7 @@ export function CalendarSettingsPanel({
   const [categories, setCategories] = useState(settings.categories);
   const [who, setWho] = useState(settings.who);
   const [tags, setTags] = useState(settings.tags);
+  const [adminStyleId, setAdminStyleId] = useState(settings.adminStyleId);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
@@ -49,6 +53,7 @@ export function CalendarSettingsPanel({
     startTransition(async () => {
       const formData = new FormData();
       formData.set("timeZone", timeZone);
+      formData.set("adminStyleId", adminStyleId);
       for (const category of categories) formData.append("categories", category);
       for (const group of who) formData.append("who", group);
       for (const tag of tags) formData.append("tags", tag);
@@ -82,6 +87,28 @@ export function CalendarSettingsPanel({
           Event times are stored as written, so changing this never shifts an existing
           event. It sets which zone the calendar treats as &ldquo;now&rdquo; when
           highlighting today — currently {timeZoneLabel(resolvedTimeZone)}.
+        </span>
+      </div>
+
+      <div className="field" style={{ maxWidth: "28rem" }}>
+        <label htmlFor="calendar-admin-style">This screen&rsquo;s look</label>
+        <select
+          id="calendar-admin-style"
+          value={adminStyleId}
+          onChange={(event) => setAdminStyleId(event.target.value)}
+        >
+          <option value="">Plain admin grid</option>
+          {styles.map((style) => (
+            <option key={style._id} value={style._id}>
+              {style.name}
+            </option>
+          ))}
+        </select>
+        <span className="help-text">
+          Dresses the calendar on this page in one of the saved Calendar
+          Styles, so a look can be judged against real events while it is being
+          built. It changes nothing a visitor sees — the public calendar and
+          each calendar block still name their own.
         </span>
       </div>
 

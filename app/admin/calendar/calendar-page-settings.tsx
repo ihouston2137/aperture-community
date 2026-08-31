@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 
 import { Panel } from "@/components/admin-ui";
+import { ColorPicker } from "@/components/color-field";
 import { CalendarDisplayFields } from "@/components/builder/calendar-block-inspector";
 import {
   defaultCalendarPageSettings,
@@ -39,6 +40,7 @@ export function CalendarPageSettingsPanel({
   const [enabled, setEnabled] = useState(settings.enabled);
   const [title, setTitle] = useState(settings.title);
   const [intro, setIntro] = useState(settings.intro);
+  const [background, setBackground] = useState(settings.backgroundColor);
   const [display, setDisplay] = useState<CalendarDisplay>(settings.display);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
@@ -52,6 +54,7 @@ export function CalendarPageSettingsPanel({
       formData.set("enabled", enabled ? "on" : "");
       formData.set("title", title);
       formData.set("intro", intro);
+      formData.set("backgroundColor", background);
       formData.set("display", JSON.stringify(display));
 
       const result = await saveCalendarPageAction(formData);
@@ -104,6 +107,18 @@ export function CalendarPageSettingsPanel({
               />
             </div>
           </div>
+
+          <ColorPicker
+            label="Page background"
+            value={background}
+            onChange={setBackground}
+            onClear={() => setBackground("")}
+          />
+          <p className="help-text" style={{ marginTop: "-0.35rem" }}>
+            What the whole page sits on. Cleared, it follows the site&rsquo;s
+            content background. A Calendar Style dresses the grid itself; this
+            is the paper behind it.
+          </p>
 
           <CalendarDisplayFields
             display={display}
