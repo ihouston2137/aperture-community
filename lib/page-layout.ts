@@ -193,6 +193,15 @@ export type FeaturedSponsorSettings = {
   /** The space between the two columns, in rem. Zero closes it entirely. */
   columnGap: number;
   /**
+   * What the website link says.
+   *
+   * Empty prints the address itself, without its scheme. A phrase reads better
+   * in running text — "Visit Ferndale Cameras" beside a paragraph about them,
+   * rather than a bare domain — but the address is the honest default: it says
+   * where the link goes before anybody clicks it.
+   */
+  websiteText: string;
+  /**
    * A style per field, keyed by the field.
    *
    * Held here rather than as flat keys on the block, because there are nine of
@@ -212,6 +221,7 @@ export const defaultFeaturedSponsor: FeaturedSponsorSettings = {
   logoWidth: 35,
   logoSide: "left",
   columnGap: 1.5,
+  websiteText: "",
   fieldStyles: {},
 };
 
@@ -242,6 +252,7 @@ export function normalizeFeaturedSponsor(input: unknown): FeaturedSponsorSetting
     // Zero is a real answer: a logo on a coloured panel butted against the
     // words is a look somebody may well want.
     columnGap: Math.min(8, Math.max(0, num(raw.columnGap, base.columnGap))),
+    websiteText: str(raw.websiteText).slice(0, 120),
     fieldStyles: normalizeSponsorFieldStyles(raw.fieldStyles),
   };
 }

@@ -43,7 +43,7 @@ export function FeaturedSponsor({
   }
 
   const rows = settings.fields
-    .map((field) => ({ field, node: fieldNode(field, sponsor) }))
+    .map((field) => ({ field, node: fieldNode(field, sponsor, settings) }))
     .filter((row) => row.node !== null);
 
   return (
@@ -107,7 +107,11 @@ export function FeaturedSponsor({
  * Returns `null` for a field the sponsor has nothing in, so an empty phone
  * number does not leave a blank row somebody has to explain.
  */
-function fieldNode(field: SponsorField, sponsor: FeaturedSponsorView): ReactNode {
+function fieldNode(
+  field: SponsorField,
+  sponsor: FeaturedSponsorView,
+  settings: FeaturedSponsorSettings
+): ReactNode {
   switch (field) {
     case "name":
       return sponsor.name ? (
@@ -128,11 +132,19 @@ function fieldNode(field: SponsorField, sponsor: FeaturedSponsorView): ReactNode
     case "website": {
       const href = sanitizeLinkUrl(sponsor.website);
       if (!href) return null;
+
+      /*
+       * Whatever the block was told to say, else the address itself without
+       * its scheme — nobody reads "https://" and it takes up the width of a
+       * word that would have meant something.
+       */
+      const text =
+        settings.websiteText.trim() ||
+        sponsor.website.replace(/^https?:\/\//i, "").replace(/\/$/, "");
+
       return (
         <a href={href} target="_blank" rel="noreferrer noopener">
-          {/* The address without its scheme: nobody reads "https://" and it
-              takes up the width of a word that means something. */}
-          {sponsor.website.replace(/^https?:\/\//i, "").replace(/\/$/, "")}
+          {text}
         </a>
       );
     }

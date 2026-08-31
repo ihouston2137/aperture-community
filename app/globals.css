@@ -10984,3 +10984,14 @@ html:has(.admin-shell) body::-webkit-scrollbar {
   flex-basis: 100%;
   margin: 0.35rem 0 0;
 }
+
+/* A setting that belongs to one field — the website's link text — set under
+   its row for the same reason. */
+.featured-field-extra {
+  flex-basis: 100%;
+  margin: 0.35rem 0 0;
+}
+
+.featured-field-extra .field {
+  margin-bottom: 0.25rem;
+}

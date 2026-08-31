@@ -1244,6 +1244,24 @@ function FeaturedSponsorFields({
                 </div>
               ) : null}
 
+              {/* What the link says, where the field is one. Beside the
+                  style rather than up with the layout settings: it is a thing
+                  about this field, and a field's settings belong with it. */}
+              {on && field === "website" ? (
+                <div className="featured-field-extra">
+                  <TextField
+                    label="Link text"
+                    value={settings.websiteText}
+                    onChange={(websiteText) => patch({ websiteText })}
+                  />
+                  <span className="help-text">
+                    Left blank, the link says the address itself without its
+                    scheme — which tells a reader where it goes before they
+                    follow it.
+                  </span>
+                </div>
+              ) : null}
+
               {/* Each field's own look, folded away until it is wanted. Nine
                   fields with nine open style panels would be a screen of
                   controls above the field list they belong to. */}
