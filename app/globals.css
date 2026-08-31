@@ -1777,6 +1777,32 @@ input, select, textarea {
   color: var(--cal-text);
 }
 
+/*
+ * The admin's add button, kept out of the style's hands.
+ *
+ * Everywhere else this control borrows the calendar's own `--cal-muted` and
+ * hides until the day is hovered, which is right for a page: it is the
+ * calendar somebody came to read, not a form. On the management screen it is
+ * the way events get made, and a chosen Calendar Style can paint `--cal-muted`
+ * into its own background and leave the control invisible — so here it is
+ * always shown, in a grey that owes nothing to the palette around it.
+ *
+ * Mid grey on purpose: it reads against a light background and a dark one
+ * alike, which is the point of not asking the style what colour to be.
+ */
+.calendar-admin-grid .calendar-add {
+  opacity: 1;
+  color: #808080;
+  border-color: rgba(128, 128, 128, 0.35);
+}
+
+.calendar-admin-grid .calendar-add:hover,
+.calendar-admin-grid .calendar-add:focus-visible {
+  color: #b0b0b0;
+  border-color: rgba(128, 128, 128, 0.8);
+  background: rgba(128, 128, 128, 0.15);
+}
+
 .calendar-day-events {
   display: flex;
   flex-direction: column;

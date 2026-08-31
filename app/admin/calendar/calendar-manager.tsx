@@ -213,7 +213,14 @@ export function CalendarManager({
         />
       ) : null}
 
-      <div className={styled ? `pb-calendar ${calendarStyleClass(adminStyle.slug)}` : undefined}>
+      {/* `calendar-admin-grid` marks this as the management screen, so the
+          controls that belong to editing rather than to the calendar can stand
+          apart from whatever a chosen style does to the colours. */}
+      <div
+        className={`calendar-admin-grid${
+          styled ? ` pb-calendar ${calendarStyleClass(adminStyle.slug)}` : ""
+        }`}
+      >
         <CalendarGrid
           view={view}
           anchorDate={anchorDate}
