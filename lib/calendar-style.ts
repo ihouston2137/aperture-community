@@ -77,6 +77,7 @@ export const CALENDAR_PARTS = [
   "weekDate",
   "listDayBox",
   "listDate",
+  "listPageText",
   "today",
   "todayLabel",
 ] as const;
@@ -97,6 +98,7 @@ export const CALENDAR_PART_LABELS: Record<CalendarPart, string> = {
   weekDate: "Date text, week view",
   listDayBox: "List day groups",
   listDate: "Date text, list view",
+  listPageText: "Pagination text",
   today: "Today box",
   todayLabel: "Today highlight",
 };
@@ -104,7 +106,8 @@ export const CALENDAR_PART_LABELS: Record<CalendarPart, string> = {
 /** A one-line note per part, so the list needs no separate legend. */
 export const CALENDAR_PART_NOTES: Record<CalendarPart, string> = {
   container: "The box around the whole calendar.",
-  navButton: "Previous, next, today, and the month/week switch.",
+  navButton:
+    "Previous, next, today, the month/week switch, and the list's page buttons.",
   dateTitle: "The month or week name above the grid.",
   grid: "The grid itself, inside the container.",
   weekdayHeader: "Sun–Sat column headings. Month view only.",
@@ -117,6 +120,7 @@ export const CALENDAR_PART_NOTES: Record<CalendarPart, string> = {
   weekDate: "The date heading above each day. Week view only.",
   listDayBox: "A date and the events under it. List view only.",
   listDate: "The date heading above each group. List view only.",
+  listPageText: "“Page 1 of 3 · 40 events”, between the page buttons.",
   today: "Overrides whichever day box today falls in.",
   todayLabel:
     "The date itself on today — the number in month view, the heading in the week and list views.",
@@ -137,6 +141,7 @@ export const CALENDAR_PART_VIEWS: Record<CalendarPart, CalendarStyleView[]> = {
   weekDate: ["week"],
   listDayBox: ["list"],
   listDate: ["list"],
+  listPageText: ["list"],
   today: ["month", "week", "list"],
   todayLabel: ["month", "week", "list"],
 };
@@ -291,7 +296,15 @@ export function calendarStyleClass(slug: string): string {
 const PART_SELECTORS: Record<CalendarPart, string[]> = {
   // An empty selector means the root itself.
   container: [""],
-  navButton: [".calendar-toolbar .btn"],
+  /*
+   * The toolbar's buttons, and the list's page buttons.
+   *
+   * Both are the calendar's way of moving between what it is showing, so one
+   * setting dresses them — the pagination was left out only because it sits
+   * under the grid rather than above it, which is not a difference anybody
+   * styling a calendar is thinking about.
+   */
+  navButton: [".calendar-toolbar .btn", ".calendar-list-pages .btn"],
   dateTitle: [".calendar-month-label"],
   grid: [".calendar-grid"],
   weekdayHeader: [".calendar-weekday"],
@@ -307,6 +320,7 @@ const PART_SELECTORS: Record<CalendarPart, string[]> = {
   weekDate: [".calendar-grid.is-week .calendar-day .calendar-day-heading"],
   listDayBox: [".calendar-grid.is-list .calendar-day"],
   listDate: [".calendar-grid.is-list .calendar-day .calendar-day-heading"],
+  listPageText: [".calendar-list-count"],
   today: [".calendar-day.is-today"],
   // Month shows a number, week a heading; one part dresses whichever is there.
   // The view class is carried so these outrank the built-in highlight rules on
