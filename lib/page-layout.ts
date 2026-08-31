@@ -1215,6 +1215,11 @@ export function blockFillsWidth(block: WidthAwareBlock): boolean {
     case "eventList":
     case "form":
     case "menu":
+    // A register is a sheet: it holds a search box, a filter and a wrapping
+    // field of names, none of which has a natural width to shrink to. Left
+    // out, its own `width: 100%` resolved against a shrink-wrapped box and it
+    // came out as narrow as its longest name.
+    case "calAttendance":
       return true;
     default:
       return false;

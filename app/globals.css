@@ -10055,6 +10055,12 @@ html:has(.admin-shell) body::-webkit-scrollbar {
   gap: 0.35rem;
 }
 
+/* Going and not going are already two headings apart; broken into levels they
+   are two headings and several keylines apart, and need the room to say so. */
+.cal-rsvp-group:has(.cal-rsvp-levels) {
+  flex: 1 1 18rem;
+}
+
 .cal-rsvp-heading {
   display: inline-flex;
   align-items: center;
@@ -10085,23 +10091,64 @@ html:has(.admin-shell) body::-webkit-scrollbar {
   font-size: 0.9em;
 }
 
-/* One list broken into its levels. Columns, like the register, because a
-   list read to see who is coming is read group by group. */
+/*
+ * One list broken into its levels.
+ *
+ * Columns, like the register, because a list read to see who is coming is read
+ * group by group — and each group has to be visibly a group. Without a
+ * boundary the levels ran together into one column of names with the odd bold
+ * word in it, which is a list of everybody, not a list per level.
+ */
 .cal-rsvp-levels {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(11rem, 100%), 1fr));
-  gap: 0.75rem;
+  gap: 0.9rem 1.5rem;
   align-items: start;
+  margin-top: 0.15rem;
 }
 
+/*
+ * A keyline down the side of each group.
+ *
+ * Down rather than across: these wrap into however many columns fit, so a rule
+ * under a heading would separate a group from its own names on one line and
+ * from nothing at all on the next. A left edge holds whichever way they land.
+ */
+.cal-rsvp-level {
+  display: flex;
+  flex-direction: column;
+  padding-left: 0.6rem;
+  border-left: 2px solid color-mix(in srgb, currentColor 20%, transparent);
+}
+
+/*
+ * The level's name, read as a heading rather than as a louder member.
+ *
+ * Small and lettered out, which reads as a label at a glance; it was set
+ * smaller *and* fainter than the names under it before, so the eye took the
+ * names for the more important thing and the grouping disappeared.
+ */
 .cal-rsvp-level-heading {
   display: flex;
   align-items: baseline;
   gap: 0.35rem;
-  font-weight: 600;
-  font-size: 0.85em;
-  opacity: 0.8;
-  margin-bottom: 0.2rem;
+  font-weight: 700;
+  font-size: 0.72em;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  padding-bottom: 0.25rem;
+  margin-bottom: 0.35rem;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 16%, transparent);
+}
+
+/* The outer "Going 12" keeps its pill; repeating one at every level turns a
+   quiet list into a row of badges. Here the number is just a number. */
+.cal-rsvp-level-heading .cal-rsvp-count {
+  min-width: 0;
+  padding: 0;
+  background: none;
+  opacity: 0.6;
+  letter-spacing: 0;
 }
 
 .cal-rsvp-empty {
@@ -10169,25 +10216,39 @@ html:has(.admin-shell) body::-webkit-scrollbar {
 
 /* Scrolls inside itself: a register of a whole membership must not stretch the
    lightbox past the height of the screen. */
-/* No scroller. A register is read from top to bottom to see who is missing,
-   and a name inside a box that scrolls is a name somebody has to go looking
-   for — the page gets longer instead, which is what a page is for. */
+/*
+ * The names, laid along the line and wrapped.
+ *
+ * A register is scanned for who is missing rather than read down like prose,
+ * and a chip is as wide as a name — a column of them wastes most of the width
+ * on nothing while making the sheet several screens tall. Wrapped, a level of
+ * twenty fits in a few lines.
+ *
+ * Still no scroller: the page gets longer, which is what a page is for.
+ */
 .cal-attendance-list {
   list-style: none;
   margin: 0;
   padding: 0;
   display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
+  flex-wrap: wrap;
+  gap: 0.3rem;
 }
 
 /* The named levels side by side, wrapping when there is no room. `auto-fit`
    with a minimum means two columns become one on a phone without a breakpoint
    having to guess where that happens. */
+/*
+ * The named levels side by side, wrapping when there is no room.
+ *
+ * Wider tracks than a column of names would need, because each holds a
+ * wrapping row of chips now — at thirteen rem a level fitted one name a line,
+ * which is the column layout the chips were meant to get away from.
+ */
 .cal-attendance-columns {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(13rem, 100%), 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(20rem, 100%), 1fr));
+  gap: 1rem 1.5rem;
   align-items: start;
 }
 
@@ -10218,10 +10279,12 @@ html:has(.admin-shell) body::-webkit-scrollbar {
  * template nobody has styled must not be a sheet nobody can read.
  */
 .cal-attendance-chip {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  width: 100%;
+  /* As wide as the name in it, and no wider — but never wider than the space
+     it has, so a long name wraps the row instead of pushing it sideways. */
+  max-width: 100%;
   text-align: left;
   padding: 0.3rem 0.5rem;
   border-radius: 999px;
