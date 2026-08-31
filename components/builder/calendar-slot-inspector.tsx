@@ -22,10 +22,13 @@ export function CalendarSlotInspector({
   block,
   update,
   onEditStyle,
+  levels = [],
 }: {
   block: CalendarSlotBlock;
   update: (patch: Partial<PageBlock>) => void;
   onEditStyle: OpenStyleEditor;
+  /** The site's membership levels, for the slots that break lists out by them. */
+  levels?: { _id: string; name: string }[];
 }) {
   const type = block.type as CalendarSlotBlockType;
 
@@ -145,6 +148,17 @@ export function CalendarSlotInspector({
               value={block.yesHeading ?? "Going"}
               onChange={(value) => update({ yesHeading: value } as Partial<PageBlock>)}
             />
+            <CheckField
+              label="Group by membership level"
+              value={block.groupByLevels ?? false}
+              onChange={(value) =>
+                update({ groupByLevels: value } as Partial<PageBlock>)
+              }
+            />
+            {block.groupByLevels ? (
+              <LevelPicker block={block} update={update} levels={levels} />
+            ) : null}
+
             <TextField
               label="Not going heading"
               value={block.noHeading ?? "Not going"}
@@ -173,6 +187,13 @@ export function CalendarSlotInspector({
             <span className="help-text">
               A starting filter, not a limit — the whole membership is one click
               away, and anyone already ticked stays listed either way.
+            </span>
+
+            <LevelPicker block={block} update={update} levels={levels} />
+            <span className="help-text">
+              Each named level becomes a column. They sit side by side where
+              there is room and wrap on a narrow screen. With none named the
+              sheet is one list, as it was.
             </span>
             <p className="help-text">
               Only appears on events taking attendance, and only for people whose
@@ -227,6 +248,35 @@ export function CalendarSlotInspector({
         </p>
       </div>
 
+      {type === "calAttendance" ? (
+        <div className="inspector-section">
+          <h4 className="inspector-title">Present and absent</h4>
+          <p className="help-text" style={{ marginTop: "-0.35rem" }}>
+            Each name is a chip that switches between these two looks. A state
+            you leave alone is drawn plain — which is fine for absent, and
+            rarely what is wanted for present. Click a chip on the canvas to
+            step through both.
+          </p>
+
+          <StateStyleButton
+            label="Present"
+            slugKey="presentStyleSlug"
+            valuesKey="presentStyle"
+            block={block}
+            update={update}
+            onEditStyle={onEditStyle}
+          />
+          <StateStyleButton
+            label="Absent"
+            slugKey="absentStyleSlug"
+            valuesKey="absentStyle"
+            block={block}
+            update={update}
+            onEditStyle={onEditStyle}
+          />
+        </div>
+      ) : null}
+
       {type === "calRsvpButton" ? (
         <div className="inspector-section">
           <h4 className="inspector-title">Answered states</h4>
@@ -274,8 +324,12 @@ function StateStyleButton({
   onEditStyle,
 }: {
   label: string;
-  slugKey: "goingStyleSlug" | "notGoingStyleSlug";
-  valuesKey: "goingStyle" | "notGoingStyle";
+  slugKey:
+    | "goingStyleSlug"
+    | "notGoingStyleSlug"
+    | "presentStyleSlug"
+    | "absentStyleSlug";
+  valuesKey: "goingStyle" | "notGoingStyle" | "presentStyle" | "absentStyle";
   block: CalendarSlotBlock;
   update: (patch: Partial<PageBlock>) => void;
   onEditStyle: OpenStyleEditor;
@@ -344,5 +398,70 @@ function StateStyleButton({
             : "Looks the same as the resting button."}
       </span>
     </div>
+  );
+}
+
+
+/**
+ * Which membership levels a list breaks out, and in what order.
+ *
+ * Ticked rather than dragged: the order is the order they are defined in,
+ * which is the order they are shown in everywhere else on the site, and a
+ * second ordering to keep in step with that one would be a way of getting them
+ * out of step. Anybody in none of the ticked levels falls into the last group.
+ */
+function LevelPicker({
+  block,
+  update,
+  levels,
+}: {
+  block: CalendarSlotBlock;
+  update: (patch: Partial<PageBlock>) => void;
+  levels: { _id: string; name: string }[];
+}) {
+  const chosen = block.levelIds ?? [];
+
+  if (levels.length === 0) {
+    return (
+      <span className="help-text">
+        No membership levels are defined yet, so there is nothing to group by.
+      </span>
+    );
+  }
+
+  return (
+    <>
+      <div className="field">
+        <label>Levels</label>
+        <div className="chip-picker">
+          {levels.map((level) => (
+            <label key={level._id} className="chip-option">
+              <input
+                type="checkbox"
+                checked={chosen.includes(level._id)}
+                onChange={(event) =>
+                  update({
+                    levelIds: event.target.checked
+                      ? [...chosen, level._id]
+                      : chosen.filter((id) => id !== level._id),
+                  } as Partial<PageBlock>)
+                }
+              />
+              {level.name}
+            </label>
+          ))}
+        </div>
+      </div>
+
+      <TextField
+        label="Everyone else"
+        value={block.otherHeading ?? "Other"}
+        onChange={(value) => update({ otherHeading: value } as Partial<PageBlock>)}
+      />
+      <span className="help-text">
+        The heading over anybody holding none of the levels above. Left out
+        entirely when nobody falls into it.
+      </span>
+    </>
   );
 }

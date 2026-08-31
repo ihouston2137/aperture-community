@@ -10069,6 +10069,25 @@ html:has(.admin-shell) body::-webkit-scrollbar {
   font-size: 0.9em;
 }
 
+/* One list broken into its levels. Columns, like the register, because a
+   list read to see who is coming is read group by group. */
+.cal-rsvp-levels {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(11rem, 100%), 1fr));
+  gap: 0.75rem;
+  align-items: start;
+}
+
+.cal-rsvp-level-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  font-weight: 600;
+  font-size: 0.85em;
+  opacity: 0.8;
+  margin-bottom: 0.2rem;
+}
+
 .cal-rsvp-empty {
   font-size: 0.9em;
   opacity: 0.55;
@@ -10134,22 +10153,83 @@ html:has(.admin-shell) body::-webkit-scrollbar {
 
 /* Scrolls inside itself: a register of a whole membership must not stretch the
    lightbox past the height of the screen. */
+/* No scroller. A register is read from top to bottom to see who is missing,
+   and a name inside a box that scrolls is a name somebody has to go looking
+   for — the page gets longer instead, which is what a page is for. */
 .cal-attendance-list {
   list-style: none;
   margin: 0;
   padding: 0;
-  max-height: 18rem;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
 }
 
-.cal-attendance-row label {
+/* The named levels side by side, wrapping when there is no room. `auto-fit`
+   with a minimum means two columns become one on a phone without a breakpoint
+   having to guess where that happens. */
+.cal-attendance-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(13rem, 100%), 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+
+.cal-attendance-column-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  font-weight: 600;
+  font-size: 0.9em;
+  padding-bottom: 0.3rem;
+  margin-bottom: 0.4rem;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 22%, transparent);
+}
+
+.cal-attendance-column-count {
+  font-weight: 400;
+  opacity: 0.6;
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * One name, as a chip that carries its own state.
+ *
+ * The resting look is deliberately plain and quiet: a template that styles
+ * "present" gets a sheet where the people who are here stand out, which is the
+ * whole reason for a chip rather than a checkbox. Both states are still
+ * distinguishable unstyled — one is filled, the other outlined — because a
+ * template nobody has styled must not be a sheet nobody can read.
+ */
+.cal-attendance-chip {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.3rem 0.15rem;
-  border-bottom: 1px solid color-mix(in srgb, currentColor 12%, transparent);
-  cursor: pointer;
+  gap: 0.4rem;
+  width: 100%;
+  text-align: left;
+  padding: 0.3rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, currentColor 25%, transparent);
+  background: transparent;
+  color: inherit;
+  font: inherit;
   font-size: 0.9em;
+  cursor: pointer;
+}
+
+.cal-attendance-chip[data-present="true"] {
+  border-color: color-mix(in srgb, currentColor 55%, transparent);
+  background: color-mix(in srgb, currentColor 14%, transparent);
+  font-weight: 600;
+}
+
+.cal-attendance-chip:hover:not(:disabled) {
+  border-color: color-mix(in srgb, currentColor 60%, transparent);
+}
+
+.cal-attendance-chip:disabled {
+  cursor: default;
+  opacity: 0.75;
 }
 
 .cal-attendance-name {

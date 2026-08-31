@@ -145,9 +145,35 @@ export type CalendarSlotBlock = ResponsiveStyleFields & {
   yesHeading?: string;
   noHeading?: string;
 
+  /**
+   * `calRsvpList` and `calAttendance`: the membership levels to break out.
+   *
+   * Named rather than "every level there is", because a list is only readable
+   * when it has a few groups in it — a committee and its guests, say, and not
+   * one heading per level a site happens to have defined. Anybody holding none
+   * of the named levels falls into a single group at the end.
+   */
+  levelIds?: string[];
+  /** What that last group is called. */
+  otherHeading?: string;
+  /** `calRsvpList`: whether to break the lists out by level at all. */
+  groupByLevels?: boolean;
+
   /** `calAttendance`: opens with only the members who said yes. */
   attendanceFromRsvp?: boolean;
   heading?: string;
+  /**
+   * `calAttendance`: the two looks a name can wear.
+   *
+   * A register is read at a glance to see who is missing, and a row of
+   * identical ticked and unticked boxes does not answer that at a glance. The
+   * chip carries the state in its own colour instead, which is a thing the
+   * template can style — so "present" can be as loud as the room needs.
+   */
+  presentStyle?: StyleValues;
+  presentStyleSlug?: string;
+  absentStyle?: StyleValues;
+  absentStyleSlug?: string;
 };
 
 export function isCalendarSlotBlock(block: {
@@ -182,16 +208,27 @@ export function createCalendarSlotBlock(
     block.namesOrCounts = "names";
     block.yesHeading = "Going";
     block.noHeading = "Not going";
+    block.groupByLevels = false;
+    block.levelIds = [];
+    block.otherHeading = "Other";
   }
   if (type === "calAttendance") {
     block.attendanceFromRsvp = true;
     block.heading = "Attendance";
+    block.levelIds = [];
+    block.otherHeading = "Other";
   }
   return block;
 }
 
 function str(value: unknown, fallback = ""): string {
   return typeof value === "string" ? value : fallback;
+}
+
+/** Role ids a block names, deduplicated and bounded. */
+function levelIds(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value.map(String).filter(Boolean))].slice(0, 50);
 }
 
 export function normalizeCalendarSlotBlock(input: unknown): CalendarSlotBlock | null {
@@ -257,12 +294,26 @@ export function normalizeCalendarSlotBlock(input: unknown): CalendarSlotBlock | 
     block.namesOrCounts = raw.namesOrCounts === "counts" ? "counts" : "names";
     block.yesHeading = str(raw.yesHeading, "Going");
     block.noHeading = str(raw.noHeading, "Not going");
+    block.groupByLevels = Boolean(raw.groupByLevels);
+    block.levelIds = levelIds(raw.levelIds);
+    block.otherHeading = str(raw.otherHeading, "Other");
   }
 
   if (type === "calAttendance") {
     block.attendanceFromRsvp =
       raw.attendanceFromRsvp === undefined ? true : Boolean(raw.attendanceFromRsvp);
     block.heading = str(raw.heading, "Attendance");
+    block.levelIds = levelIds(raw.levelIds);
+    block.otherHeading = str(raw.otherHeading, "Other");
+
+    // Present and absent, each with its own named-style slot and its own
+    // per-view overrides, exactly like the RSVP button's answered looks.
+    for (const key of ["presentStyle", "absentStyle"] as const) {
+      const slugKey = `${key}Slug` as "presentStyleSlug" | "absentStyleSlug";
+      if (raw[slugKey]) block[slugKey] = str(raw[slugKey]);
+      if (raw[key]) block[key] = normalizeStyleValues(raw[key]);
+      normalizeResponsiveStyle(raw, block, key);
+    }
   }
 
   return block;

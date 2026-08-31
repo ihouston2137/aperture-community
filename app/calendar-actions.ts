@@ -18,18 +18,41 @@ import { getSession } from "@/lib/session";
 /** A roster longer than this is a mailing list, not a room. */
 const MAX_ROSTER = 500;
 
+/**
+ * One person who answered.
+ *
+ * The levels they hold come with the name so the list can be broken out by
+ * membership level without a second round trip — and by id rather than by
+ * name, because a level renamed should not silently stop matching a template
+ * that names it.
+ */
+export type RsvpPerson = {
+  name: string;
+  /** Community role ids only: the membership levels, not what they administer. */
+  levelIds: string[];
+};
+
 export type RsvpView = {
   enabled: boolean;
   /** What this viewer answered, if anything. */
   mine: RsvpResponse | null;
-  yes: string[];
-  no: string[];
+  yes: RsvpPerson[];
+  no: RsvpPerson[];
   yesCount: number;
   noCount: number;
   /** Whether this viewer may answer, and why not when they may not. */
   canRsvp: boolean;
   signedIn: boolean;
   reason: string;
+  /**
+   * Every membership level on the site, so a block naming them by id can print
+   * their names.
+   *
+   * Sent with the view rather than threaded from the page: the list and the
+   * register are drawn deep inside a template, and passing a role table down
+   * to them would touch every renderer in between for one label each.
+   */
+  levels: { _id: string; name: string }[];
 };
 
 const emptyRsvpView: RsvpView = {
@@ -42,6 +65,7 @@ const emptyRsvpView: RsvpView = {
   canRsvp: false,
   signedIn: false,
   reason: "",
+  levels: [],
 };
 
 async function loadRsvpView(eventId: string): Promise<RsvpView> {
@@ -72,13 +96,19 @@ async function loadRsvpView(eventId: string): Promise<RsvpView> {
 
   const rsvps = await EventRsvp.find({ eventId }).limit(MAX_ROSTER).lean<any[]>();
   const userIds = rsvps.map((rsvp) => rsvp.userId);
-  const users = await User.find({ _id: { $in: userIds } })
-    .select("firstName lastName name email")
-    .lean<any[]>();
+  const [users, roles] = await Promise.all([
+    User.find({ _id: { $in: userIds } })
+      .select("firstName lastName name email roleIds")
+      .lean<any[]>(),
+    getRoleSummaries(),
+  ]);
 
-  const nameOf = (userId: unknown) => {
+  const personOf = (userId: unknown): RsvpPerson => {
     const user = users.find((candidate) => String(candidate._id) === String(userId));
-    return user ? fullName(user) : "A member";
+    if (!user) return { name: "A member", levelIds: [] };
+
+    const { community } = splitRoles((user.roleIds ?? []).map(String), roles);
+    return { name: fullName(user), levelIds: community.map((role) => role._id) };
   };
 
   const yes = rsvps.filter((rsvp) => rsvp.response === "yes");
@@ -91,13 +121,20 @@ async function loadRsvpView(eventId: string): Promise<RsvpView> {
   return {
     enabled: true,
     mine: normalizeRsvpResponse(mine),
-    yes: yes.map((rsvp) => nameOf(rsvp.userId)).sort((a, b) => a.localeCompare(b)),
-    no: no.map((rsvp) => nameOf(rsvp.userId)).sort((a, b) => a.localeCompare(b)),
+    yes: yes
+      .map((rsvp) => personOf(rsvp.userId))
+      .sort((a, b) => a.name.localeCompare(b.name)),
+    no: no
+      .map((rsvp) => personOf(rsvp.userId))
+      .sort((a, b) => a.name.localeCompare(b.name)),
     yesCount: yes.length,
     noCount: no.length,
     canRsvp,
     signedIn,
     reason,
+    levels: roles
+      .filter((role) => role.kind === "community")
+      .map((role) => ({ _id: role._id, name: role.name })),
   };
 }
 
@@ -186,7 +223,10 @@ export async function setMyRsvpAction(
 export type AttendanceRow = {
   userId: string;
   name: string;
+  /** The levels they hold, written out, for the line under the name. */
   level: string;
+  /** The same levels as ids, for grouping the sheet into columns. */
+  levelIds: string[];
   rsvp: RsvpResponse | null;
   present: boolean;
 };
@@ -199,6 +239,8 @@ export type AttendanceView = {
   presentCount: number;
   /** True when the roster hit its ceiling and is not the whole membership. */
   truncated: boolean;
+  /** Every membership level, so a block naming them by id can print the names. */
+  levels: { _id: string; name: string }[];
 };
 
 const emptyAttendanceView: AttendanceView = {
@@ -208,6 +250,7 @@ const emptyAttendanceView: AttendanceView = {
   rows: [],
   presentCount: 0,
   truncated: false,
+  levels: [],
 };
 
 async function loadAttendanceView(eventId: string): Promise<AttendanceView> {
@@ -261,6 +304,7 @@ async function loadAttendanceView(eventId: string): Promise<AttendanceView> {
       userId: id,
       name: fullName(member),
       level: community.map((role) => role.name).join(", "),
+      levelIds: community.map((role) => role._id),
       rsvp: normalizeRsvpResponse(
         rsvps.find((rsvp) => String(rsvp.userId) === id)?.response
       ),
@@ -277,6 +321,9 @@ async function loadAttendanceView(eventId: string): Promise<AttendanceView> {
     rows,
     presentCount: rows.filter((row) => row.present).length,
     truncated: total > members.length,
+    levels: roles
+      .filter((role) => role.kind === "community")
+      .map((role) => ({ _id: role._id, name: role.name })),
   };
 }
 

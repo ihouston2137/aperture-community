@@ -2,7 +2,11 @@
 
 import { useEffect, useState, useTransition } from "react";
 
-import { setMyRsvpAction, type RsvpView } from "@/app/calendar-actions";
+import {
+  setMyRsvpAction,
+  type RsvpPerson,
+  type RsvpView,
+} from "@/app/calendar-actions";
 import { eventLabel, type CalendarEventRecord } from "@/lib/calendar";
 import type { CalendarSlotBlock } from "@/lib/calendar-slot-layout";
 import { slotIsStyled } from "@/lib/responsive-style";
@@ -264,9 +268,23 @@ export function CalendarRsvpList({
   const shows = block.rsvpShows ?? "both";
   const asCounts = block.namesOrCounts === "counts";
 
+  // The levels this template named, in the order it named them — resolved
+  // against the ones the site actually has, so a level since deleted simply
+  // stops being a heading rather than leaving an empty one.
+  const levels = namedLevels(block.levelIds, view?.levels ?? []);
+  const grouped = Boolean(block.groupByLevels) && levels.length > 0;
+
+  const names = (people: RsvpPerson[]) => (
+    <ul className="cal-rsvp-names">
+      {people.map((person) => (
+        <li key={person.name}>{person.name}</li>
+      ))}
+    </ul>
+  );
+
   const section = (
     heading: string,
-    names: string[],
+    people: RsvpPerson[],
     count: number,
     kind: "yes" | "no"
   ) => (
@@ -275,14 +293,23 @@ export function CalendarRsvpList({
         {heading}
         <span className="cal-rsvp-count">{count}</span>
       </span>
-      {asCounts ? null : names.length > 0 ? (
-        <ul className="cal-rsvp-names">
-          {names.map((name) => (
-            <li key={name}>{name}</li>
-          ))}
-        </ul>
-      ) : (
+
+      {asCounts ? null : people.length === 0 ? (
         <span className="cal-rsvp-empty">Nobody yet</span>
+      ) : grouped ? (
+        <div className="cal-rsvp-levels">
+          {byLevel(people, levels, block.otherHeading || "Other").map((level) => (
+            <div key={level.key} className="cal-rsvp-level">
+              <span className="cal-rsvp-level-heading">
+                {level.name}
+                <span className="cal-rsvp-count">{level.people.length}</span>
+              </span>
+              {names(level.people)}
+            </div>
+          ))}
+        </div>
+      ) : (
+        names(people)
       )}
     </div>
   );
@@ -302,4 +329,58 @@ export function CalendarRsvpList({
         : null}
     </div>
   );
+}
+
+/**
+ * The named levels, in the order the template named them, then everyone else.
+ *
+ * Somebody holding two of the named levels appears under the first of them
+ * rather than under both: a list read to see who is coming should have each
+ * person on it once, and the order the template chose is the order it thinks
+ * they matter in.
+ *
+ * An empty group is left out — a heading over nothing is a question the reader
+ * has to answer for themselves — except "Other", which is dropped whenever it
+ * is empty for the same reason.
+ */
+function byLevel(
+  people: RsvpPerson[],
+  levels: { _id: string; name: string }[],
+  otherHeading: string
+): { key: string; name: string; people: RsvpPerson[] }[] {
+  const groups = levels.map((level) => ({
+    key: level._id,
+    name: level.name,
+    people: [] as RsvpPerson[],
+  }));
+  const other: RsvpPerson[] = [];
+
+  for (const person of people) {
+    const group = groups.find((entry) => person.levelIds.includes(entry.key));
+    if (group) group.people.push(person);
+    else other.push(person);
+  }
+
+  const listed = groups.filter((group) => group.people.length > 0);
+  if (other.length > 0) {
+    listed.push({ key: "__other", name: otherHeading, people: other });
+  }
+  return listed;
+}
+
+
+/**
+ * The levels a block names, in its order, dropping any that no longer exist.
+ *
+ * The template stores ids so a renamed level goes on matching; the names come
+ * from the view, which is the only place that knows them at render time.
+ */
+export function namedLevels(
+  ids: string[] | undefined,
+  known: { _id: string; name: string }[]
+): { _id: string; name: string }[] {
+  if (!ids || ids.length === 0) return [];
+  return ids
+    .map((id) => known.find((level) => level._id === id))
+    .filter((level): level is { _id: string; name: string } => Boolean(level));
 }

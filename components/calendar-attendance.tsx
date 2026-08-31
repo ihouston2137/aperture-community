@@ -5,10 +5,15 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import {
   getEventAttendanceAction,
   setAttendanceAction,
+  type AttendanceRow,
   type AttendanceView,
 } from "@/app/calendar-actions";
 import type { CalendarEventRecord } from "@/lib/calendar";
 import type { CalendarSlotBlock } from "@/lib/calendar-slot-layout";
+import { slotIsStyled } from "@/lib/responsive-style";
+
+import { styleSlotProps } from "./block-primitives";
+import { namedLevels } from "./calendar-rsvp";
 
 /**
  * The attendance sheet, inside the event lightbox.
@@ -48,6 +53,24 @@ export function CalendarAttendance({
       live = false;
     };
   }, [event._id, designTime]);
+
+  /*
+   * The two looks a name can wear.
+   *
+   * A state the template has not styled falls back to no styling at all rather
+   * than to the block's own — the block dresses the sheet around the names,
+   * and wearing that on the chips too would make present and absent identical,
+   * which is the one thing they must not be.
+   */
+  const present = slotIsStyled(block, "presentStyle")
+    ? styleSlotProps(block, "presentStyle")
+    : { className: "", style: undefined };
+  const absent = slotIsStyled(block, "absentStyle")
+    ? styleSlotProps(block, "absentStyle")
+    : { className: "", style: undefined };
+
+  // The levels this template named, in the order it named them.
+  const levels = namedLevels(block.levelIds, view?.levels ?? []);
 
   const rows = useMemo(() => {
     if (!view) return [];
@@ -157,29 +180,63 @@ export function CalendarAttendance({
             : "No members match that."}
         </p>
       ) : (
-        <ul className="cal-attendance-list">
-          {rows.map((row) => (
-            <li key={row.userId} className="cal-attendance-row">
-              <label>
-                <input
-                  type="checkbox"
-                  checked={row.present}
-                  disabled={!view.canRecord || saving}
-                  onChange={(changeEvent) => toggle(row.userId, changeEvent.target.checked)}
-                />
-                <span className="cal-attendance-name">{row.name}</span>
-                {row.level ? (
-                  <span className="cal-attendance-level">{row.level}</span>
-                ) : null}
-                {row.rsvp ? (
-                  <span className="cal-attendance-rsvp" data-answer={row.rsvp}>
-                    {row.rsvp === "yes" ? "said yes" : "said no"}
+        /*
+         * The named levels side by side, wrapping on a narrow screen.
+         *
+         * A register is taken by working down the people in front of you, and
+         * they are usually in front of you in groups — the committee at one
+         * table, the newcomers at another. Columns match that; one long list
+         * makes it a search each time.
+         */
+        <div className="cal-attendance-columns">
+          {groupRows(rows, levels, block.otherHeading || "Other").map((group) => (
+            <div key={group.key} className="cal-attendance-column">
+              {group.name ? (
+                <span className="cal-attendance-column-heading">
+                  {group.name}
+                  <span className="cal-attendance-column-count">
+                    {group.rows.filter((row) => row.present).length}/{group.rows.length}
                   </span>
-                ) : null}
-              </label>
-            </li>
+                </span>
+              ) : null}
+
+              <ul className="cal-attendance-list">
+                {group.rows.map((row) => (
+                  <li key={row.userId} className="cal-attendance-row">
+                    {/*
+                     * A chip, not a checkbox. The state is the chip's own
+                     * colour, so a sheet answers "who is missing" at a glance
+                     * instead of asking the eye to read a column of boxes —
+                     * and the template can style each state to suit the room.
+                     */}
+                    <button
+                      type="button"
+                      className={`cal-attendance-chip ${
+                        row.present ? present.className : absent.className
+                      }`.trim()}
+                      style={row.present ? present.style : absent.style}
+                      data-present={row.present ? "true" : "false"}
+                      aria-pressed={row.present}
+                      disabled={!view.canRecord || saving}
+                      onClick={() => toggle(row.userId, !row.present)}
+                    >
+                      <span className="cal-attendance-name">{row.name}</span>
+                      {/* Only where no heading above has already said it. */}
+                      {!group.name && row.level ? (
+                        <span className="cal-attendance-level">{row.level}</span>
+                      ) : null}
+                      {row.rsvp ? (
+                        <span className="cal-attendance-rsvp" data-answer={row.rsvp}>
+                          {row.rsvp === "yes" ? "said yes" : "said no"}
+                        </span>
+                      ) : null}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
           ))}
-        </ul>
+        </div>
       )}
 
       {view.truncated ? (
@@ -195,4 +252,42 @@ export function CalendarAttendance({
       ) : null}
     </div>
   );
+}
+
+
+/**
+ * The register split into the levels the template named, then everyone else.
+ *
+ * Somebody holding two of the named levels is listed under the first of them:
+ * a register is a headcount, and a name in two columns would be counted twice
+ * by the only person reading it.
+ *
+ * With no levels named there is one unheaded group — the whole membership, as
+ * the sheet has always been.
+ */
+function groupRows(
+  rows: AttendanceRow[],
+  levels: { _id: string; name: string }[],
+  otherHeading: string
+): { key: string; name: string; rows: AttendanceRow[] }[] {
+  if (levels.length === 0) return [{ key: "__all", name: "", rows }];
+
+  const groups = levels.map((level) => ({
+    key: level._id,
+    name: level.name,
+    rows: [] as AttendanceRow[],
+  }));
+  const other: AttendanceRow[] = [];
+
+  for (const row of rows) {
+    const group = groups.find((entry) => row.levelIds.includes(entry.key));
+    if (group) group.rows.push(row);
+    else other.push(row);
+  }
+
+  const listed = groups.filter((group) => group.rows.length > 0);
+  if (other.length > 0) {
+    listed.push({ key: "__other", name: otherHeading, rows: other });
+  }
+  return listed;
 }

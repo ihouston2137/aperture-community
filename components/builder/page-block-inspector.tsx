@@ -347,6 +347,7 @@ export function PageBlockInspector({
         block={block as unknown as CalendarSlotBlock}
         update={update}
         onEditStyle={onEditStyle}
+        levels={sources.roles.filter((role) => role.kind === "community")}
       />
     );
   }
