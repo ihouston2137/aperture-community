@@ -23,7 +23,13 @@ import {
   CONTENT_WIDTH_VALUES,
   type ContentWidth,
 } from "./site-values";
-import { normalizeStyleValues, type StyleValues } from "./style-values";
+import {
+  borderSides,
+  borderWidthValue,
+  normalizeStyleValues,
+  type BorderSides,
+  type StyleValues,
+} from "./style-values";
 
 /* ------------------------------------------------------------ Block types */
 
@@ -304,6 +310,8 @@ export type BorderSettings = {
   borderWidth: number; // rem
   borderColor: string;
   borderRadius: number; // rem
+  /** Which edges it is drawn on. A row with a rule under it is the common case. */
+  borderSides: BorderSides;
 };
 
 export type RowSettings = SpacingSettings &
@@ -380,6 +388,7 @@ export const defaultBorder: BorderSettings = {
   borderWidth: 0,
   borderColor: "#16181d",
   borderRadius: 0,
+  borderSides: "all",
 };
 
 export const defaultRowSettings: RowSettings = {
@@ -670,6 +679,9 @@ function normalizeBorder(raw: Record<string, unknown>): BorderSettings {
     borderWidth: Math.max(0, num(raw.borderWidth, 0)),
     borderColor: str(raw.borderColor, defaultBorder.borderColor),
     borderRadius: Math.max(0, num(raw.borderRadius, 0)),
+    // Rows saved before sides existed carry nothing here and mean all four,
+    // which is what `borderSides` reads an absent value as.
+    borderSides: borderSides(raw.borderSides),
   };
 }
 
@@ -984,7 +996,10 @@ export function borderStyle(settings: BorderSettings): CSSProperties {
   const style: CSSProperties = {};
   if (settings.borderWidth > 0) {
     style.borderStyle = "solid";
-    style.borderWidth = `${settings.borderWidth}rem`;
+    style.borderWidth = borderWidthValue(
+      settings.borderWidth,
+      borderSides(settings.borderSides)
+    );
     style.borderColor = settings.borderColor;
   }
   if (settings.borderRadius > 0) style.borderRadius = `${settings.borderRadius}rem`;

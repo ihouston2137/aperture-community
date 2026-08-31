@@ -1,6 +1,71 @@
 import type { CSSProperties } from "react";
 
 /**
+ * Which edges a border is drawn on.
+ *
+ * One setting rather than four widths, because the useful answers are few and
+ * naming them is clearer than four boxes to fill in: a rule under a row, a
+ * pair of rules above and below a quote, an outline all the way round. The
+ * width, colour and style stay single — a border with a different weight on
+ * each side is not a thing anybody has asked a page builder for.
+ */
+export const BORDER_SIDES = [
+  "all",
+  "top",
+  "bottom",
+  "left",
+  "right",
+  "top-bottom",
+  "left-right",
+] as const;
+
+export type BorderSides = (typeof BORDER_SIDES)[number];
+
+export const BORDER_SIDE_LABELS: Record<BorderSides, string> = {
+  all: "All sides",
+  top: "Top",
+  bottom: "Bottom",
+  left: "Left",
+  right: "Right",
+  "top-bottom": "Top & bottom",
+  "left-right": "Left & right",
+};
+
+/** Anything unrecognised is a border all the way round, as it always was. */
+export function borderSides(value: unknown): BorderSides {
+  return BORDER_SIDES.includes(value as BorderSides) ? (value as BorderSides) : "all";
+}
+
+/**
+ * The width as a four-value shorthand: top, right, bottom, left.
+ *
+ * Written out even for "all" so the shorthand always replaces whatever it is
+ * layered over — a per-side value left standing under a later `all` would draw
+ * a border the settings no longer describe.
+ */
+export function borderWidthValue(width: number, sides: BorderSides): string {
+  const on = `${width}rem`;
+  const off = "0";
+
+  switch (sides) {
+    case "top":
+      return `${on} ${off} ${off} ${off}`;
+    case "right":
+      return `${off} ${on} ${off} ${off}`;
+    case "bottom":
+      return `${off} ${off} ${on} ${off}`;
+    case "left":
+      return `${off} ${off} ${off} ${on}`;
+    case "top-bottom":
+      return `${on} ${off} ${on} ${off}`;
+    case "left-right":
+      return `${off} ${on} ${off} ${on}`;
+    default:
+      return `${on} ${on} ${on} ${on}`;
+  }
+}
+
+/**
  * One shared style shape drives the centralized style editor, saved
  * `CustomStyle` records, and every builder's local (unnamed) style controls.
  *
@@ -28,6 +93,8 @@ export type StyleValues = {
   borderWidth?: number; // rem
   borderStyle?: "none" | "solid" | "dashed" | "dotted";
   borderColor?: string;
+  /** Which edges it is drawn on. Absent means all of them. */
+  borderSides?: BorderSides;
   borderRadius?: number; // rem
   /** Per-corner overrides; each falls back to `borderRadius`. */
   borderRadiusTopLeft?: number;
@@ -143,6 +210,12 @@ export function normalizeStyleValues(input: unknown): StyleValues {
     out.fontWeight = weight as number | string;
   }
 
+  // Only kept when it says something: an absent value already means all four
+  // sides, and storing "all" on every style that ever had a border would put a
+  // key on records that never asked a question.
+  const sides = borderSides(raw.borderSides);
+  if (sides !== "all") out.borderSides = sides;
+
   return out;
 }
 
@@ -190,7 +263,10 @@ export function styleValuesToCss(
 
   if (values.borderStyle && values.borderStyle !== "none") {
     style.borderStyle = values.borderStyle;
-    style.borderWidth = `${values.borderWidth ?? 0.0625}rem`;
+    style.borderWidth = borderWidthValue(
+      values.borderWidth ?? 0.0625,
+      borderSides(values.borderSides)
+    );
     style.borderColor = values.borderColor ?? "currentColor";
   }
   // Any single corner switches to the four-value shorthand, with the others

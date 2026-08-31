@@ -5,9 +5,12 @@ import { useState } from "react";
 import { ModalPortal } from "@/components/modal-portal";
 import { ColorPicker } from "@/components/color-field";
 import {
+  BORDER_SIDES,
+  BORDER_SIDE_LABELS,
   CORNER_KEYS,
   normalizeStyleValues,
   styleValuesToCss,
+  type BorderSides,
   type StyleValues,
 } from "@/lib/style-values";
 
@@ -311,6 +314,25 @@ export function StyleFields({
             step={0.0625}
             onChange={(value) => onChange({ borderWidth: value })}
           />
+          {/* Only where there is a border to put on a side. Offering it
+              against "none" would be a setting for nothing. */}
+          {values.borderStyle && values.borderStyle !== "none" ? (
+            <div className="field">
+              <label>Border sides</label>
+              <select
+                value={values.borderSides ?? "all"}
+                onChange={(event) =>
+                  onChange({ borderSides: event.target.value as BorderSides })
+                }
+              >
+                {BORDER_SIDES.map((side) => (
+                  <option key={side} value={side}>
+                    {BORDER_SIDE_LABELS[side]}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
           <ColorField
             label="Border colour"
             value={values.borderColor}

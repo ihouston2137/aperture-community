@@ -24,6 +24,11 @@ import {
   hasColorOverrides,
   type ColorOverrides,
 } from "@/lib/color-overrides";
+import {
+  BORDER_SIDES,
+  BORDER_SIDE_LABELS,
+  type BorderSides,
+} from "@/lib/style-values";
 
 /** Numeric input for a rem-valued setting — no pixel conversion. */
 export function RemField({
@@ -421,6 +426,15 @@ export function BorderFields({
         label="Rounding"
         value={settings.borderRadius}
         onChange={(value) => onChange({ borderRadius: Math.max(0, value) })}
+      />
+      <SelectField
+        label="Sides"
+        value={settings.borderSides ?? "all"}
+        options={BORDER_SIDES.map((side) => ({
+          value: side,
+          label: BORDER_SIDE_LABELS[side],
+        }))}
+        onChange={(value) => onChange({ borderSides: value as BorderSides })}
       />
       <ColorField
         label="Colour"
