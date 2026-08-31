@@ -10663,14 +10663,33 @@ html:has(.admin-shell) body::-webkit-scrollbar {
  * this takes and how big the marks in it are, and the two can never disagree.
  * Width is left to the artwork: a crest and a long wordmark are not the same
  * shape, and forcing them into one box would letterbox both.
+ *
+ * Every height here is written as a length off `--sponsor-scroll-height`
+ * rather than as a percentage of the parent. A chain of percentage heights
+ * ending at an `<img>` inside nested flex boxes is the classic way to get
+ * nothing at all on Safari, which resolves the image to no height and then to
+ * no width — the row was there, empty, on an iPhone.
  */
 .sponsor-scroll {
+  /* A flex parent, so the track can shrink-wrap its contents without
+     `width: max-content` — which Safari mishandles inside a flex context. */
+  display: flex;
+  align-items: center;
   height: var(--sponsor-scroll-height, 8rem);
   overflow: hidden;
   position: relative;
   width: 100%;
   /* The run fades out at both ends rather than being cut off square, so a logo
-     leaves the band instead of being chopped by it. */
+     leaves the band instead of being chopped by it. Prefixed as well: Safari
+     took the unprefixed property late, and an unrecognised mask is simply no
+     fade rather than a blank block. */
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    #000 6%,
+    #000 94%,
+    transparent 100%
+  );
   mask-image: linear-gradient(
     to right,
     transparent 0,
@@ -10686,16 +10705,21 @@ html:has(.admin-shell) body::-webkit-scrollbar {
  * makes the scroll continuous: nothing jumps, because the frame after the last
  * is identical to the frame before the first.
  *
- * `width: max-content` so the track is as wide as both runs laid end to end
- * rather than as wide as the block — without it the halves would wrap and the
- * 50% would be half of the wrong thing.
+ * `flex: none` is what keeps it at its content width: a flex item may shrink
+ * to fit by default, and the whole point is that this one overflows.
  */
 .sponsor-scroll-track {
   display: flex;
   flex-direction: row;
-  width: max-content;
-  height: 100%;
+  flex: none;
+  align-items: center;
+  height: var(--sponsor-scroll-height, 8rem);
   animation: sponsor-scroll-left var(--sponsor-scroll-seconds, 30s) linear infinite;
+  /* Promoted explicitly. Safari animates a wide strip far more smoothly on its
+     own layer, and `translateZ` is the older way of asking that still works
+     where `will-change` alone does not. */
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
   will-change: transform;
 }
 
@@ -10719,28 +10743,25 @@ html:has(.admin-shell) body::-webkit-scrollbar {
   padding: 0;
   display: flex;
   flex-direction: row;
+  flex: none;
   align-items: center;
-  height: 100%;
 }
 
-/*
- * One logo: the band's height, and whatever width that leaves it.
- *
- * `flex: none` matters — a flex item in a row is allowed to shrink to fit by
- * default, and the whole point here is that the row overflows its block.
- */
+/* One logo: the band's height, and whatever width that leaves it. */
 .sponsor-scroll-item {
   display: flex;
   align-items: center;
   justify-content: center;
   flex: none;
-  height: 100%;
-  padding: 0.75rem 1.25rem;
+  height: var(--sponsor-scroll-height, 8rem);
+  padding: 0 1.25rem;
   box-sizing: border-box;
 }
 
 .sponsor-scroll-item img {
-  height: 100%;
+  /* A length, not a percentage — see the note on the block above. The subtracted
+     rem is the breathing room above and below the mark. */
+  height: calc(var(--sponsor-scroll-height, 8rem) - 1.5rem);
   width: auto;
   /* Overrides the sheet-wide `img { max-width: 100% }`, which would hold a wide
      wordmark to the width of its own box and squash it out of proportion. */
@@ -10751,8 +10772,6 @@ html:has(.admin-shell) body::-webkit-scrollbar {
 }
 
 .sponsor-scroll.is-empty {
-  display: flex;
-  align-items: center;
   justify-content: center;
   border: 1px dashed var(--admin-border, rgba(128, 128, 128, 0.4));
   border-radius: var(--radius, 0.5rem);
@@ -10764,24 +10783,33 @@ html:has(.admin-shell) body::-webkit-scrollbar {
 
 @keyframes sponsor-scroll-left {
   from {
-    transform: translateX(0);
+    -webkit-transform: translate3d(0, 0, 0);
+    transform: translate3d(0, 0, 0);
   }
   to {
-    transform: translateX(-50%);
+    -webkit-transform: translate3d(-50%, 0, 0);
+    transform: translate3d(-50%, 0, 0);
   }
 }
 
 @keyframes sponsor-scroll-right {
   from {
-    transform: translateX(-50%);
+    -webkit-transform: translate3d(-50%, 0, 0);
+    transform: translate3d(-50%, 0, 0);
   }
   to {
-    transform: translateX(0);
+    -webkit-transform: translate3d(0, 0, 0);
+    transform: translate3d(0, 0, 0);
   }
 }
 
-/* Somebody who has asked their system for less movement gets a still row of
-   the same logos rather than a page that will not settle. */
+/*
+ * Somebody who has asked their system for less movement gets a still row of
+ * the same logos, which they can push along themselves.
+ *
+ * Worth knowing when a phone seems not to be scrolling: Reduce Motion is on by
+ * default for a good many people, and this is the block doing as it was told.
+ */
 @media (prefers-reduced-motion: reduce) {
   .sponsor-scroll-track {
     animation: none;
@@ -10789,6 +10817,8 @@ html:has(.admin-shell) body::-webkit-scrollbar {
 
   .sponsor-scroll {
     overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    -webkit-mask-image: none;
     mask-image: none;
   }
 }
