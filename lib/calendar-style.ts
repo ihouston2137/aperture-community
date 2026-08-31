@@ -127,6 +127,21 @@ export const CALENDAR_BOX_PARTS: readonly CalendarPart[] = [
 
 /* ------------------------------------------------------------- The record */
 
+/**
+ * The detail panel at one screen size.
+ *
+ * Full screen is per size because it is a decision about the screen: a layout
+ * that wants the whole window on a phone is very often the same layout that
+ * should stay a panel on a desktop, where filling a wide window with one
+ * event's details leaves a lot of nothing around it.
+ */
+export type LightboxVariant = {
+  /** A saved lightbox layout. Empty means the built-in arrangement. */
+  layoutId: string;
+  /** Fills the window rather than sitting as a panel over it. */
+  fullScreen: boolean;
+};
+
 /** One event box: what it contains, and how the box itself looks. */
 export type EventBoxVariant = {
   /** A saved event layout. Empty means the built-in arrangement. */
@@ -143,7 +158,7 @@ export type CalendarStyleValues = {
   /** The detail panel: one style, and a layout per screen size. */
   lightbox: {
     style: StyleValues;
-    bySize: Record<CalendarSize, { layoutId: string }>;
+    bySize: Record<CalendarSize, LightboxVariant>;
   };
 };
 
@@ -169,7 +184,10 @@ export function emptyCalendarStyle(): CalendarStyleValues {
       week: bySize(emptyVariant),
       list: bySize(emptyVariant),
     },
-    lightbox: { style: {}, bySize: bySize(() => ({ layoutId: "" })) },
+    lightbox: {
+      style: {},
+      bySize: bySize(() => ({ layoutId: "", fullScreen: false })),
+    },
   };
 }
 
@@ -218,8 +236,11 @@ export function normalizeCalendarStyle(raw: unknown): CalendarStyleValues {
     },
     lightbox: {
       style: normalizeStyleValues(rawLightbox.style),
+      // A style saved before full screen existed carries nothing here, which
+      // reads as false — the panel it has always been.
       bySize: normalizeBySize(rawLightbox.bySize, (entry) => ({
         layoutId: str((entry as Record<string, unknown>)?.layoutId),
+        fullScreen: Boolean((entry as Record<string, unknown>)?.fullScreen),
       })),
     },
   };

@@ -73,10 +73,20 @@ export function CalendarEventLightbox({
     else groups.push({ sizes: [size], layoutId });
   }
 
+  /*
+   * Which sizes open full screen, named on the panel for CSS to answer.
+   *
+   * The same trick the size-specific contents use: one markup tree carries
+   * every size and the stylesheet reveals the one that fits, so the page is
+   * complete from the server and nothing has to measure the window to render.
+   */
+  const fullSizes = CALENDAR_SIZES.filter((size) => lightbox.bySize[size].fullScreen);
+
   return (
     <div className="lightbox-backdrop" role="presentation" onClick={onClose}>
       <div
         className="calendar-detail"
+        data-full={fullSizes.length > 0 ? fullSizes.join(" ") : undefined}
         role="dialog"
         aria-modal="true"
         aria-label={eventLabel(event)}

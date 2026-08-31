@@ -173,7 +173,11 @@ export function CalendarStyleEditor({
               note="The panel that opens on click. Varies by screen size."
               touched={
                 Object.keys(style.lightbox.style).length > 0 ||
-                CALENDAR_SIZES.some((entry) => style.lightbox.bySize[entry].layoutId)
+                CALENDAR_SIZES.some(
+                  (entry) =>
+                    style.lightbox.bySize[entry].layoutId ||
+                    style.lightbox.bySize[entry].fullScreen
+                )
               }
               onClick={() => {
                 setTab("lightbox");
@@ -259,7 +263,10 @@ export function CalendarStyleEditor({
                         ...current.lightbox,
                         bySize: {
                           ...current.lightbox.bySize,
-                          [size]: { layoutId: event.target.value },
+                          [size]: {
+                            ...current.lightbox.bySize[size],
+                            layoutId: event.target.value,
+                          },
                         },
                       },
                     }))
@@ -274,9 +281,39 @@ export function CalendarStyleEditor({
                 </select>
               </div>
 
+              <label className="checkbox-row">
+                <input
+                  type="checkbox"
+                  checked={style.lightbox.bySize[size].fullScreen}
+                  onChange={(event) =>
+                    setStyle((current) => ({
+                      ...current,
+                      lightbox: {
+                        ...current.lightbox,
+                        bySize: {
+                          ...current.lightbox.bySize,
+                          [size]: {
+                            ...current.lightbox.bySize[size],
+                            fullScreen: event.target.checked,
+                          },
+                        },
+                      },
+                    }))
+                  }
+                />
+                Open full screen
+              </label>
+
+              <p className="help-text">
+                Full screen fills the window instead of sitting as a panel over
+                it — usually wanted on a phone, where a panel leaves little
+                room, and rarely on a desktop, where it leaves a lot of nothing
+                around one event.
+              </p>
+
               <p className="help-text">
                 The panel itself is styled once, at every size — only its contents
-                change with the screen.
+                and whether it fills the screen change with the screen.
               </p>
               <StyleFields
                 values={style.lightbox.style}

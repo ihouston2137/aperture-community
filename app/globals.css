@@ -3406,6 +3406,81 @@ ol.doc-list ol.doc-list ol.doc-list {
   z-index: 1;
 }
 
+/*
+ * The detail panel, filling the window.
+ *
+ * Which sizes do this is named on the panel as `data-full`, and answered here
+ * rather than in the generated stylesheet: the rule is the same for every
+ * Calendar Style and only which sizes it applies to differs. The breakpoints
+ * are the ones in `VIEW_MEDIA` — desktop above 64rem, tablet between, mobile
+ * at or below 48rem — and have to be kept in step with them.
+ *
+ * `box-sizing` because the panel carries padding and there is no universal
+ * reset here; without it a full-screen panel overflows by its own padding.
+ * The rounding goes with the width: a corner radius on something meeting all
+ * four edges of the screen is a rounded rectangle over nothing.
+ */
+.calendar-detail[data-full] {
+  box-sizing: border-box;
+  /* The backdrop centres its child, which leaves the cross size to the
+     content — so filling the height has to be asked for as well as set. */
+  align-self: stretch;
+}
+
+@media (width > 64rem) {
+  .calendar-detail[data-full~="desktop"] {
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    max-height: none;
+    border-radius: 0;
+  }
+}
+
+@media (48rem < width <= 64rem) {
+  .calendar-detail[data-full~="tablet"] {
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    max-height: none;
+    border-radius: 0;
+  }
+}
+
+@media (width <= 48rem) {
+  .calendar-detail[data-full~="mobile"] {
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    max-height: none;
+    border-radius: 0;
+  }
+}
+
+/*
+ * The builder canvas is a narrow box in a wide window, so the queries above
+ * are answering the window while the canvas is showing a phone. Inside a
+ * canvas the panel obeys the canvas's own viewport instead: put back to a
+ * panel first, then filled again for the size actually being previewed.
+ */
+.builder-canvas[data-viewport] .calendar-detail[data-full] {
+  width: min(34rem, 100%);
+  max-width: none;
+  height: auto;
+  max-height: 85vh;
+  border-radius: 0.5rem;
+}
+
+.builder-canvas[data-viewport="desktop"] .calendar-detail[data-full~="desktop"],
+.builder-canvas[data-viewport="tablet"] .calendar-detail[data-full~="tablet"],
+.builder-canvas[data-viewport="mobile"] .calendar-detail[data-full~="mobile"] {
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  max-height: none;
+  border-radius: 0;
+}
+
 .calendar-detail-head {
   display: flex;
   align-items: flex-start;
