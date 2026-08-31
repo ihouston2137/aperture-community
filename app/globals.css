@@ -10656,43 +10656,51 @@ html:has(.admin-shell) body::-webkit-scrollbar {
 /* ------------------------------------------------------ Sponsor scroll */
 
 /*
- * A slow vertical run of sponsor logos.
+ * A slow horizontal run of sponsor logos.
  *
- * The height is the window, and the logos are sized against it rather than
+ * The height is the band, and the logos are sized against it rather than
  * carrying a size of their own — one number decides both how much of the page
  * this takes and how big the marks in it are, and the two can never disagree.
+ * Width is left to the artwork: a crest and a long wordmark are not the same
+ * shape, and forcing them into one box would letterbox both.
  */
 .sponsor-scroll {
-  height: var(--sponsor-scroll-height, 18rem);
+  height: var(--sponsor-scroll-height, 8rem);
   overflow: hidden;
   position: relative;
   width: 100%;
   /* The run fades out at both ends rather than being cut off square, so a logo
-     leaves the window instead of being chopped by it. */
+     leaves the band instead of being chopped by it. */
   mask-image: linear-gradient(
-    to bottom,
+    to right,
     transparent 0,
-    #000 8%,
-    #000 92%,
+    #000 6%,
+    #000 94%,
     transparent 100%
   );
 }
 
 /*
- * The track holds the run twice and travels exactly half its own height, so
- * the second copy sits where the first was when the loop restarts. That is
- * what makes the scroll continuous: nothing jumps, because the frame after the
- * last is identical to the frame before the first.
+ * The track holds the run twice and travels exactly half its own width, so the
+ * second copy sits where the first was when the loop restarts. That is what
+ * makes the scroll continuous: nothing jumps, because the frame after the last
+ * is identical to the frame before the first.
+ *
+ * `width: max-content` so the track is as wide as both runs laid end to end
+ * rather than as wide as the block — without it the halves would wrap and the
+ * 50% would be half of the wrong thing.
  */
 .sponsor-scroll-track {
   display: flex;
-  flex-direction: column;
-  animation: sponsor-scroll-up var(--sponsor-scroll-seconds, 30s) linear infinite;
+  flex-direction: row;
+  width: max-content;
+  height: 100%;
+  animation: sponsor-scroll-left var(--sponsor-scroll-seconds, 30s) linear infinite;
   will-change: transform;
 }
 
-.sponsor-scroll[data-direction="down"] .sponsor-scroll-track {
-  animation-name: sponsor-scroll-down;
+.sponsor-scroll[data-direction="right"] .sponsor-scroll-track {
+  animation-name: sponsor-scroll-right;
 }
 
 /* Held still on the builder canvas, where a block that will not stay put is
@@ -10710,28 +10718,33 @@ html:has(.admin-shell) body::-webkit-scrollbar {
   margin: 0;
   padding: 0;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  align-items: center;
+  height: 100%;
 }
 
 /*
- * One logo, sized against the window rather than against itself.
+ * One logo: the band's height, and whatever width that leaves it.
  *
- * A third of the height keeps two whole logos and part of a third in view,
- * which reads as a moving run; at half the height it reads as a slideshow, and
- * at a fifth as a list.
+ * `flex: none` matters — a flex item in a row is allowed to shrink to fit by
+ * default, and the whole point here is that the row overflows its block.
  */
 .sponsor-scroll-item {
   display: flex;
   align-items: center;
   justify-content: center;
-  height: calc(var(--sponsor-scroll-height, 18rem) / 3);
-  padding: 0.5rem;
+  flex: none;
+  height: 100%;
+  padding: 0.75rem 1.25rem;
   box-sizing: border-box;
 }
 
 .sponsor-scroll-item img {
-  max-width: 100%;
-  max-height: 100%;
+  height: 100%;
+  width: auto;
+  /* Overrides the sheet-wide `img { max-width: 100% }`, which would hold a wide
+     wordmark to the width of its own box and squash it out of proportion. */
+  max-width: none;
   /* Whole and undistorted: a sponsor's mark is the one image on a site that
      must not be cropped or stretched to fit. */
   object-fit: contain;
@@ -10749,25 +10762,25 @@ html:has(.admin-shell) body::-webkit-scrollbar {
   padding: 1rem;
 }
 
-@keyframes sponsor-scroll-up {
+@keyframes sponsor-scroll-left {
   from {
-    transform: translateY(0);
+    transform: translateX(0);
   }
   to {
-    transform: translateY(-50%);
+    transform: translateX(-50%);
   }
 }
 
-@keyframes sponsor-scroll-down {
+@keyframes sponsor-scroll-right {
   from {
-    transform: translateY(-50%);
+    transform: translateX(-50%);
   }
   to {
-    transform: translateY(0);
+    transform: translateX(0);
   }
 }
 
-/* Somebody who has asked their system for less movement gets a still list of
+/* Somebody who has asked their system for less movement gets a still row of
    the same logos rather than a page that will not settle. */
 @media (prefers-reduced-motion: reduce) {
   .sponsor-scroll-track {
@@ -10775,7 +10788,7 @@ html:has(.admin-shell) body::-webkit-scrollbar {
   }
 
   .sponsor-scroll {
-    overflow-y: auto;
+    overflow-x: auto;
     mask-image: none;
   }
 }

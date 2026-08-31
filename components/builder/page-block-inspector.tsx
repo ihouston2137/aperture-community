@@ -934,8 +934,9 @@ function SponsorScrollFields({
         onChange={(value) => patch({ height: value })}
       />
       <span className="help-text">
-        The window the logos travel through, and what each one is sized against
-        \u2014 a taller block shows bigger logos rather than more of them.
+        The band the logos travel through, and what each one is sized against
+        \u2014 a taller block shows bigger logos rather than more of them. Each
+        logo is then as wide as its own artwork at that height.
       </span>
 
       <NumField
@@ -947,7 +948,7 @@ function SponsorScrollFields({
         onChange={(value) => patch({ secondsPerLogo: value })}
       />
       <span className="help-text">
-        How long one logo takes to cross the window. Set per logo, so adding a
+        How long one logo takes to cross the band. Set per logo, so adding a
         sponsor makes the run longer rather than making everything faster.
       </span>
 
@@ -955,8 +956,8 @@ function SponsorScrollFields({
         label="Travels"
         value={settings.direction}
         options={[
-          { value: "up", label: "Upwards" },
-          { value: "down", label: "Downwards" },
+          { value: "left", label: "Right to left" },
+          { value: "right", label: "Left to right" },
         ]}
         onChange={(value) =>
           patch({ direction: value as SponsorScrollSettings["direction"] })

@@ -5,16 +5,15 @@ import type { SponsorScrollSettings } from "@/lib/page-layout";
 export type SponsorLogo = { id: string; name: string; src: string };
 
 /**
- * A slow vertical run of sponsor logos.
+ * A slow horizontal run of sponsor logos.
  *
- * The height is the whole of the geometry: it is the window the logos travel
- * through and, minus the padding, the size each one is drawn at. One number
- * rather than two because they cannot disagree — a logo taller than the window
- * would never be wholly visible, and one much shorter would leave the block as
- * mostly empty space.
+ * The height is the whole of the geometry: it is the band the logos travel
+ * through and, minus the padding, the size each one is drawn at. Width is left
+ * to the artwork — a logo is as wide as it needs to be at that height, which
+ * is the only way a row of a tall crest and a long wordmark reads evenly.
  *
  * The run is printed twice and the animation moves it exactly half its own
- * height, so the second copy is where the first was when the loop restarts and
+ * width, so the second copy is where the first was when the loop restarts and
  * the seam falls on a frame nobody can pick out. Duplicating is what makes it
  * continuous: an animation that ran the list once and jumped back would show
  * the jump, and one that measured and repositioned in JavaScript would do the
@@ -52,8 +51,8 @@ export function SponsorScroll({
   /*
    * One lap is one logo's travel times the number of logos, so adding a
    * sponsor lengthens the run rather than speeding everything up to keep the
-   * lap the same. `steps` is not used here — the movement is linear, because a
-   * conveyor that eased in and out would read as broken rather than as gentle.
+   * lap the same. Linear, because a conveyor that eased in and out would read
+   * as broken rather than as gentle.
    */
   const seconds = Math.max(1, settings.secondsPerLogo * logos.length);
 

@@ -125,10 +125,10 @@ export const PAGE_LINK_TYPE_LABELS: Record<PageLinkType, string> = {
 
 /** How a sponsor scroll is set up. */
 export type SponsorScrollSettings = {
-  /** The window's height in rem, and what each logo is sized against. */
+  /** The band's height in rem, and what each logo is sized against. */
   height: number;
   /**
-   * Seconds for one logo to travel the height of the window.
+   * Seconds for one logo to cross the band.
    *
    * Per logo rather than per loop, so adding a sponsor lengthens the run
    * instead of speeding the whole thing up to keep the same lap time — a
@@ -138,17 +138,19 @@ export type SponsorScrollSettings = {
   secondsPerLogo: number;
   /** Which recognition levels supply the logos. Empty means every level. */
   levelIds: string[];
-  /** Bottom to top, or top to bottom. */
-  direction: "up" | "down";
+  /** Right to left, or left to right. */
+  direction: "left" | "right";
   /** Stops the scroll while the pointer is over it, so a logo can be read. */
   pauseOnHover: boolean;
 };
 
 export const defaultSponsorScroll: SponsorScrollSettings = {
-  height: 18,
+  // A band across the page rather than a column down it, so it starts far
+  // shallower than the vertical version did.
+  height: 8,
   secondsPerLogo: 3,
   levelIds: [],
-  direction: "up",
+  direction: "left",
   pauseOnHover: true,
 };
 
@@ -159,13 +161,17 @@ export function normalizeSponsorScroll(input: unknown): SponsorScrollSettings {
   return {
     // Bounded either side: a scroll shorter than a logo shows nothing, and one
     // taller than a screen is a page of its own.
-    height: Math.min(80, Math.max(4, num(raw.height, base.height))),
+    height: Math.min(40, Math.max(3, num(raw.height, base.height))),
     // A tenth of a second per logo is a blur; a minute is not moving.
     secondsPerLogo: Math.min(60, Math.max(0.5, num(raw.secondsPerLogo, base.secondsPerLogo))),
     levelIds: Array.isArray(raw.levelIds)
       ? [...new Set(raw.levelIds.map(String).filter(Boolean))].slice(0, 50)
       : [],
-    direction: raw.direction === "down" ? "down" : "up",
+    // `up` and `down` are what the first version of this block stored, when it
+    // ran as a column. Read as the way the row travels rather than dropped, so
+    // a block already on a page keeps the direction somebody chose for it.
+    direction:
+      raw.direction === "right" || raw.direction === "down" ? "right" : "left",
     pauseOnHover: raw.pauseOnHover === undefined ? true : Boolean(raw.pauseOnHover),
   };
 }
@@ -266,11 +272,13 @@ export type PageBlock = ResponsiveStyleFields & {
   menuButtonText?: string;
 
   /*
-   * A vertical run of sponsor logos, scrolling on its own.
+   * A row of sponsor logos, travelling across on its own.
    *
-   * The height is the setting that matters: it is both the window the logos
-   * scroll through and what each logo is sized against, so one number decides
-   * how much of the page this takes and how big the marks are in it.
+   * The height is the setting that matters: it is both the band the logos
+   * travel through and what each logo is sized against, so one number decides
+   * how much of the page this takes and how big the marks are in it. Each logo
+   * is then as wide as its own artwork at that height, which is the only way a
+   * row of marks of different proportions reads evenly.
    */
   sponsorScroll?: SponsorScrollSettings;
 
