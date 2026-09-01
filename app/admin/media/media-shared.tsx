@@ -3,6 +3,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
+  PASTED_FILTERS,
+  PASTED_FILTER_LABELS,
+  type PastedFilter,
+} from "@/lib/media-query";
+import {
   USAGE_CATEGORIES,
   USAGE_CATEGORY_LABELS,
   type UsageCategory,
@@ -32,6 +37,8 @@ export type MediaAssetSummary = {
   provider?: string;
   embedUrl?: string;
   isNsfw?: boolean;
+  /** `paste` for a picture that arrived off a clipboard mid-edit. */
+  origin?: string;
   tags?: string[];
   width?: number;
   height?: number;
@@ -47,6 +54,8 @@ export type MediaFilters = {
   type: string;
   use: UsageCategory | "all";
   ref: string;
+  /** What to do about media that arrived off a clipboard. */
+  pasted: PastedFilter;
 };
 
 export const emptyMediaFilters: MediaFilters = {
@@ -54,6 +63,9 @@ export const emptyMediaFilters: MediaFilters = {
   type: "all",
   use: "all",
   ref: "all",
+  // Out of the way unless asked for: a pasted screenshot is a by-product of an
+  // edit, and a library that fills up with them stops being a library.
+  pasted: "exclude",
 };
 
 /** Grid tiles use the generated thumbnail; only detail views need the original. */
@@ -103,6 +115,10 @@ export async function fetchMediaPage(
   if (type && type !== "all") params.set("type", type);
   if (filters.use !== "all") params.set("use", filters.use);
   if (filters.ref !== "all") params.set("ref", filters.ref);
+  // Always stated, since the server's own default is not the same as "unset"
+  // meaning nothing — it hides pasted media too, and saying so keeps the URL
+  // an honest description of what came back.
+  params.set("pasted", filters.pasted);
 
   const response = await fetch(`/api/admin/media?${params}`);
   if (!response.ok) return { assets: [], total: 0, hasMore: false, page };
@@ -124,7 +140,7 @@ export function useMediaBrowser(filters: MediaFilters, lockedType?: string, acti
   const [revision, setRevision] = useState(0);
   const requestRef = useRef(0);
 
-  const key = `${filters.query}|${filters.type}|${filters.use}|${filters.ref}|${lockedType ?? ""}`;
+  const key = `${filters.query}|${filters.type}|${filters.use}|${filters.ref}|${filters.pasted}|${lockedType ?? ""}`;
 
   // Changing the filters restarts paging. Adjusting during render (rather than
   // in an effect) avoids a wasted fetch of the old page.
@@ -230,6 +246,22 @@ export function MediaFilterBar({
           {USAGE_CATEGORIES.map((category) => (
             <option key={category} value={category}>
               {USAGE_CATEGORY_LABELS[category]}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="field">
+        <label>Pasted media</label>
+        <select
+          value={filters.pasted}
+          onChange={(event) =>
+            onChange({ ...filters, pasted: event.target.value as PastedFilter })
+          }
+        >
+          {PASTED_FILTERS.map((option) => (
+            <option key={option} value={option}>
+              {PASTED_FILTER_LABELS[option]}
             </option>
           ))}
         </select>

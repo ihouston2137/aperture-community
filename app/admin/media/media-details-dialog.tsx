@@ -138,6 +138,9 @@ function DetailsBody({
                 <p className="help-text" style={{ marginTop: 0 }}>
                   {asset.originalName}
                   {asset.width ? ` · ${asset.width}×${asset.height}` : ""}
+                  {/* Said here because it is the answer to "why did I have to
+                      go looking for this": the browsers hide it by default. */}
+                  {asset.origin === "paste" ? " · pasted while editing" : ""}
                 </p>
 
                 <form key={asset._id} onSubmit={handleSubmit}>

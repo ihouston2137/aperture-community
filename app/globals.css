@@ -5884,6 +5884,27 @@ ol.doc-list ol.doc-list ol.doc-list {
   cursor: grabbing;
 }
 
+/* What a paste is doing, floated over the canvas it is doing it to. Only ever
+   shown for a pasted picture, which is the one that has to go to the network
+   before it can appear. */
+.pub-editor-pasting {
+  position: absolute;
+  top: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.9rem;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--radius);
+  background: var(--admin-panel);
+  color: var(--admin-text);
+  box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.35);
+  font-size: 0.9rem;
+}
+
 /* The canvas is clipped to the whole editor body, not to the workspace column,
    which is what lets it carry on beneath the side panels. It still cannot
    escape the builder and paint over the admin chrome. */

@@ -253,6 +253,14 @@ export type PublicationRecord = {
   coverUrl: string;
 };
 
+/**
+ * How this editor recognises its own blocks on the machine's clipboard.
+ *
+ * A key nothing else would write, so a paste of ordinary JSON copied from
+ * somewhere else is read as the words it is rather than mistaken for a page.
+ */
+const BLOCK_CLIPBOARD_KEY = "aperturePublicationBlocks";
+
 export function PublicationEditor({
   publication,
   sources,
@@ -292,6 +300,16 @@ export function PublicationEditor({
       ? initialView
       : postViews[0]?.id ?? "square"
   );
+  /**
+   * What a paste is doing, while it is doing it.
+   *
+   * Only ever set for a pasted picture, which is the one that goes to the
+   * network: a block or a line of words is on the page before anybody could
+   * read a notice about it. Doubles as where the failure is said, since a
+   * paste that quietly does nothing is indistinguishable from one that was
+   * never noticed.
+   */
+  const [pasting, setPasting] = useState("");
   const [saving, startSaving] = useTransition();
   /**
    * True for a few seconds after a save.
@@ -742,13 +760,32 @@ export function PublicationEditor({
 
   function copySelection() {
     const ids = actionable();
-    setClipboard(
-      activeBlocks
-        .filter((block) => ids.includes(block.id))
-        // A copy, so editing the original afterwards does not edit what was
-        // taken — the clipboard holds what was there when it was copied.
-        .map((block) => ({ ...block }))
-    );
+    const taken = activeBlocks
+      .filter((block) => ids.includes(block.id))
+      // A copy, so editing the original afterwards does not edit what was
+      // taken — the clipboard holds what was there when it was copied.
+      .map((block) => ({ ...block }));
+
+    setClipboard(taken);
+
+    /*
+     * Written to the machine's clipboard as well as held here.
+     *
+     * So that there is one clipboard rather than two. With a private one, a
+     * block copied in the morning would go on winning every paste for the rest
+     * of the day — a picture copied from somewhere else afterwards would have
+     * nowhere to land, because Ctrl+V already meant something. Putting the
+     * blocks where everything else puts what it copies makes the most recent
+     * copy the one that wins, whichever application it came from, and lets a
+     * block be carried between two publications or two tabs into the bargain.
+     *
+     * The private copy stays as the fallback: writing to the clipboard needs a
+     * secure context and can be refused, and a refusal must not cost somebody
+     * the copy they just made.
+     */
+    void navigator.clipboard
+      ?.writeText(JSON.stringify({ [BLOCK_CLIPBOARD_KEY]: 1, blocks: taken }))
+      .catch(() => {});
   }
 
   /**
@@ -761,9 +798,14 @@ export function PublicationEditor({
    */
   function pasteClipboard() {
     if (clipboard.length === 0) return;
+    placeBlocks(clipboard);
+  }
+
+  function placeBlocks(blocks: PublicationBlock[]) {
+    if (blocks.length === 0) return;
 
     const regroup = new Map<string, string>();
-    const pasted = clipboard.map((block, index) => {
+    const pasted = blocks.map((block, index) => {
       const groupId = block.groupId
         ? (regroup.get(block.groupId) ??
            (() => {
@@ -787,6 +829,151 @@ export function PublicationEditor({
 
     setActiveBlocks([...activeBlocks, ...pasted]);
     setSelectedIds(pasted.map((block) => block.id));
+    setStyleSlot(null);
+  }
+
+  /**
+   * Puts down whatever came off the machine's clipboard.
+   *
+   * Three things can arrive and they are tried in that order: blocks this
+   * editor copied, a picture, then words. Anything else — a file that is not
+   * an image, an empty clipboard — falls through to the blocks held privately,
+   * so the old behaviour is still there when the clipboard has nothing to say.
+   */
+  async function pasteFromSystem(data: DataTransfer): Promise<boolean> {
+    const text = data.getData("text/plain");
+
+    // Ours, and therefore blocks rather than the JSON that carries them.
+    if (text) {
+      try {
+        const parsed = JSON.parse(text);
+        if (parsed?.[BLOCK_CLIPBOARD_KEY] && Array.isArray(parsed.blocks)) {
+          placeBlocks(parsed.blocks as PublicationBlock[]);
+          return true;
+        }
+      } catch {
+        // Not JSON, so not ours. It is just words, handled below.
+      }
+    }
+
+    const picture = [...data.files].find((file) => file.type.startsWith("image/"));
+    if (picture) {
+      await pasteImage(picture);
+      return true;
+    }
+
+    if (text.trim()) {
+      pasteText(text);
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * A pasted picture, uploaded and laid on the page at its own shape.
+   *
+   * Uploaded rather than held as a data URL: a publication is saved as a
+   * record and read back on other machines, and a picture that only exists
+   * inside one browser's clipboard is a picture that is missing from every
+   * other reader's copy. It goes to the media library like any other upload,
+   * which is also what gives it a name, a thumbnail and a usage record.
+   */
+  async function pasteImage(file: File) {
+    setPasting("Uploading the pasted image…");
+
+    try {
+      // Read before the upload, and from the file rather than the response:
+      // this is the picture's own shape, and it decides the block's.
+      const shape = await imageShape(file);
+
+      const body = new FormData();
+      // Named, because a clipboard picture arrives as `image.png` at best and
+      // as nothing at all at worst, and a library of "image.png" is a library
+      // nobody can search.
+      body.append(
+        "files",
+        file,
+        file.name || `pasted-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}.png`
+      );
+      body.append("folder", "media");
+      /*
+       * Marked as a paste, so the media browsers can leave it out.
+       *
+       * A screenshot dropped into a slide is a real asset and is kept like any
+       * other, but nobody chose to file it — it is a by-product of the edit.
+       * Told apart here rather than guessed at later, because after the fact
+       * there is nothing about the file that says how it arrived.
+       */
+      body.append("origin", "paste");
+
+      const response = await fetch("/api/admin/media", { method: "POST", body });
+      const result = await response.json().catch(() => null);
+
+      if (!response.ok || !result?.assets?.[0]) {
+        // The library's own refusal, in words that mean something here: an
+        // editor without the upload grant is told what they lack rather than
+        // "Unauthorized", which reads as a fault in the editor.
+        setPasting(
+          response.status === 401
+            ? "Pasting a picture uploads it to the media library, which your role cannot do."
+            : (result?.error ?? "That image could not be uploaded.")
+        );
+        return;
+      }
+
+      const asset = result.assets[0];
+      const block = createPublicationBlock("image");
+      block.mediaUrl = asset.url ?? "";
+      block.mediaId = String(asset._id ?? "");
+      block.zIndex = activeBlocks.length + 1;
+
+      /*
+       * Sized to its own proportions, and never larger than most of the page.
+       * A photograph off a phone is several thousand units wide; dropped on at
+       * full size it would cover the slide and everything on it, and the first
+       * thing anybody would have to do is shrink it back.
+       */
+      const fit = Math.min(
+        1,
+        (activeCanvas.width * 0.6) / shape.width,
+        (activeCanvas.height * 0.6) / shape.height
+      );
+      block.width = Math.round(shape.width * fit);
+      block.height = Math.round(shape.height * fit);
+      block.x = Math.round((activeCanvas.width - block.width) / 2);
+      block.y = Math.round((activeCanvas.height - block.height) / 2);
+
+      setActiveBlocks([...activeBlocks, block]);
+      setSelectedId(block.id);
+      setStyleSlot(null);
+      setPasting("");
+    } catch {
+      setPasting("That image could not be uploaded.");
+    }
+  }
+
+  /** Pasted words, as a text block wide enough to hold them. */
+  function pasteText(text: string) {
+    const block = createPublicationBlock("text");
+    block.text = text.slice(0, 5000);
+    block.zIndex = activeBlocks.length + 1;
+
+    // Roughly as tall as the words need. An estimate, not a measurement — the
+    // block is resizable, and the point is only that a paragraph does not
+    // arrive in a box built for one line.
+    const width = Math.min(activeCanvas.width - 160, 900);
+    const lines = block.text
+      .split("\n")
+      .reduce((total, line) => total + Math.max(1, Math.ceil(line.length / 48)), 0);
+
+    block.width = width;
+    block.height = Math.min(activeCanvas.height - 80, Math.max(120, lines * 56));
+    block.x = Math.round((activeCanvas.width - block.width) / 2);
+    block.y = Math.round((activeCanvas.height - block.height) / 2);
+
+    setActiveBlocks([...activeBlocks, block]);
+    setSelectedId(block.id);
     setStyleSlot(null);
   }
 
@@ -859,12 +1046,16 @@ export function PublicationEditor({
         return;
       }
 
-      if (command && event.key.toLowerCase() === "v") {
-        if (clipboard.length === 0) return;
-        event.preventDefault();
-        pasteClipboard();
-        return;
-      }
+      /*
+       * Ctrl+V is deliberately absent.
+       *
+       * Preventing the default of the keystroke would cancel the `paste` event
+       * it produces, and that event is the only place the machine's clipboard
+       * can be read — so handling the key here would mean never seeing a
+       * pasted picture. The listener below does the whole job, including
+       * falling back to the blocks held privately when the clipboard has
+       * nothing to offer.
+       */
 
       if (event.key === "Delete" || event.key === "Backspace") {
         if (selectedIds.length === 0) return;
@@ -879,6 +1070,54 @@ export function PublicationEditor({
     return () => window.removeEventListener("keydown", onKey);
     // Everything these read is captured on each render, which is what keeps
     // them acting on the selection as it stands rather than as it was.
+  });
+
+  /**
+   * A paste from anywhere: this editor, another tab, or another application.
+   *
+   * On the window rather than on the canvas, because nothing on the canvas
+   * holds the focus — the page is a surface, not a field. Guarded exactly as
+   * the keyboard shortcuts are, so pasting into a box in the inspector still
+   * pastes into that box.
+   */
+  useEffect(() => {
+    const onPaste = (event: ClipboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (
+        target?.closest(
+          "input, textarea, select, [contenteditable=''], [contenteditable='true']"
+        )
+      ) {
+        return;
+      }
+
+      const data = event.clipboardData;
+      if (!data) return;
+
+      // Held before the handler goes async: the event's data is only readable
+      // while the event is being dispatched.
+      const files = [...data.files];
+      const text = data.getData("text/plain");
+      const hasSomething = files.length > 0 || Boolean(text);
+
+      event.preventDefault();
+
+      if (!hasSomething) {
+        pasteClipboard();
+        return;
+      }
+
+      void (async () => {
+        const handled = await pasteFromSystem(data);
+        // Nothing the clipboard offered could be used — a copied file that is
+        // not a picture, most likely. The blocks held here are still a paste.
+        if (!handled) pasteClipboard();
+      })();
+    };
+
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+    // Reads the selection and the blocks as they stand, like the key handler.
   });
 
   /** Lines the selection up, against itself or against the page. */
@@ -926,6 +1165,27 @@ export function PublicationEditor({
       )
     );
     setOpenGroupId(null);
+  }
+
+  /**
+   * The pasted picture's own dimensions.
+   *
+   * Read from the file in the browser rather than taken from the upload's
+   * reply: the reply's width and height describe the thumbnail that was
+   * generated from it, and a block built to a thumbnail's proportions would be
+   * right only by coincidence.
+   */
+  async function imageShape(file: File): Promise<{ width: number; height: number }> {
+    try {
+      const bitmap = await createImageBitmap(file);
+      const shape = { width: bitmap.width, height: bitmap.height };
+      bitmap.close();
+      return shape;
+    } catch {
+      // A format the decoder will not open — an SVG in some browsers. The
+      // block still gets a sensible box rather than a zero-sized one.
+      return { width: 800, height: 600 };
+    }
   }
 
   function addBlock(type: PublicationBlockType) {
@@ -1729,6 +1989,28 @@ export function PublicationEditor({
             setMenu({ x: event.clientX, y: event.clientY, onBlock: false });
           }}
         >
+          {/* Over the canvas rather than beside it: a pasted picture takes a
+              moment to upload, and where somebody is looking while they wait
+              for it is where they expect it to appear. Inside the workspace,
+              which is the positioned ancestor, and deaf to the pointer
+              handlers that draw a marquee across it. */}
+          {pasting ? (
+            <div
+              className="pub-editor-pasting"
+              role="status"
+              onPointerDown={(event) => event.stopPropagation()}
+            >
+              {pasting}
+              <button
+                type="button"
+                className="btn btn-sm"
+                onClick={() => setPasting("")}
+              >
+                Dismiss
+              </button>
+            </div>
+          ) : null}
+
           <div
             className="pub-editor-canvas"
             ref={canvasRef}

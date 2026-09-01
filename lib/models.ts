@@ -1138,6 +1138,20 @@ const MediaAssetSchema = new Schema<any>(
     mediaType: { type: String, enum: MEDIA_TYPES, default: "image" },
     provider: { type: String, enum: MEDIA_PROVIDERS, default: "local" },
     embedUrl: { type: String, default: "" },
+    /**
+     * How the file got here.
+     *
+     * `paste` is a picture that arrived off somebody's clipboard while they
+     * were editing — a screenshot, a crop, something dragged out of a chat.
+     * They are real assets and are kept like any other, but they are a
+     * by-product of an edit rather than something anybody chose to file, so
+     * the browsers leave them out until asked for.
+     *
+     * Absent on everything uploaded before this existed, which is why the
+     * filter tests for "not paste" rather than for "upload": a library's whole
+     * history must not disappear behind a new default.
+     */
+    origin: { type: String, enum: ["upload", "paste"], default: "upload" },
     usage: { type: [MediaUsageSchema], default: [] },
   },
   { timestamps: true }
@@ -1152,6 +1166,9 @@ MediaAssetSchema.index({ createdAt: -1 });
 MediaAssetSchema.index({ mediaType: 1, createdAt: -1 });
 MediaAssetSchema.index({ "usage.refId": 1 });
 MediaAssetSchema.index({ "usage.kind": 1, createdAt: -1 });
+/* Every listing now carries an origin condition, and every listing sorts by
+   this — the same shape as the media-type index above. */
+MediaAssetSchema.index({ origin: 1, createdAt: -1 });
 // `syncMediaUsage` resolves url-only references back to assets.
 MediaAssetSchema.index({ url: 1 });
 MediaAssetSchema.index({ tags: 1 });

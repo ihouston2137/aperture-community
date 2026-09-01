@@ -26,7 +26,25 @@ const MAX_PAGE_SIZE = 200;
 
 /** Fields the grids actually render — never the whole document. */
 export const MEDIA_LIST_PROJECTION =
-  "url thumbnailUrl title alt caption originalName mediaType provider embedUrl isNsfw tags usage width height createdAt";
+  "url thumbnailUrl title alt caption originalName mediaType provider embedUrl isNsfw origin tags usage width height createdAt";
+
+/**
+ * What a browser does about media that arrived off somebody's clipboard.
+ *
+ * `exclude` is the default everywhere. A pasted screenshot is a by-product of
+ * an edit rather than something anybody chose to file, and a library that
+ * fills up with them stops being a library. `only` is how they are found again
+ * to be tidied away — without it, excluding them by default would mean
+ * hunting for them among everything else, which is the same problem again.
+ */
+export const PASTED_FILTERS = ["exclude", "include", "only"] as const;
+export type PastedFilter = (typeof PASTED_FILTERS)[number];
+
+export const PASTED_FILTER_LABELS: Record<PastedFilter, string> = {
+  exclude: "Hide pasted media",
+  include: "Include pasted media",
+  only: "Only pasted media",
+};
 
 export type MediaQueryInput = {
   q?: string | null;
@@ -35,6 +53,7 @@ export type MediaQueryInput = {
   ref?: string | null;
   page?: string | null;
   limit?: string | null;
+  pasted?: string | null;
 };
 
 export type MediaQuery = {
@@ -68,6 +87,17 @@ export function buildMediaQuery(input: MediaQueryInput): MediaQuery {
         : { usage: { $elemMatch: { kind: { $in: kinds } } } }
     );
   }
+
+  /*
+   * Tested as "not paste" rather than "is upload".
+   *
+   * Everything filed before this was recorded carries no `origin` at all, and
+   * `{ origin: "upload" }` would not match a missing field — turning a new
+   * default into a library that appears to have emptied itself.
+   */
+  const pasted = (input.pasted ?? "exclude").trim() as PastedFilter;
+  if (pasted === "only") conditions.push({ origin: "paste" });
+  else if (pasted !== "include") conditions.push({ origin: { $ne: "paste" } });
 
   const q = (input.q ?? "").trim();
   if (q) {

@@ -43,6 +43,7 @@ export async function GET(request: NextRequest) {
     ref: params.get("ref"),
     page: params.get("page"),
     limit: params.get("limit"),
+    pasted: params.get("pasted"),
   });
 
   const [assets, total] = await Promise.all([
@@ -148,6 +149,9 @@ export async function POST(request: NextRequest) {
         alt: String(formData.get("alt") ?? ""),
         caption: String(formData.get("caption") ?? ""),
         isNsfw: formData.get("isNsfw") === "true",
+        // Only the editors that paste say so; everything else is an upload
+        // somebody chose to make, which is the default.
+        origin: formData.get("origin") === "paste" ? "paste" : "upload",
         mediaType: mediaTypeForMime(stored.mimeType),
         provider: "local",
       });
