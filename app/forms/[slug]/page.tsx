@@ -36,7 +36,7 @@ export default async function PublicFormPage({
   // it is guarded like every other kind of content — otherwise a members-only
   // form would be a members-only *link* to a public form.
   // A test has its own address, its own heading and its own rules about who
-  // may sit it. Sending it here would render one thing under the other's name.
+  // may take it. Sending it here would render one thing under the other's name.
   if (form.kind === "test") redirect(`/test/${slug}`);
 
   await guardContent("form", String(form._id), `/forms/${slug}`);

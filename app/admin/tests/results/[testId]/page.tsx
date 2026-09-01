@@ -50,13 +50,13 @@ export default async function TestResultPage({
     const name = String(submission.userName ?? "").trim();
     return {
       _id: String(submission._id),
-      // A sitting from before takers were recorded has no name to show, and
+      // A result from before takers were recorded has no name to show, and
       // saying so is better than showing an empty cell.
       name: name ? surnameFirst(name) : "Not recorded",
       attempts: submission.attempts ?? 1,
       percent: submission.grade?.percent ?? 0,
       passMark: submission.grade?.passMark ?? 0,
-      // A sitting recorded before the threshold existed was judged by nothing,
+      // A result recorded before the threshold existed was judged by nothing,
       // which is what `null` says.
       passed:
         typeof submission.grade?.passed === "boolean"
@@ -81,7 +81,7 @@ export default async function TestResultPage({
           records.reduce((total, row) => total + row.percent, 0) / records.length
         );
 
-  // Only those actually judged: a sitting from before the threshold was set is
+  // Only those actually judged: a result from before the threshold was set is
   // neither a pass nor a fail, and counting it as either would be a made-up
   // number in the one place the figures have to be trusted.
   const judged = records.filter((row) => row.passed !== null);
@@ -99,12 +99,12 @@ export default async function TestResultPage({
         title={test?.title ?? "Untitled test"}
         subtitle={
           records.length === 0
-            ? "Nobody has sat this yet."
+            ? "Nobody has taken this yet."
             : `${records.length} ${
                 records.length === 1 ? "person" : "people"
               } · ${average}% average${
                 judged.length > 0 ? ` · ${passes} of ${judged.length} passed` : ""
-              } · each person's best sitting`
+              } · each person's best result is the one kept`
         }
         actions={
           test ? (

@@ -34,7 +34,7 @@ export default async function TestResultsPage() {
         $group: {
           _id: "$formId",
           takers: { $sum: 1 },
-          sittings: { $sum: { $ifNull: ["$attempts", 1] } },
+          attempts: { $sum: { $ifNull: ["$attempts", 1] } },
           average: { $avg: "$grade.percent" },
           latest: { $max: "$createdAt" },
         },
@@ -53,20 +53,20 @@ export default async function TestResultsPage() {
       title: test.title ?? "",
       status: test.status ?? "draft",
       takers: found?.takers ?? 0,
-      sittings: found?.sittings ?? 0,
+      attempts: found?.attempts ?? 0,
       average: found?.average ? Math.round(found.average) : 0,
       latest: found?.latest ? new Date(found.latest).toISOString() : "",
     };
   });
 
-  // The ones people are actually sitting first, then alphabetically.
+  // The ones people are actually taking first, then alphabetically.
   cards.sort((a, b) => b.takers - a.takers || a.title.localeCompare(b.title));
 
   return (
     <>
       <AdminHeader
         title="Test results"
-        subtitle="One card per test. Each person's best sitting is the one kept."
+        subtitle="One card per test. Each person's best result is the one kept."
       />
 
       {cards.length === 0 ? (
@@ -94,7 +94,7 @@ export default async function TestResultsPage() {
                   <strong>{card.takers === 0 ? "—" : `${card.average}%`}</strong>
                   <span className="help-text">
                     {card.takers === 0
-                      ? "nobody has sat it yet"
+                      ? "nobody has taken it yet"
                       : `average of ${card.takers} ${
                           card.takers === 1 ? "person" : "people"
                         }`}
@@ -103,9 +103,9 @@ export default async function TestResultsPage() {
 
                 <span className="inbox-card-foot">
                   {card.takers === 0
-                    ? "No sittings yet"
-                    : `${card.sittings} sitting${
-                        card.sittings === 1 ? "" : "s"
+                    ? "Nobody has taken it yet"
+                    : `${card.attempts} attempt${
+                        card.attempts === 1 ? "" : "s"
                       } · last ${new Date(card.latest).toLocaleDateString()}`}
                 </span>
               </Link>

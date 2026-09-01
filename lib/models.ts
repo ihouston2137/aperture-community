@@ -1426,21 +1426,21 @@ const FormSubmissionSchema = new Schema<any>(
     /** Which question and which variant of it was served, in order. */
     sitting: { type: [Mixed], default: [] },
     /**
-     * Who sat it, for a test.
+     * Who took it, for a test.
      *
      * A form is answered by whoever opens it and may be answered anonymously;
-     * a test is sat by somebody, and a result nobody is attached to is not a
+     * a test is taken by somebody, and a result nobody is attached to is not
      * result. Their name is stored alongside the id so a list of results reads
      * without a second query, and so a member since removed still shows as
-     * whoever sat it.
+     * whoever took it.
      */
     userId: { type: String, default: "" },
     userName: { type: String, default: "" },
     /**
-     * How many times they have sat it, this attempt included.
+     * How many times they have taken it, this attempt included.
      *
      * One row per person per test, holding their best result — so this is a
-     * count of sittings rather than a count of rows, and the two would
+     * count of attempts rather than a count of rows, and the two would
      * otherwise disagree the first time somebody retook anything.
      */
     attempts: { type: Number, default: 1 },

@@ -258,7 +258,7 @@ export function TestBuilder({
         </div>
 
         <div className="field" style={{ maxWidth: "16rem" }}>
-          <label htmlFor="test-attempts">Times one person may sit it</label>
+          <label htmlFor="test-attempts">Times one person may take it</label>
           <input
             id="test-attempts"
             type="number"
@@ -274,7 +274,7 @@ export function TestBuilder({
           <span className="help-text">
             {test.attemptLimit === 0
               ? "Zero is as often as they like."
-              : `Their best sitting is the one kept, whichever of the ${test.attemptLimit} it was.`}{" "}
+              : `Their best result is the one kept, whichever of the ${test.attemptLimit} attempts it came from.`}{" "}
             Counted per person, which is why a test asks somebody to sign in.
           </span>
         </div>
@@ -297,7 +297,7 @@ export function TestBuilder({
             {test.passMark === 0
               ? "Zero passes nobody and fails nobody — the test just reports a mark."
               : `${test.passMark}% and above passes.`}{" "}
-            Recorded with each sitting, so raising it later does not turn a
+            Recorded with each attempt, so raising it later does not turn a
             past pass into a fail.
           </span>
         </div>
@@ -320,7 +320,7 @@ export function TestBuilder({
         </label>
 
         <p className="help-text">
-          The three ways of varying a sitting compose: a pool is drawn from, a
+          The three ways of varying an attempt compose: a pool is drawn from, a
           variant is picked for each question drawn, then the order is shuffled.
           Using none of them gives the same paper every time.
         </p>
@@ -478,7 +478,7 @@ function QuestionCard({
 
       {question.variants.length > 1 ? (
         <p className="help-text">
-          {question.variants.length} variants — one is drawn each sitting.
+          {question.variants.length} variants — one is drawn each attempt.
         </p>
       ) : null}
 

@@ -117,7 +117,7 @@ export type TestQuestion = {
   id: string;
   /** What it is worth. Ungradable questions are worth nothing whatever this says. */
   points: number;
-  /** At least one. Several means one is drawn per sitting. */
+  /** At least one. Several means one is drawn per attempt. */
   variants: TestVariant[];
 };
 
@@ -133,9 +133,9 @@ export type TestSettings = {
    */
   instructions: string;
   /**
-   * How many times one person may sit it. Zero is as often as they like.
+   * How many times one person may take it. Zero is as often as they like.
    *
-   * Counted per person rather than per sitting, which is why the taker is
+   * Counted per person rather than per attempt, which is why the taker is
    * recorded — a limit nobody is identified against is not a limit.
    */
   attemptLimit: number;
@@ -152,9 +152,9 @@ export type TestSettings = {
   titleStyle: StyleSlot;
   instructionsStyle: StyleSlot;
   /**
-   * How many questions a sitting asks. Zero asks all of them.
+   * How many questions an attempt asks. Zero asks all of them.
    *
-   * Drawing ten from twenty-five is the cheapest way to make two sittings
+   * Drawing ten from twenty-five is the cheapest way to make two attempts
    * different papers, and it grades out of ten either way — the denominator is
    * what was asked, never what was written.
    */
@@ -436,7 +436,7 @@ export type TestGrade = {
   available: number;
   percent: number;
   /**
-   * The mark this sitting was judged against, and whether it made it.
+   * The mark this attempt was judged against, and whether it made it.
    *
    * Both recorded rather than worked out when the result is read, for the same
    * reason the grade itself is: the threshold can be changed afterwards, and a

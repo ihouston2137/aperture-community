@@ -52,7 +52,7 @@ export default async function TestPage({
   const formSettings = normalizeFormSettings(test.settings);
 
   /*
-   * How many sittings they have left.
+   * How many attempts they have left.
    *
    * Counted here as well as on submit: a candidate who has used their attempts
    * should be told before they answer forty questions, not after. The submit

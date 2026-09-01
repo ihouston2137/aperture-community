@@ -10,7 +10,7 @@ export type ResultRecord = {
   name: string;
   attempts: number;
   percent: number;
-  /** The threshold the sitting was judged against, and whether it made it. */
+  /** The threshold the result was judged against, and whether it made it. */
   passMark: number;
   passed: boolean | null;
   scored: number;
@@ -31,7 +31,7 @@ export type ResultRecord = {
 /**
  * A test's results, a row per person.
  *
- * One row each rather than one per sitting: a retake is the same person trying
+ * One row each rather than one per attempt: a retake is the same person trying
  * again, and what a results list answers is how well each of them can do it.
  * The attempt count is beside the mark, so a first-time pass and a fourth-time
  * pass are told apart without being two rows.
@@ -63,7 +63,7 @@ export function TestResultsList({ records }: { records: ResultRecord[] }) {
               <th className="is-figure">Result</th>
               <th>Outcome</th>
               <th className="is-figure">Attempts</th>
-              <th>Best sitting</th>
+              <th>Taken</th>
               <th />
             </tr>
           </thead>
@@ -174,7 +174,7 @@ function ResultDialog({
 
             {record.questions.length === 0 ? (
               <p className="admin-subtitle">
-                This sitting was recorded before the per-question marking was
+                This result was recorded before the per-question marking was
                 kept, so only the total is known.
               </p>
             ) : (

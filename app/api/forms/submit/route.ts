@@ -145,14 +145,14 @@ export async function POST(request: NextRequest) {
 
   if (isTest && taker) {
     /*
-     * One row per person per test, holding their best sitting.
+     * One row per person per test, holding their best result.
      *
      * Retaking is not a second result — it is the same person trying again,
      * and what is wanted from the list is how well they can do it. A tie goes
      * to the later attempt, since the more recent answer is the one that
      * reflects where they are now.
      *
-     * The count is of sittings and survives whichever paper is kept, so a
+     * The count is of attempts and survives whichever paper is kept, so a
      * limit still means what it says after a retake that scored worse.
      */
     const previous = await FormSubmission.findOne({
@@ -185,8 +185,8 @@ export async function POST(request: NextRequest) {
           formTitle: form.title ?? "",
           userName: taker.name,
           attempts,
-          // Only the kept paper's answers, so the row is one whole sitting
-          // rather than this attempt's grade against that attempt's answers.
+          // Only the kept paper's answers, so the row is one whole attempt
+          // rather than this attempt's grade against another's answers.
           ...(better
             ? { data, fields, grade, sitting, status: "new", createdAt: new Date() }
             : {}),
