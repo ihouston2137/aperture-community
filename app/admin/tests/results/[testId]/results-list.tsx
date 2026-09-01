@@ -36,9 +36,44 @@ export type ResultRecord = {
  * The attempt count is beside the mark, so a first-time pass and a fourth-time
  * pass are told apart without being two rows.
  */
-export function TestResultsList({ records }: { records: ResultRecord[] }) {
+export function TestResultsList({
+  records,
+  canDelete,
+}: {
+  records: ResultRecord[];
+  /** Whoever may read results may also remove one — see the note on `remove`. */
+  canDelete: boolean;
+}) {
+  const [rows, setRows] = useState(records);
   const [openId, setOpenId] = useState<string | null>(null);
-  const open = records.find((row) => row._id === openId) ?? null;
+  const [confirming, setConfirming] = useState<string | null>(null);
+  const [error, setError] = useState("");
+  const open = rows.find((row) => row._id === openId) ?? null;
+
+  /*
+   * Remove one result.
+   *
+   * Which is also how somebody is let back in: the attempt count lives on the
+   * record, so taking it away returns them to nought attempts. That is the
+   * point rather than a side effect — a candidate cut off mid-test, or one who
+   * sat it by mistake, needs the result gone and another go.
+   */
+  async function remove(id: string) {
+    setError("");
+    const response = await fetch(`/api/admin/forms/submissions/${id}`, {
+      method: "DELETE",
+    });
+
+    if (!response.ok) {
+      const result = await response.json().catch(() => ({}));
+      setError(result.error ?? "That result could not be deleted.");
+      return;
+    }
+
+    setRows((current) => current.filter((row) => row._id !== id));
+    setConfirming(null);
+    setOpenId((current) => (current === id ? null : current));
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -49,12 +84,18 @@ export function TestResultsList({ records }: { records: ResultRecord[] }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [open]);
 
-  if (records.length === 0) {
-    return <p className="admin-subtitle">No results yet.</p>;
+  if (rows.length === 0) {
+    return (
+      <p className="admin-subtitle">
+        {records.length === 0 ? "No results yet." : "Every result has been deleted."}
+      </p>
+    );
   }
 
   return (
     <>
+      {error ? <div className="admin-notice is-error">{error}</div> : null}
+
       <div className="submission-rows">
         <table className="admin-table">
           <thead>
@@ -68,7 +109,7 @@ export function TestResultsList({ records }: { records: ResultRecord[] }) {
             </tr>
           </thead>
           <tbody>
-            {records.map((row) => (
+            {rows.map((row) => (
               <tr
                 key={row._id}
                 className="is-openable"
@@ -109,14 +150,57 @@ export function TestResultsList({ records }: { records: ResultRecord[] }) {
 
                 <td className="is-figure">{row.attempts}</td>
                 <td>{new Date(row.takenAt).toLocaleString()}</td>
-                <td className="is-narrow" />
+
+                <td className="is-narrow">
+                  {!canDelete ? null : confirming === row._id ? (
+                    <span className="admin-list-actions">
+                      <button
+                        type="button"
+                        className="btn btn-danger btn-sm"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          remove(row._id);
+                        }}
+                      >
+                        Delete
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-sm"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setConfirming(null);
+                        }}
+                      >
+                        Cancel
+                      </button>
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      className="btn btn-sm"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setConfirming(row._id);
+                      }}
+                    >
+                      Delete
+                    </button>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
 
-      {open ? <ResultDialog record={open} onClose={() => setOpenId(null)} /> : null}
+      {open ? (
+        <ResultDialog
+          record={open}
+          onClose={() => setOpenId(null)}
+          onDelete={canDelete ? () => remove(open._id) : undefined}
+        />
+      ) : null}
     </>
   );
 }
@@ -125,10 +209,15 @@ export function TestResultsList({ records }: { records: ResultRecord[] }) {
 function ResultDialog({
   record,
   onClose,
+  onDelete,
 }: {
   record: ResultRecord;
   onClose: () => void;
+  /** Absent where the reader may not remove one. */
+  onDelete?: () => void;
 }) {
+  const [confirming, setConfirming] = useState(false);
+
   return (
     <ModalPortal>
       <div className="style-modal-backdrop" onClick={onClose}>
@@ -205,6 +294,44 @@ function ResultDialog({
           </div>
 
           <div className="style-modal-footer">
+            {onDelete ? (
+              confirming ? (
+                <>
+                  <button
+                    type="button"
+                    className="btn btn-danger"
+                    onClick={onDelete}
+                  >
+                    Yes, delete this result
+                  </button>
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => setConfirming(false)}
+                  >
+                    Cancel
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  className="btn btn-danger"
+                  onClick={() => setConfirming(true)}
+                >
+                  Delete
+                </button>
+              )
+            ) : null}
+
+            {/* Said where the decision is made: deleting the record is how
+                somebody who used up their attempts is let back in. */}
+            {onDelete && !confirming ? (
+              <span className="help-text" style={{ maxWidth: "20rem" }}>
+                Deleting this returns them to no attempts, so they may take the
+                test again.
+              </span>
+            ) : null}
+
             <button
               type="button"
               className="btn btn-primary"

@@ -115,7 +115,10 @@ export default async function TestResultPage({
         }
       />
 
-      <TestResultsList records={records} />
+      {/* Reading results and removing one are the same grant: whoever is
+          trusted to see a mark is the person who has to take a mistaken one
+          away, and there is nobody else the job could fall to. */}
+      <TestResultsList records={records} canDelete />
     </>
   );
 }
