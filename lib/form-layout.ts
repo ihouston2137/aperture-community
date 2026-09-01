@@ -275,6 +275,25 @@ export function normalizeFormBlock(input: unknown): FormBlock | null {
       block.required = Boolean(raw.required);
       block.defaultValue = str(raw.defaultValue);
 
+      /*
+       * A picture belonging to the question, shown under it and above the
+       * answer.
+       *
+       * Kept on the field itself rather than as an image block beside it,
+       * because it is part of the question: "which of these is the aileron"
+       * is not a question at all without the photograph, and a test that
+       * draws its questions from a pool has to carry the picture with
+       * whichever one it drew. An image block would be a separate thing on a
+       * page the test does not have.
+       *
+       * The same fields the image block uses, so nothing downstream has to
+       * learn a second name for a picture.
+       */
+      block.mediaId = str(raw.mediaId);
+      block.mediaUrl = sanitizeMediaPath(str(raw.mediaUrl));
+      block.alt = str(raw.alt);
+      block.width = num(raw.width, 0);
+
       if (type === "select" || type === "radio" || type === "checkboxGroup") {
         block.options = Array.isArray(raw.options)
           ? raw.options.map((option) => str(option)).filter(Boolean).slice(0, 100)

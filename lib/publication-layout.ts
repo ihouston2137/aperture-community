@@ -173,6 +173,23 @@ export type PublicationPage = {
   videoLoop: boolean;
   audioUrl: string;
   blocks: PublicationBlock[];
+  /**
+   * Kept out of the order somebody pages through.
+   *
+   * Not a private page and not an unpublished one — it is part of the
+   * publication and anybody can reach it. It simply is not on the way to
+   * anywhere: the arrows, the wheel, the keyboard and the slideshow all step
+   * over it, and the only way in is a link on another page. An appendix, a
+   * long footnote, the terms behind a "read the small print".
+   */
+  hidden: boolean;
+  /**
+   * Offer a way back to whatever linked here. Ignored on a page that is not
+   * hidden, which is already somewhere the arrows can leave.
+   */
+  showBack: boolean;
+  /** What that way back is called. */
+  backLabel: string;
   /** The page layout this page is built on, if any. */
   templateId: string;
   /** Per-view block overrides for social posts, keyed by view id. */
@@ -350,6 +367,9 @@ export function createPublicationPage(index = 0): PublicationPage {
     videoLoop: true,
     audioUrl: "",
     blocks: [],
+    hidden: false,
+    showBack: true,
+    backLabel: "Back",
     templateId: "",
     viewOverrides: {},
   };
@@ -602,6 +622,12 @@ export function normalizePublicationPage(input: unknown, index: number): Publica
       .slice(0, 300)
       .map(normalizePublicationBlock)
       .filter((block): block is PublicationBlock => block !== null),
+    hidden: Boolean(raw.hidden),
+    // A page hidden without saying anything about a way back gets one: it is
+    // reached by a link and left by nothing else, and the alternative is a
+    // reader who has to work out that the arrows will do it.
+    showBack: raw.showBack === undefined ? true : Boolean(raw.showBack),
+    backLabel: str(raw.backLabel, "Back").slice(0, 60),
     templateId: str(raw.templateId),
     viewOverrides:
       raw.viewOverrides && typeof raw.viewOverrides === "object"

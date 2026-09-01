@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import {
   effectiveBackground,
@@ -56,6 +63,15 @@ export function PublicationViewer({
   fileName?: string;
 }) {
   const [index, setIndex] = useState(0);
+  /**
+   * Where a link came from, so a hidden page can offer the way back.
+   *
+   * A stack rather than one value, because a hidden page may link to another:
+   * an appendix that refers to a second appendix should come back through both
+   * rather than jumping over the first. Reset by ordinary paging, since
+   * stepping off a hidden page is leaving it rather than returning from it.
+   */
+  const [cameFrom, setCameFrom] = useState<number[]>([]);
   const [scale, setScale] = useState(1);
   // Enabled says it *can* advance on its own; autoplay says it does so
   // without being asked.
@@ -65,15 +81,72 @@ export function PublicationViewer({
   const hostRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
 
+  /** The pages somebody actually pages through. */
+  const browsable = useMemo(
+    () => pages.map((page, at) => (page.hidden ? -1 : at)).filter((at) => at >= 0),
+    [pages]
+  );
+
+  /**
+   * One step along the browse order, skipping anything hidden.
+   *
+   * Walks the real array rather than an index into a filtered copy, so a
+   * reader standing on a hidden page can still step off it — forward goes to
+   * the next visible page after where that page sits, back to the one before.
+   * Being unreachable by paging is not the same as being a trap.
+   *
+   * A publication whose every page is hidden stays where it is, which beats
+   * looping forever looking for somewhere to go.
+   */
+  const step = useCallback(
+    (from: number, direction: 1 | -1) => {
+      if (browsable.length === 0) return from;
+
+      for (let at = from + direction; at >= 0 && at < pages.length; at += direction) {
+        if (!pages[at].hidden) return at;
+      }
+
+      if (!slideshow.loop) {
+        // Off the end: stay on the last page there is to browse, which is what
+        // stopping at the end has always meant here.
+        const edge = direction === 1 ? browsable[browsable.length - 1] : browsable[0];
+        return pages[from]?.hidden ? edge : from;
+      }
+
+      return direction === 1 ? browsable[0] : browsable[browsable.length - 1];
+    },
+    [browsable, pages, slideshow.loop]
+  );
+
   const goTo = useCallback(
     (next: number) => {
       if (pages.length === 0) return;
-      if (next < 0) return setIndex(slideshow.loop ? pages.length - 1 : 0);
-      if (next >= pages.length) return setIndex(slideshow.loop ? 0 : pages.length - 1);
+      // Paging away is leaving, not returning: the trail back belongs to the
+      // link that made it, and following the arrows off a hidden page is not
+      // following that link back.
+      setCameFrom([]);
       setIndex(next);
     },
-    [pages.length, slideshow.loop]
+    [pages.length]
   );
+
+  /** Follows a link, remembering where it was followed from. */
+  const navigateTo = useCallback(
+    (target: number, from: number) => {
+      setCameFrom((trail) => (pages[target]?.hidden ? [...trail, from] : []));
+      setIndex(target);
+    },
+    [pages]
+  );
+
+  const goBack = useCallback(() => {
+    setCameFrom((trail) => {
+      const to = trail[trail.length - 1];
+      if (to === undefined) return trail;
+      setIndex(to);
+      return trail.slice(0, -1);
+    });
+  }, []);
 
   // Fit the canvas inside the viewport without cropping.
   useLayoutEffect(() => {
@@ -89,11 +162,18 @@ export function PublicationViewer({
     return () => window.removeEventListener("resize", measure);
   }, [canvas.width, canvas.height]);
 
+  /*
+   * Advances on its own, but never off a page somebody was linked to.
+   *
+   * A hidden page is somewhere a reader chose to go; sliding out from under
+   * them after four seconds would undo the choice. The show waits there until
+   * they leave, by the back button or by an arrow.
+   */
   useEffect(() => {
-    if (!playing || pages.length < 2) return;
-    const timer = setInterval(() => goTo(index + 1), slideshow.intervalMs);
+    if (!playing || browsable.length < 2 || pages[index]?.hidden) return;
+    const timer = setInterval(() => setIndex(step(index, 1)), slideshow.intervalMs);
     return () => clearInterval(timer);
-  }, [playing, index, pages.length, slideshow.intervalMs, goTo]);
+  }, [playing, index, pages, browsable.length, slideshow.intervalMs, step]);
 
   /*
    * The wheel turns the page.
@@ -107,7 +187,7 @@ export function PublicationViewer({
    */
   useEffect(() => {
     const host = hostRef.current;
-    if (!host || pages.length < 2) return;
+    if (!host || browsable.length < 2) return;
 
     let settledAt = 0;
     const onWheel = (event: WheelEvent) => {
@@ -122,21 +202,27 @@ export function PublicationViewer({
       if (now - settledAt < 350) return;
       settledAt = now;
 
-      goTo(index + (travel > 0 ? 1 : -1));
+      goTo(step(index, travel > 0 ? 1 : -1));
     };
 
     host.addEventListener("wheel", onWheel, { passive: false });
     return () => host.removeEventListener("wheel", onWheel);
-  }, [index, goTo, pages.length]);
+  }, [index, goTo, step, browsable.length]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "ArrowRight" || event.key === " ") goTo(index + 1);
-      if (event.key === "ArrowLeft") goTo(index - 1);
+      // Escape retraces a link before it does anything else: on a page reached
+      // that way it is the gesture everybody tries first.
+      if (event.key === "Escape" && cameFrom.length > 0) {
+        goBack();
+        return;
+      }
+      if (event.key === "ArrowRight" || event.key === " ") goTo(step(index, 1));
+      if (event.key === "ArrowLeft") goTo(step(index, -1));
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [index, goTo]);
+  }, [index, goTo, step, goBack, cameFrom.length]);
 
   useEffect(() => {
     const element = audioRef.current;
@@ -149,6 +235,11 @@ export function PublicationViewer({
   }
 
   const pageAudio = pages[index]?.audioUrl;
+
+  /** Where this page sits in the browse order, or null if it is outside it. */
+  const browsePosition = pages[index]?.hidden
+    ? null
+    : browsable.indexOf(index) + 1;
 
   return (
     <div className="pub-viewer" ref={hostRef}>
@@ -199,6 +290,10 @@ export function PublicationViewer({
                   : undefined
             }
             aria-hidden={pageIndex !== index}
+            // Read by the PDF capture, which leaves these out: a printed copy
+            // has no links, so a page reachable only by one has no place in
+            // the run of pages somebody turns.
+            data-unlisted={page.hidden ? "true" : undefined}
           >
             {background.backgroundType === "color" ? (
               <div className="pub-bg" style={{ background: background.backgroundColor }} />
@@ -240,7 +335,9 @@ export function PublicationViewer({
                   sources={sources}
                   onNavigate={(pageId) => {
                     const target = pages.findIndex((candidate) => candidate.id === pageId);
-                    if (target >= 0) setIndex(target);
+                    // Through `navigateTo`, which is what remembers the way
+                    // back — a hidden page has no other way out.
+                    if (target >= 0) navigateTo(target, index);
                   }}
                 />
               </div>
@@ -274,17 +371,35 @@ export function PublicationViewer({
         />
       ) : null}
 
-      {showControls && !navHidden && pages.length > 1 ? (
+      {/* The way back off a linked page.
+          Its own control rather than a place in the nav bar: it belongs to the
+          page somebody was sent to, comes and goes with that page, and reads
+          as the answer to "how do I get out of here" only if it is somewhere
+          the eye lands first. */}
+      {!navHidden && pages[index]?.hidden && pages[index].showBack && cameFrom.length > 0 ? (
+        <button type="button" className="pub-back" onClick={goBack}>
+          <IconView name="ChevronLeft" width="1rem" height="1rem" />
+          {pages[index].backLabel || "Back"}
+        </button>
+      ) : null}
+
+      {showControls && !navHidden && browsable.length > 1 ? (
         <div className="pub-controls">
           {/* Arrows rather than the ‹ › glyphs, which at this size read as
               punctuation instead of something to press. */}
-          <button type="button" onClick={() => goTo(index - 1)} aria-label="Previous page">
+          <button type="button" onClick={() => goTo(step(index, -1))} aria-label="Previous page">
             <IconView name="ChevronLeft" width="1.25rem" height="1.25rem" />
           </button>
           <span style={{ color: "#fff", alignSelf: "center", fontSize: "0.8125rem" }}>
-            {index + 1} / {pages.length}
+            {/* Counted over what can be browsed, so the total matches what the
+                arrows can actually reach. A hidden page is not in that run and
+                has no number in it — saying so beats naming a position the
+                reader cannot get back to by counting. */}
+            {browsePosition === null
+              ? `— / ${browsable.length}`
+              : `${browsePosition} / ${browsable.length}`}
           </span>
-          <button type="button" onClick={() => goTo(index + 1)} aria-label="Next page">
+          <button type="button" onClick={() => goTo(step(index, 1))} aria-label="Next page">
             <IconView name="ChevronRight" width="1.25rem" height="1.25rem" />
           </button>
           {slideshow.enabled ? (

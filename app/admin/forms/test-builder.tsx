@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { MediaField } from "@/app/admin/media/media-picker";
 import { AdminHeader, Panel } from "@/components/admin-ui";
 import { FormFieldView } from "@/components/form-shell";
 import {
@@ -708,6 +709,56 @@ function VariantCard({
             onChange={(event) => patchBlock({ helpText: event.target.value })}
           />
         </div>
+
+        {/* Part of the question, so it is set with the question rather than
+            among the styling: a diagram or a photograph the answer depends on
+            is not decoration. Shown under the wording and above the answer. */}
+        <MediaField
+          label="Picture (optional)"
+          value={block.mediaUrl ?? ""}
+          mediaType="image"
+          onChange={(mediaUrl, asset) =>
+            patchBlock({ mediaUrl, mediaId: asset?._id ?? "" })
+          }
+        />
+
+        {block.mediaUrl ? (
+          <div className="inspector-grid">
+            <div className="field">
+              <label>Described as</label>
+              <input
+                value={block.alt ?? ""}
+                placeholder="What the picture shows"
+                onChange={(event) => patchBlock({ alt: event.target.value })}
+              />
+              <span className="help-text">
+                Read aloud in place of the picture. On a test this is the
+                question for anybody who cannot see it, so it should say what
+                the picture shows without giving the answer away.
+              </span>
+            </div>
+
+            <div className="field">
+              <label>Width</label>
+              <input
+                type="number"
+                min={0}
+                max={80}
+                step={1}
+                value={block.width ?? 0}
+                onChange={(event) =>
+                  patchBlock({
+                    width: Math.max(0, Math.min(80, Number(event.target.value) || 0)),
+                  })
+                }
+              />
+              <span className="help-text">
+                In rem. 0 fills the width it is given. Never wider than that
+                whatever is set here, and it keeps its shape either way.
+              </span>
+            </div>
+          </div>
+        ) : null}
 
         {hasOptions ? (
           <>

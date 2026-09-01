@@ -206,6 +206,13 @@ function PageList({
             onClick={() => onSelect(index)}
           >
             {item.name}
+            {/* Said in the list, because the whole point of the setting is
+                that this page is not where the one above it leads. */}
+            {item.hidden ? (
+              <span className="help-text" style={{ marginLeft: "0.4rem" }}>
+                linked only
+              </span>
+            ) : null}
           </button>
           <div className="outline-row-actions">
             <button type="button" title="Delete page" onClick={() => onRemove(index)}>
@@ -1833,6 +1840,55 @@ export function PublicationEditor({
                   onChange={(name) => updatePage(pageIndex, { name })}
                 />
               )}
+
+              {editingTemplate ? null : (
+                <>
+                  <CheckField
+                    label="Keep out of the page order"
+                    value={Boolean(page.hidden)}
+                    onChange={(hidden) => updatePage(pageIndex, { hidden })}
+                  />
+                  <p className="help-text" style={{ marginTop: "-0.4rem" }}>
+                    {page.hidden ? (
+                      <>
+                        Skipped by the arrows, the wheel, the keyboard and the
+                        slideshow, and left out of the PDF. Reached only by a
+                        link on another page &mdash; set one on a block&rsquo;s{" "}
+                        <em>When clicked</em>.
+                      </>
+                    ) : (
+                      <>
+                        For an appendix, a footnote or the small print: a page
+                        that is part of the publication but not on the way
+                        through it.
+                      </>
+                    )}
+                  </p>
+
+                  {page.hidden ? (
+                    <>
+                      <CheckField
+                        label="Offer a way back"
+                        value={page.showBack !== false}
+                        onChange={(showBack) => updatePage(pageIndex, { showBack })}
+                      />
+                      {page.showBack !== false ? (
+                        <TextField
+                          label="Back button says"
+                          value={page.backLabel ?? "Back"}
+                          onChange={(backLabel) => updatePage(pageIndex, { backLabel })}
+                        />
+                      ) : null}
+                      <p className="help-text" style={{ marginTop: "-0.4rem" }}>
+                        Returns to whichever page the reader followed a link
+                        from, so the same page can be reached from several and
+                        still send everybody back where they were. Shown only
+                        when they arrived by a link.
+                      </p>
+                    </>
+                  ) : null}
+                </>
+              )}
               {/* Blocks from the chosen layout show on this page and are edited
                   from the Layouts tab, never from here. */}
               {editingTemplate ? null : (
@@ -2753,7 +2809,13 @@ export function PublicationEditor({
                     value={selected.clickTarget ?? ""}
                     options={[
                       { value: "", label: "Select a page…" },
-                      ...pages.map((item) => ({ value: item.id, label: item.name })),
+                      // Pages kept out of the order are named as such: they
+                      // are exactly what this control is most often for, and a
+                      // list that did not say so would look like a duplicate.
+                      ...pages.map((item) => ({
+                        value: item.id,
+                        label: item.hidden ? `${item.name} (linked only)` : item.name,
+                      })),
                     ]}
                     onChange={(clickTarget) => updateBlock(selected.id, { clickTarget })}
                   />

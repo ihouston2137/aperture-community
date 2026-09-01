@@ -1469,6 +1469,19 @@ input, select, textarea {
   width: 4.5rem;
 }
 
+/* A question's own picture, between what was asked and where it is answered.
+   Never wider than the space it is in, whatever width was set, and it keeps
+   its shape: a photograph squeezed to fit a column is a different photograph.
+   The margins are what separate it from the words above and the control
+   below — without them it reads as decoration of one or the other. */
+.form-question-image {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0.5rem 0 0.6rem;
+  border-radius: var(--radius);
+}
+
 /* The question as the site will ask it, shown inert on the paper it will be
    printed on. The dashed edge and the padding are only a default: the test's
    own "paper" style is laid over this, and a border or a padding set there has
@@ -5862,6 +5875,30 @@ ol.doc-list ol.doc-list ol.doc-list {
   color: #fff;
   padding: 0.25rem 0.5rem;
   border-radius: 999px;
+}
+
+/* The way back off a page reached by a link. Top-left rather than beside the
+   page arrows: it undoes the step that got here, which is not the same kind of
+   move as turning a page, and putting it with them would read as one. */
+.pub-back {
+  position: fixed;
+  top: 1rem;
+  left: 1rem;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.9rem 0.45rem 0.6rem;
+  border: none;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.pub-back:hover {
+  background: rgba(0, 0, 0, 0.75);
 }
 
 .pub-controls button:hover {

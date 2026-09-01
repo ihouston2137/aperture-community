@@ -22,7 +22,17 @@ export async function capturePublicationPages(
   onProgress?: (message: string) => void
 ): Promise<string[]> {
   const { toPng } = await import("html-to-image");
-  const nodes = Array.from(document.querySelectorAll<HTMLElement>(".pub-page"));
+  /*
+   * Every page but the ones kept off the browse order.
+   *
+   * A hidden page is reached by a link and by nothing else, and a PDF has no
+   * links to follow — dropped into the run it would read as a page somebody
+   * had lost their place in. Saving one on its own still works: that is a
+   * choice about a particular page, not about the sequence.
+   */
+  const nodes = Array.from(
+    document.querySelectorAll<HTMLElement>('.pub-page:not([data-unlisted="true"])')
+  );
 
   const frames: string[] = [];
   for (const [index, node] of nodes.entries()) {

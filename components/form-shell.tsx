@@ -271,11 +271,37 @@ export function FormFieldView({
    */
   const groupName = `field-${block.id}`;
 
+  /*
+   * The question's own picture, between what was asked and where it is
+   * answered.
+   *
+   * Below the words and above the control, because that is the order the
+   * question is read in: "which of these is the aileron", the photograph, then
+   * the choices. Put anywhere else it stops being part of the question.
+   *
+   * Dressed by nothing here. The label and field styles belong to words and to
+   * boxes; a font size or a colour laid over a photograph does nothing, and a
+   * border laid over one is the kind of surprise a shared style should never
+   * spring. Its width is its own setting.
+   */
+  const picture = block.mediaUrl ? (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={protectedMediaUrl(block.mediaUrl)}
+      alt={block.alt ?? ""}
+      className="form-question-image"
+      style={block.width ? { width: `${block.width}rem` } : undefined}
+    />
+  ) : null;
+
   const label = (
-    <label htmlFor={inputId} className={className || undefined} style={style}>
-      {block.label}
-      {block.required ? <span aria-hidden="true"> *</span> : null}
-    </label>
+    <>
+      <label htmlFor={inputId} className={className || undefined} style={style}>
+        {block.label}
+        {block.required ? <span aria-hidden="true"> *</span> : null}
+      </label>
+      {picture}
+    </>
   );
 
   const helpStyled = styleSlotProps(settings.helpStyle);
@@ -343,6 +369,7 @@ export function FormFieldView({
             {block.label}
             {block.required ? <span aria-hidden="true"> *</span> : null}
           </legend>
+          {picture}
           <div className={`checkbox-rows is-${block.optionLayout ?? "column"}`}>
             {(block.options ?? []).map((option) => (
               <label key={option} className="checkbox-row">
@@ -370,6 +397,7 @@ export function FormFieldView({
             {block.label}
             {block.required ? <span aria-hidden="true"> *</span> : null}
           </legend>
+          {picture}
           <div className={`checkbox-rows is-${block.optionLayout ?? "column"}`}>
             {(block.options ?? []).map((option) => (
               <label key={option} className="checkbox-row">
@@ -393,6 +421,9 @@ export function FormFieldView({
     case "checkbox":
       return (
         <div className="field">
+          {/* Above the box rather than beside it: the words next to a tick box
+              are the control, and a photograph does not belong inside one. */}
+          {picture}
           <label className="checkbox-row">
             <input
               id={inputId}
