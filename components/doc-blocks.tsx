@@ -225,6 +225,11 @@ function DocListItemView({ item }: { item: DocListItem }) {
 const INLINE =
   /(`+)([\s\S]*?)\1|!\[([^\]]*)\]\(([^\s)]+)(?:\s+"([^"]*)")?\)|\[([^\]]*)\]\(([^\s)]+)(?:\s+"([^"]*)")?\)|(\*\*\*|___)([\s\S]+?)\9|(\*\*|__)([\s\S]+?)\11|(\*|_)([\s\S]+?)\13|~~([\s\S]+?)~~|(\n)/g;
 
+/** Whether a source is an SVG, which is the one kind with no natural size. */
+function isVector(src: string): boolean {
+  return /\.svg(\?|#|$)/i.test(src.trim());
+}
+
 export function Inline({ text }: { text: string }): ReactNode {
   if (!text) return null;
 
@@ -246,6 +251,15 @@ export function Inline({ text }: { text: string }): ReactNode {
           src={protectedMediaUrl(match[4])}
           alt={match[3]}
           title={match[5] || undefined}
+          /*
+           * Marked as a vector, so the stylesheet can size it.
+           *
+           * An SVG written with only a `viewBox` has a ratio but no intrinsic
+           * size, and nothing in CSS can ask an image whether it has one — the
+           * file name is the only thing here that knows. See the table rule in
+           * the stylesheet for what this is for.
+           */
+          className={isVector(match[4]) ? "is-vector" : undefined}
         />
       );
     } else if (match[6] !== undefined) {

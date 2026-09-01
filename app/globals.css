@@ -2767,6 +2767,35 @@ ol.doc-list ol.doc-list ol.doc-list {
   text-align: left;
 }
 
+/*
+ * Pictures inside a table cell.
+ *
+ * A cell's width is worked out from what is in it, and `max-width: 100%` on
+ * something being measured to decide that width is a circle — so a picture
+ * gets whatever the engine breaks the circle with, which for one that has an
+ * intrinsic size is its own width and is fine.
+ *
+ * An SVG written with only a `viewBox` has no intrinsic size at all. Outside a
+ * table a browser falls back to 300px wide; inside one, where the fallback
+ * never applies, it collapses to nothing — which is why SVGs appeared not to
+ * work in tables while working everywhere else.
+ *
+ * A height breaks the circle without joining it: a cell's height never decides
+ * its width, so naming one gives the ratio something to work from and the
+ * image comes out at its proper proportions. Only vectors are given one, since
+ * a photograph already knows how big it is.
+ */
+.doc-table img {
+  max-width: 100%;
+  height: auto;
+}
+
+.doc-table img.is-vector {
+  height: 2.5em;
+  width: auto;
+  max-width: 100%;
+}
+
 .doc-table th {
   background: color-mix(in srgb, var(--content-text) 5%, transparent);
   font-weight: 600;
