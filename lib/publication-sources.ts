@@ -5,7 +5,11 @@ import type { SponsorLogo } from "@/components/sponsor-scroll";
 
 import { normalizeSponsorScroll } from "./page-layout";
 import { isPubliclyNamed, primaryLogo, sponsorLogoSrc } from "./sponsorship-types";
-import { getRecognitionLevels, getSponsors } from "./sponsorships";
+import {
+  getRecognitionLevels,
+  getSponsors,
+  sponsorScrollLogos,
+} from "./sponsorships";
 
 import { connectDB } from "./db";
 import { Collection, CustomShape, FormDefinition, MediaAsset, Story } from "./models";
@@ -92,19 +96,16 @@ export async function loadPublicationSources(
     );
 
     for (const entry of sponsorScrollBlocks) {
-      sponsorLogos[entry.id] = ordered
-        .filter((sponsor) => {
+      // Thumbnails, capped, and carrying each logo's shape — see
+      // `sponsorScrollLogos`. Doing it any other way is what made the run
+      // stutter and half-draw on a phone.
+      sponsorLogos[entry.id] = await sponsorScrollLogos(
+        ordered.filter((sponsor) => {
           if (!isPubliclyNamed(sponsor, levels)) return false;
           if (entry.levelIds.length === 0) return Boolean(sponsor.recognitionLevelId);
           return entry.levelIds.includes(sponsor.recognitionLevelId);
         })
-        .map((sponsor) => ({
-          id: sponsor._id,
-          name: sponsor.name,
-          src: sponsorLogoSrc(primaryLogo(sponsor.logos)),
-        }))
-        // A sponsor with no artwork has nothing to put in a run of logos.
-        .filter((sponsor) => Boolean(sponsor.src));
+      );
     }
   }
 

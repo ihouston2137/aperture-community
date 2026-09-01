@@ -10970,12 +10970,17 @@ html:has(.admin-shell) body::-webkit-scrollbar {
   align-items: center;
   height: var(--sponsor-scroll-height, 8rem);
   animation: sponsor-scroll-left var(--sponsor-scroll-seconds, 30s) linear infinite;
-  /* Promoted explicitly. Safari animates a wide strip far more smoothly on its
+  /* Promoted explicitly: Safari animates a wide strip far more smoothly on its
      own layer, and `translateZ` is the older way of asking that still works
-     where `will-change` alone does not. */
+     where `will-change` alone does not.
+
+     `will-change: transform` was here too and has been taken out. It is a hint
+     about a change that is *coming*, which buys nothing on an element already
+     animating, and it pins a layer the full size of the element — on a strip
+     several thousand pixels wide that is precisely the surface iOS gives up on
+     and stops drawing parts of. The animation promotes what it needs. */
   -webkit-transform: translateZ(0);
   transform: translateZ(0);
-  will-change: transform;
 }
 
 .sponsor-scroll[data-direction="right"] .sponsor-scroll-track {
@@ -11002,13 +11007,28 @@ html:has(.admin-shell) body::-webkit-scrollbar {
   align-items: center;
 }
 
-/* One logo: the band's height, and whatever width that leaves it. */
+/*
+ * One logo: the band's height, and the width its own shape asks for.
+ *
+ * The width is computed from `--logo-ratio`, which the block sets per item from
+ * the artwork's recorded pixel size. That is the whole point: it is known
+ * before the file arrives, so the strip is its final width from the first
+ * layout and never grows underneath the animation. `width: auto` on an image
+ * measures zero until the bytes land, and since the loop travels half the
+ * strip's own width, every logo that arrived moved the run under itself.
+ */
 .sponsor-scroll-item {
   display: flex;
   align-items: center;
   justify-content: center;
   flex: none;
   height: var(--sponsor-scroll-height, 8rem);
+  /* The mark's own height, and the width that shape gives it, plus the padding
+     on either side. Written out rather than left to the image, so the box is
+     right with no image in it at all. */
+  width: calc(
+    (var(--sponsor-scroll-height, 8rem) - 1.5rem) * var(--logo-ratio, 2.5) + 2.5rem
+  );
   padding: 0 1.25rem;
   box-sizing: border-box;
 }
@@ -11017,12 +11037,15 @@ html:has(.admin-shell) body::-webkit-scrollbar {
   /* A length, not a percentage — see the note on the block above. The subtracted
      rem is the breathing room above and below the mark. */
   height: calc(var(--sponsor-scroll-height, 8rem) - 1.5rem);
-  width: auto;
+  /* Filling the box the ratio built, rather than sizing it. Whole and
+     undistorted either way: a sponsor's mark is the one image on a site that
+     must not be cropped or stretched to fit, so a logo whose real shape turns
+     out to differ from the recorded one is letterboxed inside its box rather
+     than moving the strip to suit itself. */
+  width: 100%;
   /* Overrides the sheet-wide `img { max-width: 100% }`, which would hold a wide
      wordmark to the width of its own box and squash it out of proportion. */
   max-width: none;
-  /* Whole and undistorted: a sponsor's mark is the one image on a site that
-     must not be cropped or stretched to fit. */
   object-fit: contain;
 }
 

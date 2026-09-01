@@ -1,6 +1,9 @@
 import { connectDB } from "./db";
+import type { SponsorLogo as SponsorLogoView } from "../components/sponsor-scroll";
+import { protectedMediaUrl } from "./protected-media-url";
 import {
   Donation,
+  MediaAsset,
   RecognitionLevel,
   Sponsor,
   SponsorBenefit,
@@ -19,6 +22,7 @@ import {
   normalizeLinks,
   normalizeLogos,
   normalizeStretchGoals,
+  primaryLogo,
   sponsorSize,
   sponsorType,
   uniqueIds,
@@ -34,6 +38,16 @@ import {
 } from "./sponsorship-types";
 
 export * from "./sponsorship-types";
+
+/**
+ * How many logos one run may hold.
+ *
+ * The strip is printed twice, so forty logos is eighty boxes side by side.
+ * Past roughly that the element is wider than the largest surface a phone will
+ * composite in one piece, and iOS stops drawing the parts it cannot fit —
+ * which looks exactly like a scroll that half-renders after a few laps.
+ */
+const MAX_SCROLL_LOGOS = 40;
 
 export function toSponsorSummary(record: any): SponsorSummary {
   return {
@@ -142,6 +156,62 @@ export async function getSponsors(): Promise<SponsorSummary[]> {
   await connectDB();
   const records = await Sponsor.find().sort({ name: 1 }).lean<any[]>();
   return records.map(toSponsorSummary);
+}
+
+/**
+ * The sponsors of a scrolling run, as the block wants them.
+ *
+ * Three things happen here that the naive mapping did not do, and each of them
+ * was costing an iPhone dearly.
+ *
+ * **The thumbnail, not the artwork.** A sponsor's logo is uploaded at whatever
+ * size they sent it, which is often a few thousand pixels across. A run of
+ * twenty of those is twenty full-size decodes and the texture memory to match,
+ * for a band eight rem tall. The 400px WebP the library already generated on
+ * upload is more than enough at that size and is a fraction of the bytes.
+ *
+ * **The shape of each logo, before it has arrived.** Without it an `<img>` with
+ * `width: auto` measures zero until it decodes, so the strip grows as the
+ * images land — and since the loop travels half the strip's *own* width, every
+ * arrival moved the animation under itself. That is the stutter.
+ *
+ * **A ceiling on how many.** Past a few dozen the strip is wider than the
+ * largest layer a phone will composite, and the browser stops drawing parts of
+ * it. Nobody reads the fortieth logo in a conveyor anyway.
+ */
+export async function sponsorScrollLogos(
+  sponsors: SponsorSummary[]
+): Promise<SponsorLogoView[]> {
+  const chosen = sponsors
+    .map((sponsor) => ({ sponsor, logo: primaryLogo(sponsor.logos) }))
+    // A sponsor with no artwork has nothing to put in a run of logos.
+    .filter((entry) => Boolean(entry.logo?.url))
+    .slice(0, MAX_SCROLL_LOGOS);
+
+  const mediaIds = chosen
+    .map((entry) => entry.logo?.mediaId ?? "")
+    .filter((id) => /^[a-f0-9]{24}$/i.test(id));
+
+  await connectDB();
+  const assets = mediaIds.length
+    ? await MediaAsset.find({ _id: { $in: mediaIds } })
+        .select("thumbnailUrl width height")
+        .lean<any[]>()
+    : [];
+  const byId = new Map(assets.map((asset) => [String(asset._id), asset]));
+
+  return chosen.map(({ sponsor, logo }) => {
+    const asset = byId.get(logo!.mediaId);
+    return {
+      id: sponsor._id,
+      name: sponsor.name,
+      // The original where no thumbnail was made — an SVG, which needs none:
+      // it is a few kilobytes and draws at any size.
+      src: protectedMediaUrl(asset?.thumbnailUrl || logo!.url),
+      width: Number(asset?.width) || 0,
+      height: Number(asset?.height) || 0,
+    };
+  });
 }
 
 export async function getCampaigns(): Promise<CampaignSummary[]> {

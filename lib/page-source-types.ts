@@ -1,3 +1,4 @@
+import type { SponsorLogo } from "@/components/sponsor-scroll";
 import type { StoryView } from "@/components/story-blocks";
 import type { MenuItem } from "./menu-types";
 
@@ -88,7 +89,15 @@ export type PageSources = {
    * same levels and each is filtered and ordered for itself. Already through
    * the media route, so the browser has nothing to resolve.
    */
-  sponsorLogos: Record<string, { id: string; name: string; src: string }[]>;
+  /*
+   * The real type, not a copy of its first three fields.
+   *
+   * It was written out here, which meant the shape each logo carries for
+   * reserving its width was dropped on the way through the page path while the
+   * publication path kept it — the same block, two truths, and the one that
+   * mattered on a phone was the one being lost.
+   */
+  sponsorLogos: Record<string, SponsorLogo[]>;
   /**
    * The sponsor each sponsor block is showing, keyed by block id.
    *

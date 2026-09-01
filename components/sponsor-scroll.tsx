@@ -2,7 +2,29 @@ import type { CSSProperties } from "react";
 
 import type { SponsorScrollSettings } from "@/lib/page-layout";
 
-export type SponsorLogo = { id: string; name: string; src: string };
+export type SponsorLogo = {
+  id: string;
+  name: string;
+  src: string;
+  /**
+   * The artwork's own pixel size, where the library knows it.
+   *
+   * Not for sizing — the band's height does that — but for *reserving* the
+   * width before the file arrives. Zero for anything with no recorded size,
+   * an SVG usually, which falls back to a nominal shape.
+   */
+  width?: number;
+  height?: number;
+};
+
+/**
+ * The shape assumed for a logo whose real one is not on record.
+ *
+ * A wordmark rather than a square, because that is what most sponsor artwork
+ * is, and because a box a little too wide only spaces the run out slightly
+ * while one too narrow crowds it.
+ */
+const FALLBACK_RATIO = 2.5;
 
 /**
  * A slow horizontal run of sponsor logos.
@@ -92,9 +114,46 @@ export function SponsorScroll({
             aria-hidden={copy === 1 ? "true" : undefined}
           >
             {logos.map((logo) => (
-              <li key={`${copy}-${logo.id}`} className="sponsor-scroll-item">
+              <li
+                key={`${copy}-${logo.id}`}
+                className="sponsor-scroll-item"
+                /*
+                 * The logo's shape, given to the layout before the file is.
+                 *
+                 * Without it an image with `width: auto` measures nothing until
+                 * it decodes, so the strip grew as the logos landed. The loop
+                 * travels half the strip's *own* width, so every arrival shifted
+                 * the animation under itself — the stutter, and on a slow
+                 * connection a strip still growing several laps in.
+                 */
+                style={
+                  {
+                    "--logo-ratio":
+                      logo.width && logo.height
+                        ? logo.width / logo.height
+                        : FALLBACK_RATIO,
+                  } as CSSProperties
+                }
+              >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={logo.src} alt={copy === 0 ? logo.name : ""} loading="lazy" />
+                <img
+                  src={logo.src}
+                  alt={copy === 0 ? logo.name : ""}
+                  width={logo.width || undefined}
+                  height={logo.height || undefined}
+                  /*
+                   * Eager, deliberately.
+                   *
+                   * `loading="lazy"` looks right here and is the reason the run
+                   * half-drew: laziness is decided by intersection with the
+                   * viewport, and these sit inside a clipped strip that is being
+                   * transformed, where iOS reaches the wrong answer and simply
+                   * never fetches them. The second copy is the same URLs as the
+                   * first, so the whole run costs one thumbnail per sponsor.
+                   */
+                  loading="eager"
+                  decoding="async"
+                />
               </li>
             ))}
           </ul>

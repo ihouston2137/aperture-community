@@ -13,7 +13,11 @@ import {
   Story,
 } from "./models";
 import { normalizeCalendarTemplateLayout } from "./calendar-slot-layout";
-import { getRecognitionLevels, getSponsors } from "./sponsorships";
+import {
+  getRecognitionLevels,
+  getSponsors,
+  sponsorScrollLogos,
+} from "./sponsorships";
 import {
   isPubliclyNamed,
   primaryLogo,
@@ -420,7 +424,7 @@ export async function loadPageSources(layout: PageLayout): Promise<PageSources> 
    * anonymous never appears: the level says the site does not name them, and
    * a logo names them louder than a line of type would.
    */
-  const sponsorLogos: Record<string, { id: string; name: string; src: string }[]> = {};
+  const sponsorLogos: PageSources["sponsorLogos"] = {};
   if (sponsorScrollBlocks.length > 0) {
     const [levels, sponsors] = await Promise.all([
       getRecognitionLevels(),
@@ -437,21 +441,18 @@ export async function loadPageSources(layout: PageLayout): Promise<PageSources> 
     );
 
     for (const entry of sponsorScrollBlocks) {
-      sponsorLogos[entry.id] = ordered
-        .filter((sponsor) => {
+      // Thumbnails, capped, and carrying each logo's shape — see
+      // `sponsorScrollLogos`. Doing it any other way is what made the run
+      // stutter and half-draw on a phone.
+      sponsorLogos[entry.id] = await sponsorScrollLogos(
+        ordered.filter((sponsor) => {
           if (!isPubliclyNamed(sponsor, levels)) return false;
           // No levels named means every level, which is what a scroll dropped
           // on a page with nothing configured should show.
           if (entry.levelIds.length === 0) return Boolean(sponsor.recognitionLevelId);
           return entry.levelIds.includes(sponsor.recognitionLevelId);
         })
-        .map((sponsor) => ({
-          id: sponsor._id,
-          name: sponsor.name,
-          src: sponsorLogoSrc(primaryLogo(sponsor.logos)),
-        }))
-        // A sponsor with no artwork has nothing to put in a run of logos.
-        .filter((sponsor) => Boolean(sponsor.src));
+      );
     }
   }
 
