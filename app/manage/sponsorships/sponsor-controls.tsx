@@ -558,12 +558,22 @@ export function SponsorLogosButton({
   sponsorName,
   logos,
   canEdit,
+  canDelete,
 }: {
   sponsorId: string;
   sponsorName: string;
   logos: SponsorLogo[];
-  /** Whether this reader may put artwork on file or take it off. */
+  /** Whether this reader may put artwork on file and choose which is shown. */
   canEdit: boolean;
+  /**
+   * Whether they may take it off — a separate grant.
+   *
+   * Somebody asked to keep the artwork current needs to add to it; removing a
+   * sponsor's mark is a decision about the record, and is given to whoever
+   * holds the record rather than to whoever holds the file. Downloading is
+   * offered to anybody who can open this at all.
+   */
+  canDelete: boolean;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -690,7 +700,7 @@ export function SponsorLogosButton({
                       Download
                     </a>
 
-                    {canEdit ? (
+                    {canDelete ? (
                       confirming === index ? (
                         <>
                           <button

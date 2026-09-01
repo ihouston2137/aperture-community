@@ -30,7 +30,11 @@ import {
   getSponsors,
 } from "@/lib/sponsorships";
 
-import { ContactButton, DeleteContactButton } from "../../../../contact-controls";
+import {
+  ContactButton,
+  DeleteContactButton,
+  SponsorReachButton,
+} from "../../../../contact-controls";
 import {
   DonationButton,
   SponsorRecordButton,
@@ -180,6 +184,7 @@ export default async function CampaignSponsorDashboard({
             sponsorName={sponsor.name}
             logos={sponsor.logos}
             canEdit={access.canEditLogos}
+            canDelete={access.canDeleteLogos}
           />
 
           {/* The whole record, for somebody trusted with the programme rather
@@ -340,7 +345,12 @@ export default async function CampaignSponsorDashboard({
       <section className="member-card manager-card">
         <div className="manager-card-head">
           <h2 className="member-card-title">How to reach them</h2>
-          {access.canEditSponsors ? <ContactButton sponsorId={sponsor._id} /> : null}
+          {access.canEditContacts ? (
+            <>
+              <SponsorReachButton sponsor={sponsor} />
+              <ContactButton sponsorId={sponsor._id} />
+            </>
+          ) : null}
         </div>
 
         <div className="sponsor-detail-columns">
@@ -385,7 +395,7 @@ export default async function CampaignSponsorDashboard({
         {sponsor.contacts.length === 0 ? (
           <p className="member-note">
             No contacts on file.
-            {access.canEditSponsors ? " Add the person to ask for." : ""}
+            {access.canEditContacts ? " Add the person to ask for." : ""}
           </p>
         ) : (
           <ul className="manager-donations" style={{ marginTop: "1rem" }}>
@@ -400,7 +410,7 @@ export default async function CampaignSponsorDashboard({
                   </span>
                 </div>
 
-                {access.canEditSponsors ? (
+                {access.canEditContacts ? (
                   <>
                     <ContactButton
                       sponsorId={sponsor._id}

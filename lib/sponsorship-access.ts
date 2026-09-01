@@ -16,14 +16,31 @@ export type SponsorshipAccess = {
   canEditCampaigns: boolean;
   canEditSponsors: boolean;
   /**
-   * The artwork alone.
+   * Putting a sponsor on a campaign, and everything about them once they are
+   * on it: the status, who is looking after them, the recognition level.
+   *
+   * Its own grant, because it is the week-to-week work of running a campaign
+   * and is not the same trust as being able to rewrite the sponsor's record or
+   * to create a campaign in the first place.
+   */
+  canEditAssignments: boolean;
+  /**
+   * Putting artwork up and taking a copy of it — never removing it.
    *
    * Narrower than editing a sponsor and granted separately, since it is the
-   * one job a member is often asked to do — somebody has the logo file and
-   * nothing else about the record is theirs to change. Anybody who may edit
-   * sponsors may still do it, so nothing that worked before stops working.
+   * one job a member is often asked to do: somebody has the logo file and
+   * nothing else about the record is theirs to change. Removing artwork is a
+   * decision about the record, so it sits with `canEditSponsors`.
    */
   canEditLogos: boolean;
+  /** Taking a sponsor's artwork off the site, which is not the same thing. */
+  canDeleteLogos: boolean;
+  /**
+   * The people at a sponsor, and the address, phone and site they are reached
+   * at. Kept apart from the record as a whole: keeping a contact list current
+   * is a job to be helped with, and it says nothing about what they gave.
+   */
+  canEditContacts: boolean;
   canEditDonations: boolean;
   /**
    * Reading back what is already finished.
@@ -57,18 +74,39 @@ export function sponsorshipAccess(permissions: string[]): SponsorshipAccess {
   const all = has("sponsorships.manage");
 
   return {
+    /*
+     * Any grant at all gets somebody through the door.
+     *
+     * Whatever they were given it for, they have to reach the sponsor or the
+     * campaign to do it — a permission that leads to a page they cannot open
+     * is not a permission.
+     */
     canView:
       all ||
       has("sponsorships.view") ||
       has("sponsorships.campaigns") ||
       has("sponsorships.sponsors") ||
       has("sponsorships.donations") ||
-      // Somebody who may only put the artwork up still has to be able to
-      // reach the sponsor to put it there.
-      has("sponsorships.logos"),
+      has("sponsorships.assignments") ||
+      has("sponsorships.logos") ||
+      has("sponsorships.contacts"),
     canEditCampaigns: all || has("sponsorships.campaigns"),
     canEditSponsors: all || has("sponsorships.sponsors"),
+    /*
+     * `campaigns` still grants this.
+     *
+     * Before assignments were their own permission, editing a campaign was
+     * what let somebody put a sponsor on one — so a role set up then goes on
+     * doing exactly what it did rather than quietly losing half its job.
+     */
+    canEditAssignments:
+      all ||
+      has("sponsorships.assignments") ||
+      has("sponsorships.campaigns") ||
+      has("sponsorships.sponsors"),
     canEditLogos: all || has("sponsorships.sponsors") || has("sponsorships.logos"),
+    canDeleteLogos: all || has("sponsorships.sponsors"),
+    canEditContacts: all || has("sponsorships.sponsors") || has("sponsorships.contacts"),
     canEditDonations: all || has("sponsorships.donations"),
     canSeeArchived: all || has("sponsorships.closed"),
     canSeeRecords: all || has("sponsorships.records"),

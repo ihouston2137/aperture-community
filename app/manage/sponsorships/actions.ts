@@ -18,9 +18,11 @@ import { sponsorshipAccess } from "@/lib/sponsorship-access";
 import {
   assignmentStatus,
   normalizeContacts,
+  normalizeLinks,
   normalizeLogos,
   uniqueIds,
 } from "@/lib/sponsorship-types";
+import { normalizePhone } from "@/lib/member-types";
 
 /** The dialog stays open on failure to show the message, so these report back. */
 export type ManageResult = { ok: boolean; error?: string };
@@ -50,7 +52,7 @@ function revalidate() {
 export async function addCampaignSponsorAction(
   formData: FormData
 ): Promise<ManageResult> {
-  if (!(await access()).canEditCampaigns) {
+  if (!(await access()).canEditAssignments) {
     return { ok: false, error: "You cannot change this campaign." };
   }
 
@@ -90,7 +92,7 @@ export async function createCampaignSponsorAction(
   formData: FormData
 ): Promise<ManageResult> {
   const allowed = await access();
-  if (!allowed.canEditCampaigns) {
+  if (!allowed.canEditAssignments) {
     return { ok: false, error: "You cannot change this campaign." };
   }
   if (!allowed.canEditSponsors) {
@@ -134,7 +136,7 @@ export async function createCampaignSponsorAction(
 export async function removeCampaignSponsorAction(
   formData: FormData
 ): Promise<ManageResult> {
-  if (!(await access()).canEditCampaigns) {
+  if (!(await access()).canEditAssignments) {
     return { ok: false, error: "You cannot change this campaign." };
   }
 
@@ -153,7 +155,7 @@ export async function removeCampaignSponsorAction(
 export async function setCampaignAssignedAction(
   formData: FormData
 ): Promise<ManageResult> {
-  if (!(await access()).canEditCampaigns) {
+  if (!(await access()).canEditAssignments) {
     return { ok: false, error: "You cannot change this campaign." };
   }
 
@@ -207,7 +209,9 @@ export async function setCampaignAssignedAction(
 export async function setSponsorRecognitionAction(
   formData: FormData
 ): Promise<ManageResult> {
-  if (!(await access()).canEditSponsors) {
+  // Recognition sits with the campaign work rather than with the record: it is
+  // decided by what somebody gave this year, which is what a campaign is.
+  if (!(await access()).canEditAssignments) {
     return { ok: false, error: "You cannot change this sponsor." };
   }
 
@@ -243,11 +247,52 @@ async function contactsOf(sponsorId: string) {
   return sponsor;
 }
 
+/**
+ * The sponsor's own address, phone, site and links.
+ *
+ * Its own action rather than a corner of the record editor, because it belongs
+ * to the same job as the contact list: keeping current how the sponsor is
+ * reached. Everything else about the record — what they are, what they are
+ * worth, the notes kept about them — is untouched, so somebody trusted with
+ * the phone number is not thereby trusted with the rest.
+ */
+export async function saveSponsorReachAction(
+  formData: FormData
+): Promise<ManageResult> {
+  if (!(await access()).canEditContacts) {
+    return { ok: false, error: "You cannot change how this sponsor is reached." };
+  }
+
+  const sponsorId = String(formData.get("sponsorId") ?? "");
+  const sponsor = await Sponsor.findById(sponsorId);
+  if (!sponsor) return { ok: false, error: "That sponsor no longer exists." };
+
+  let links;
+  try {
+    links = normalizeLinks(JSON.parse(String(formData.get("links") ?? "[]")));
+  } catch {
+    return { ok: false, error: "Could not read those links." };
+  }
+
+  sponsor.email = String(formData.get("email") ?? "").trim().slice(0, 200);
+  // Stored as digits alone, the way every other phone number on the site is,
+  // so one number is one string wherever it was typed.
+  sponsor.phone = normalizePhone(String(formData.get("phone") ?? ""));
+  sponsor.address = String(formData.get("address") ?? "").trim().slice(0, 500);
+  sponsor.website = String(formData.get("website") ?? "").trim().slice(0, 300);
+  sponsor.links = links;
+
+  await sponsor.save();
+
+  revalidate();
+  return { ok: true };
+}
+
 export async function saveSponsorContactAction(
   formData: FormData
 ): Promise<ManageResult> {
-  if (!(await access()).canEditSponsors) {
-    return { ok: false, error: "You cannot change this sponsor." };
+  if (!(await access()).canEditContacts) {
+    return { ok: false, error: "You cannot change this sponsor's contacts." };
   }
 
   const sponsorId = String(formData.get("sponsorId") ?? "");
@@ -291,8 +336,8 @@ export async function saveSponsorContactAction(
 export async function deleteSponsorContactAction(
   formData: FormData
 ): Promise<ManageResult> {
-  if (!(await access()).canEditSponsors) {
-    return { ok: false, error: "You cannot change this sponsor." };
+  if (!(await access()).canEditContacts) {
+    return { ok: false, error: "You cannot change this sponsor's contacts." };
   }
 
   const sponsorId = String(formData.get("sponsorId") ?? "");
@@ -419,8 +464,10 @@ export async function uploadSponsorLogoAction(
 export async function deleteSponsorLogoAction(
   formData: FormData
 ): Promise<ManageResult> {
-  if (!(await access()).canEditLogos) {
-    return { ok: false, error: "You cannot change this sponsor's artwork." };
+  // Taking artwork off the site is a decision about the record, so it asks for
+  // the record's permission rather than the one that puts artwork up.
+  if (!(await access()).canDeleteLogos) {
+    return { ok: false, error: "You cannot remove this sponsor's artwork." };
   }
 
   const sponsorId = String(formData.get("sponsorId") ?? "");

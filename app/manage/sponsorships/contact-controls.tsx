@@ -6,7 +6,11 @@ import { useEffect, useState, useTransition } from "react";
 import { ModalPortal } from "@/components/modal-portal";
 import { formatPhone } from "@/lib/member-types";
 
-import { deleteSponsorContactAction, saveSponsorContactAction } from "./actions";
+import {
+  deleteSponsorContactAction,
+  saveSponsorContactAction,
+  saveSponsorReachAction,
+} from "./actions";
 import { IconButton, TrashIcon } from "./sponsor-controls";
 
 export type Contact = {
@@ -301,6 +305,172 @@ export function DeleteContactButton({
             Remove {contact.name || "this contact"} from this sponsor? Nothing
             else about the sponsor changes.
           </p>
+        </Shell>
+      ) : null}
+    </>
+  );
+}
+
+/**
+ * The sponsor's own address, phone, site and links.
+ *
+ * Beside the contact list rather than inside the record editor, because the
+ * two are one job — keeping current how a sponsor is reached — and because the
+ * record editor asks for a trust this does not need. Everything else about the
+ * sponsor is left alone by the action behind it.
+ */
+export function SponsorReachButton({
+  sponsor,
+}: {
+  sponsor: {
+    _id: string;
+    email: string;
+    phone: string;
+    address: string;
+    website: string;
+    links: { label: string; href: string }[];
+  };
+}) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [error, setError] = useState("");
+  const [pending, startTransition] = useTransition();
+
+  const [email, setEmail] = useState(sponsor.email);
+  const [phone, setPhone] = useState(sponsor.phone);
+  const [address, setAddress] = useState(sponsor.address);
+  const [website, setWebsite] = useState(sponsor.website);
+  /*
+   * Links as one box, a line each.
+   *
+   * `Label | https://…`, which is the shape somebody types without being told
+   * — and a row of paired inputs for a list nobody fills in more than twice is
+   * a form to fight rather than to fill in.
+   */
+  const [links, setLinks] = useState(
+    sponsor.links.map((link) => `${link.label} | ${link.href}`).join("\n")
+  );
+
+  function save() {
+    setError("");
+    startTransition(async () => {
+      const parsed = links
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .map((line) => {
+          const at = line.lastIndexOf("|");
+          if (at < 0) return { label: "", href: line };
+          return {
+            label: line.slice(0, at).trim(),
+            href: line.slice(at + 1).trim(),
+          };
+        });
+
+      const formData = new FormData();
+      formData.set("sponsorId", sponsor._id);
+      formData.set("email", email);
+      formData.set("phone", phone);
+      formData.set("address", address);
+      formData.set("website", website);
+      formData.set("links", JSON.stringify(parsed));
+
+      const result = await saveSponsorReachAction(formData);
+      if (result.ok) {
+        setOpen(false);
+        router.refresh();
+      } else {
+        setError(result.error ?? "Could not save that.");
+      }
+    });
+  }
+
+  return (
+    <>
+      <button type="button" className="btn btn-sm" onClick={() => setOpen(true)}>
+        Edit details
+      </button>
+
+      {open ? (
+        <Shell
+          title="How to reach them"
+          pending={pending}
+          error={error}
+          onClose={() => setOpen(false)}
+          footer={
+            <button
+              type="button"
+              className="btn btn-primary"
+              style={{ marginLeft: "auto" }}
+              disabled={pending}
+              onClick={save}
+            >
+              {pending ? "Saving…" : "Save"}
+            </button>
+          }
+        >
+          <div className="field">
+            <label htmlFor="reach-email">Email</label>
+            <input
+              id="reach-email"
+              type="email"
+              value={email}
+              disabled={pending}
+              onChange={(event) => setEmail(event.target.value)}
+            />
+          </div>
+
+          <div className="field">
+            <label htmlFor="reach-phone">Phone</label>
+            <input
+              id="reach-phone"
+              type="tel"
+              value={phone}
+              disabled={pending}
+              onChange={(event) => setPhone(event.target.value)}
+            />
+            <span className="help-text">
+              Stored as digits alone, and shown as (555) 555-5555.
+            </span>
+          </div>
+
+          <div className="field">
+            <label htmlFor="reach-website">Website</label>
+            <input
+              id="reach-website"
+              type="url"
+              value={website}
+              disabled={pending}
+              onChange={(event) => setWebsite(event.target.value)}
+            />
+          </div>
+
+          <div className="field">
+            <label htmlFor="reach-address">Address</label>
+            <textarea
+              id="reach-address"
+              rows={3}
+              value={address}
+              disabled={pending}
+              onChange={(event) => setAddress(event.target.value)}
+            />
+          </div>
+
+          <div className="field">
+            <label htmlFor="reach-links">Links</label>
+            <textarea
+              id="reach-links"
+              rows={3}
+              value={links}
+              disabled={pending}
+              placeholder="Instagram | https://instagram.com/…"
+              onChange={(event) => setLinks(event.target.value)}
+            />
+            <span className="help-text">
+              One a line, as <code>Label | address</code>. A line with no bar is
+              taken as an address with no label.
+            </span>
+          </div>
         </Shell>
       ) : null}
     </>

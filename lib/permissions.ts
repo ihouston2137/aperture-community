@@ -114,27 +114,46 @@ export const permissionGroups: PermissionGroup[] = [
     key: "sponsorships",
     label: "Sponsorships",
     permissions: [
+      /*
+       * The four a membership level may also be given, first and in the same
+       * order the community list offers them — helping with the programme and
+       * running it are the same jobs, and reading the two lists side by side
+       * should show that at a glance.
+       */
       {
         key: "sponsorships.view",
-        label: "Open the sponsorships dashboard and read what is running",
+        label: "View the dashboard, campaigns and sponsors",
       },
-      { key: "sponsorships.campaigns", label: "Add and edit campaigns" },
-      { key: "sponsorships.sponsors", label: "Add and edit sponsors" },
       {
-        // Narrower than editing a sponsor, and offered separately because it
-        // is the one job somebody outside the programme is often asked to do:
-        // a member with the artwork uploads it without also being handed the
-        // sponsor's contacts and notes.
+        // Upload and download, never delete. Taking a sponsor's artwork off
+        // the site is a decision about the record, which is the next grant
+        // down — see `sponsorships.sponsors`.
         key: "sponsorships.logos",
-        label: "Upload and remove sponsor logos",
+        label: "Upload and download sponsor logos",
       },
-      { key: "sponsorships.donations", label: "Add and edit donations" },
+      {
+        key: "sponsorships.contacts",
+        label: "Add and update sponsor contacts, and how to reach them",
+      },
       {
         // The key keeps the older word: it is stored on every role that has
         // been granted this, and renaming it would quietly revoke them all.
         key: "sponsorships.closed",
-        label: "See archived campaigns and what they raised",
+        label: "View archived campaigns and what they raised",
       },
+
+      /* And the four that only somebody running the programme is given. */
+      {
+        key: "sponsorships.assignments",
+        label:
+          "Put sponsors on campaigns, and set status, who looks after them, and recognition level",
+      },
+      {
+        key: "sponsorships.sponsors",
+        label: "Add and update sponsors, and delete their logos",
+      },
+      { key: "sponsorships.donations", label: "Add and update donations" },
+      { key: "sponsorships.campaigns", label: "Add and update campaigns" },
       {
         key: "sponsorships.records",
         label: "Browse every campaign, sponsor and donation on file",
@@ -203,19 +222,28 @@ export const communityPermissionGroups: PermissionGroup[] = [
      * "may see the sponsorships dashboard" would be two things to keep in step
      * and one of them eventually forgotten.
      *
-     * Only these two. Everything else about the programme — campaigns,
-     * donations, the sponsor records, what a level is worth — stays with the
-     * management roles, because those are decisions about how the community
-     * is funded rather than jobs somebody helps with.
+     * Only these four. Everything else about the programme — putting sponsors
+     * on campaigns, the sponsor records, donations, campaigns themselves and
+     * what a level is worth — stays with the management roles, because those
+     * are decisions about how the community is funded rather than jobs
+     * somebody helps with.
      */
     key: "community-sponsorships",
     label: "Sponsorships",
     permissions: [
       {
         key: "sponsorships.view",
-        label: "Open the sponsorships dashboard and read what is running",
+        label: "View the dashboard, campaigns and sponsors",
       },
-      { key: "sponsorships.logos", label: "Upload and remove sponsor logos" },
+      { key: "sponsorships.logos", label: "Upload and download sponsor logos" },
+      {
+        key: "sponsorships.contacts",
+        label: "Add and update sponsor contacts, and how to reach them",
+      },
+      {
+        key: "sponsorships.closed",
+        label: "View archived campaigns and what they raised",
+      },
     ],
   },
 ];
