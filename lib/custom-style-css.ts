@@ -50,8 +50,27 @@ export function customStyleCss(styles: CustomStyleRecord[]): string {
       .join("\n");
 
     if (drop) {
+      /*
+       * The same swap, wherever the thing being dressed is words.
+       *
+       * A publication block is a rectangle on a canvas; a page's headline,
+       * paragraph and rich text are rectangles in a column. In all of them the
+       * rectangle is a place rather than a thing, and a shadow of it is a
+       * shadow of nothing anybody put there.
+       *
+       * Scoped to those, not to every block: a card, an image or a button is a
+       * box, and a shadow of the box is exactly right there — which is why one
+       * saved style can dress a heading on a page and a panel beside it
+       * without having to choose between them.
+       */
       blocks.push(
-        `.pub-block ${selector},\n.pub-editor-block ${selector} {\n  box-shadow: none;\n${drop}\n}`
+        [
+          `.pub-block ${selector}`,
+          `.pub-editor-block ${selector}`,
+          `.pb-headline${selector}`,
+          `.pb-plain-text${selector}`,
+          `.rich-text${selector}`,
+        ].join(",\n") + ` {\n  box-shadow: none;\n${drop}\n}`
       );
     }
 

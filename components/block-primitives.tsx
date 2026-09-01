@@ -32,7 +32,11 @@ import {
   responsiveStyleSetsRadius,
   slugKeyFor,
 } from "@/lib/responsive-style";
-import { styleValuesToCss, type StyleValues } from "@/lib/style-values";
+import {
+  styleValuesToCss,
+  type ShadowMode,
+  type StyleValues,
+} from "@/lib/style-values";
 
 /**
  * Primitives shared by the page builder preview, the public page renderer, the
@@ -56,11 +60,14 @@ export type StyledBlock = {
  * rules that supply them. The sheet those rules live in is emitted once per
  * layout, by `LayoutView` on a page and by the builder canvas.
  */
-export function blockTextProps(block: StyledBlock): {
+export function blockTextProps(
+  block: StyledBlock,
+  shadow: ShadowMode = "box"
+): {
   className: string;
   style: CSSProperties | undefined;
 } {
-  return styleSlotProps(block, "textStyle");
+  return styleSlotProps(block, "textStyle", shadow);
 }
 
 /** Any block, read by style-slot key rather than by its own field names. */
@@ -75,7 +82,21 @@ type StyleHost = Record<string, unknown> & { id?: string };
  */
 export function styleSlotProps(
   host: StyleHost,
-  valuesKey: string
+  valuesKey: string,
+  /**
+   * Which shadow local values cast.
+   *
+   * `drop` for anything whose content is words: a block is a rectangle holding
+   * a line of type, and the rectangle is a place rather than a thing — a
+   * shadow of it is a shadow of nothing anybody put there. `drop-shadow`
+   * follows the element's own alpha, so a text block that *does* carry a
+   * background or a border still casts the shadow of that box.
+   *
+   * A style arriving as a class rather than as values is handled in the
+   * stylesheet those classes come from; see `custom-style-css` and
+   * `responsive-style`.
+   */
+  shadow: ShadowMode = "box"
 ): { className: string; style: CSSProperties | undefined } {
   const slug = host[slugKeyFor(valuesKey)];
   if (typeof slug === "string" && slug) {
@@ -84,7 +105,10 @@ export function styleSlotProps(
   if (host.id && hasResponsiveStyle(host, valuesKey)) {
     return { className: responsiveStyleClass(host.id, valuesKey), style: undefined };
   }
-  return { className: "", style: styleValuesToCss(host[valuesKey] as StyleValues | undefined) };
+  return {
+    className: "",
+    style: styleValuesToCss(host[valuesKey] as StyleValues | undefined, shadow),
+  };
 }
 
 /**
@@ -391,7 +415,8 @@ export function HeadlineBlock({
 }: {
   block: StyledBlock & { text?: string; level?: number };
 }) {
-  const { className, style } = blockTextProps(block);
+  // A shadow here belongs to the letters, not to the box round them.
+  const { className, style } = blockTextProps(block, "drop");
   const Tag = (`h${Math.min(6, Math.max(1, block.level ?? 2))}` as unknown) as "h2";
   return (
     <Tag className={`pb-headline ${className}`.trim()} style={style}>
@@ -405,7 +430,8 @@ export function PlainTextBlock({
 }: {
   block: StyledBlock & { text?: string };
 }) {
-  const { className, style } = blockTextProps(block);
+  // A shadow here belongs to the letters, not to the box round them.
+  const { className, style } = blockTextProps(block, "drop");
   return (
     <p className={`pb-plain-text ${className}`.trim()} style={style}>
       {block.text}
@@ -418,7 +444,8 @@ export function RichTextBlock({
 }: {
   block: StyledBlock & { html?: string };
 }) {
-  const { className, style } = blockTextProps(block);
+  // A shadow here belongs to the letters, not to the box round them.
+  const { className, style } = blockTextProps(block, "drop");
   return (
     <div
       className={`rich-text ${className}`.trim()}

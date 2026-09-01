@@ -2,6 +2,7 @@ import {
   CORNER_KEYS,
   normalizeStyleValues,
   styleValuesToDeclarations,
+  type ShadowMode,
   type StyleValues,
 } from "./style-values";
 
@@ -192,9 +193,26 @@ function slotCss(id: string, host: StyleHost, valuesKey: string): string {
   const className = responsiveStyleClass(id, valuesKey);
   const lines: string[] = [];
 
+  /*
+   * A block whose content is words casts its shadow from the words.
+   *
+   * The same rule the inline path and the named styles follow: the block is a
+   * rectangle holding a line of type, and the rectangle is a place rather than
+   * a thing. `drop-shadow` follows the element's own alpha, so one that does
+   * carry a background or a border still casts the shadow of that box.
+   *
+   * Read from the block's own type here, since these rules are generated per
+   * block and there is nothing else to scope them with.
+   */
+  const shadow: ShadowMode =
+    host.type === "headline" || host.type === "plainText" || host.type === "richText"
+      ? "drop"
+      : "box";
+
   for (const view of STYLE_VIEWS) {
     const declarations = styleValuesToDeclarations(
-      styleValuesForView(host, valuesKey, view)
+      styleValuesForView(host, valuesKey, view),
+      shadow
     );
     if (!declarations) continue;
 
