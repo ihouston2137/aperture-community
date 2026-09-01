@@ -239,6 +239,22 @@ export function FormFieldView({
     style: fieldStyled.style,
   };
 
+  /*
+   * What the browser groups these inputs by.
+   *
+   * The block's own `name` will not do. A radio's `name` is what makes a set of
+   * them one choice, and a name is derived from the label — so every question
+   * added from the palette starts out called "choose_one", and a page with
+   * three of them had three questions sharing one group: answering the third
+   * silently cleared the first two. On a test drawing a different few questions
+   * each time, that reads as the answers not lining up with the questions.
+   *
+   * The block id instead, which is the one thing that is already unique. The
+   * submission is built from state keyed by that id and never read out of the
+   * form, so nothing downstream depends on what this says.
+   */
+  const groupName = `field-${block.id}`;
+
   const label = (
     <label htmlFor={inputId} className={className || undefined} style={style}>
       {block.label}
@@ -316,7 +332,7 @@ export function FormFieldView({
               <label key={option} className="checkbox-row">
                 <input
                   type="radio"
-                  name={block.name}
+                  name={groupName}
                   value={option}
                   checked={value === option}
                   disabled={disabled}
@@ -343,7 +359,7 @@ export function FormFieldView({
               <label key={option} className="checkbox-row">
                 <input
                   type="checkbox"
-                  name={block.name}
+                  name={groupName}
                   value={option}
                   checked={chosen.includes(option)}
                   disabled={disabled}
@@ -523,7 +539,9 @@ export function FormShell({
                 (chosen[field.id] ?? []).includes(option)
               )
             : values[field.id] ?? field.defaultValue ?? "";
-      data[field.name ?? field.id] = value;
+      // Named, unless that name is taken — see the same rule on the server,
+      // which is the one that decides what is stored.
+      data[field.name && !(field.name in data) ? field.name : field.id] = value;
       return {
         id: field.id,
         name: field.name,

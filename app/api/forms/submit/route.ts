@@ -120,7 +120,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    data[field.name ?? field.id] = value;
+    /*
+     * The keyed bag, without one field standing on another.
+     *
+     * A field's name comes from its label, so two questions worded the same —
+     * and every radio question starts life as "Choose one" — would write to one
+     * key and only the last would survive. The ordered `fields` list below is
+     * unaffected, and the marking reads answers by block id, so this only ever
+     * cost the lookup copy; it cost it silently, which is worse.
+     */
+    const key = field.name && !(field.name in data) ? field.name : field.id;
+    data[key] = value;
     fields.push({
       id: field.id,
       name: field.name,
