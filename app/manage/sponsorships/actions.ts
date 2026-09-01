@@ -348,8 +348,8 @@ async function logosOf(sponsorId: string) {
 export async function uploadSponsorLogoAction(
   formData: FormData
 ): Promise<ManageResult> {
-  if (!(await access()).canEditSponsors) {
-    return { ok: false, error: "You cannot change this sponsor." };
+  if (!(await access()).canEditLogos) {
+    return { ok: false, error: "You cannot change this sponsor's artwork." };
   }
 
   const sponsorId = String(formData.get("sponsorId") ?? "");
@@ -419,8 +419,8 @@ export async function uploadSponsorLogoAction(
 export async function deleteSponsorLogoAction(
   formData: FormData
 ): Promise<ManageResult> {
-  if (!(await access()).canEditSponsors) {
-    return { ok: false, error: "You cannot change this sponsor." };
+  if (!(await access()).canEditLogos) {
+    return { ok: false, error: "You cannot change this sponsor's artwork." };
   }
 
   const sponsorId = String(formData.get("sponsorId") ?? "");
@@ -458,8 +458,8 @@ export async function deleteSponsorLogoAction(
 export async function setPrimarySponsorLogoAction(
   formData: FormData
 ): Promise<ManageResult> {
-  if (!(await access()).canEditSponsors) {
-    return { ok: false, error: "You cannot change this sponsor." };
+  if (!(await access()).canEditLogos) {
+    return { ok: false, error: "You cannot change this sponsor's artwork." };
   }
 
   const sponsorId = String(formData.get("sponsorId") ?? "");

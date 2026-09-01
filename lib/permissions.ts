@@ -120,6 +120,14 @@ export const permissionGroups: PermissionGroup[] = [
       },
       { key: "sponsorships.campaigns", label: "Add and edit campaigns" },
       { key: "sponsorships.sponsors", label: "Add and edit sponsors" },
+      {
+        // Narrower than editing a sponsor, and offered separately because it
+        // is the one job somebody outside the programme is often asked to do:
+        // a member with the artwork uploads it without also being handed the
+        // sponsor's contacts and notes.
+        key: "sponsorships.logos",
+        label: "Upload and remove sponsor logos",
+      },
       { key: "sponsorships.donations", label: "Add and edit donations" },
       {
         // The key keeps the older word: it is stored on every role that has
@@ -184,6 +192,30 @@ export const communityPermissionGroups: PermissionGroup[] = [
       { key: "community.events.rsvp", label: "RSVP to events" },
       { key: "community.events.host", label: "Propose events" },
       { key: "community.upload", label: "Upload to member collections" },
+    ],
+  },
+  {
+    /*
+     * The two sponsorship jobs a membership level may be given.
+     *
+     * The same keys the management group offers, not copies of them: a
+     * permission means one thing wherever it is granted, and two keys meaning
+     * "may see the sponsorships dashboard" would be two things to keep in step
+     * and one of them eventually forgotten.
+     *
+     * Only these two. Everything else about the programme — campaigns,
+     * donations, the sponsor records, what a level is worth — stays with the
+     * management roles, because those are decisions about how the community
+     * is funded rather than jobs somebody helps with.
+     */
+    key: "community-sponsorships",
+    label: "Sponsorships",
+    permissions: [
+      {
+        key: "sponsorships.view",
+        label: "Open the sponsorships dashboard and read what is running",
+      },
+      { key: "sponsorships.logos", label: "Upload and remove sponsor logos" },
     ],
   },
 ];

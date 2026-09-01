@@ -15,6 +15,15 @@ export type SponsorshipAccess = {
   canView: boolean;
   canEditCampaigns: boolean;
   canEditSponsors: boolean;
+  /**
+   * The artwork alone.
+   *
+   * Narrower than editing a sponsor and granted separately, since it is the
+   * one job a member is often asked to do — somebody has the logo file and
+   * nothing else about the record is theirs to change. Anybody who may edit
+   * sponsors may still do it, so nothing that worked before stops working.
+   */
+  canEditLogos: boolean;
   canEditDonations: boolean;
   /**
    * Reading back what is already finished.
@@ -53,9 +62,13 @@ export function sponsorshipAccess(permissions: string[]): SponsorshipAccess {
       has("sponsorships.view") ||
       has("sponsorships.campaigns") ||
       has("sponsorships.sponsors") ||
-      has("sponsorships.donations"),
+      has("sponsorships.donations") ||
+      // Somebody who may only put the artwork up still has to be able to
+      // reach the sponsor to put it there.
+      has("sponsorships.logos"),
     canEditCampaigns: all || has("sponsorships.campaigns"),
     canEditSponsors: all || has("sponsorships.sponsors"),
+    canEditLogos: all || has("sponsorships.sponsors") || has("sponsorships.logos"),
     canEditDonations: all || has("sponsorships.donations"),
     canSeeArchived: all || has("sponsorships.closed"),
     canSeeRecords: all || has("sponsorships.records"),

@@ -179,7 +179,7 @@ export default async function CampaignSponsorDashboard({
             sponsorId={sponsor._id}
             sponsorName={sponsor.name}
             logos={sponsor.logos}
-            canEdit={access.canEditSponsors}
+            canEdit={access.canEditLogos}
           />
 
           {/* The whole record, for somebody trusted with the programme rather
