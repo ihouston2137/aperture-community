@@ -36,14 +36,26 @@ import {
 
 /* ------------------------------------------------------------------ Types */
 
-/** What the person taking the test is shown once it is sent. */
-export const TEST_RESULT_MODES = ["score", "review", "silent"] as const;
+/**
+ * What the person taking the test is shown once it is sent.
+ *
+ * Four settings rather than three, because "which they got wrong" and "and
+ * here are the answers" are different decisions. Telling somebody they missed
+ * question four sends them back to the material; telling them the answer to
+ * question four saves them the trip — and on a test that may be retaken, hands
+ * them the paper.
+ *
+ * Listed in order of how much they give away, so the list itself reads as the
+ * choice being made.
+ */
+export const TEST_RESULT_MODES = ["silent", "score", "marks", "review"] as const;
 export type TestResultMode = (typeof TEST_RESULT_MODES)[number];
 
 export const TEST_RESULT_LABELS: Record<TestResultMode, string> = {
+  silent: "Nothing — the result is recorded only",
   score: "Their percentage",
-  review: "Percentage, and which they got wrong",
-  silent: "Nothing — the grade is recorded only",
+  marks: "Percentage, and which they got wrong",
+  review: "Percentage, which they got wrong, and the answers",
 };
 
 /** How a typed answer is compared with the key. */
@@ -262,6 +274,8 @@ export function normalizeTestSettings(input: unknown): TestSettings {
     askCount: Math.max(0, Math.min(questions.length, num(raw.askCount, 0))),
     shuffleQuestions: Boolean(raw.shuffleQuestions),
     shuffleOptions: Boolean(raw.shuffleOptions),
+    // `review` keeps meaning what it always did — percentage, misses and
+    // answers — so a test already set to it goes on showing what it showed.
     resultMode: TEST_RESULT_MODES.includes(raw.resultMode as TestResultMode)
       ? (raw.resultMode as TestResultMode)
       : "score",
@@ -533,9 +547,31 @@ export function gradeSitting(
   };
 }
 
-/** Strips a grade down to what the taker is allowed to see. */
+/**
+ * Strips a grade down to what the taker is allowed to see.
+ *
+ * Stripped here rather than hidden by the page, because a page that is handed
+ * the answers has handed them to anybody reading the response — hiding them in
+ * the markup would be hiding them from the reader and nobody else.
+ */
 export function gradeForTaker(grade: TestGrade, mode: TestResultMode): TestGrade | null {
   if (mode === "silent") return null;
   if (mode === "score") return { ...grade, questions: [] };
+
+  if (mode === "marks") {
+    return {
+      ...grade,
+      // Which ones, not what they should have been — and not what they wrote
+      // either, since a wrong answer beside a question is most of the way to
+      // telling somebody what the right one was.
+      questions: grade.questions.map((question) => ({
+        questionId: question.questionId,
+        label: question.label,
+        points: question.points,
+        correct: question.correct,
+      })),
+    };
+  }
+
   return grade;
 }

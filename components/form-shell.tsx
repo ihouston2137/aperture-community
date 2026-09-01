@@ -746,14 +746,22 @@ function TestResult({ grade }: { grade: TestGrade }) {
               </span>
               <span className="test-result-question">
                 <strong>{question.label}</strong>
-                {question.correct ? null : (
+                {/*
+                  * Only where the answers came back.
+                  *
+                  * A test set to show which ones were missed and no more sends
+                  * the marks without them, so there is nothing here to print —
+                  * and a bare "Correct:" with nothing after it would read as
+                  * something having gone wrong rather than as a decision.
+                  */}
+                {!question.correct && question.expected !== undefined ? (
                   <>
                     <span className="help-text">
                       You answered: {question.given || "nothing"}
                     </span>
                     <span className="help-text">Correct: {question.expected}</span>
                   </>
-                )}
+                ) : null}
               </span>
               <span className="visually-hidden">
                 {question.correct ? "Correct" : "Wrong"}
