@@ -4,7 +4,7 @@ import { requirePermission } from "@/lib/access";
 import { connectDB } from "@/lib/db";
 import { normalizeFormSettings } from "@/lib/form-layout";
 import { normalizeTestSettings } from "@/lib/form-test";
-import { FormDefinition } from "@/lib/models";
+import { CustomStyle, FontFamily, FormDefinition } from "@/lib/models";
 
 import { TestBuilder } from "../../test-builder";
 
@@ -27,6 +27,21 @@ export default async function EditTestPage({
   // that is still there.
   if (doc.kind !== "test") redirect(`/admin/forms/${id}/edit`);
 
+  // Just the two the style folds need — the full builder sources are a page's
+  // worth of queries for controls that set type and colour.
+  const [fontDocs, styleDocs] = await Promise.all([
+    FontFamily.find().select("family").sort({ family: 1 }).lean<any[]>(),
+    CustomStyle.find().select("name slug style").sort({ name: 1 }).lean<any[]>(),
+  ]);
+
+  const fonts = fontDocs.map((font) => String(font.family ?? ""));
+  const savedStyles = styleDocs.map((style) => ({
+    _id: String(style._id),
+    name: style.name ?? "",
+    slug: style.slug ?? "",
+    style: style.style ?? {},
+  }));
+
   return (
     <TestBuilder
       test={{
@@ -37,6 +52,8 @@ export default async function EditTestPage({
         settings: normalizeFormSettings(doc.settings),
         test: normalizeTestSettings(doc.test),
       }}
+      fonts={fonts}
+      savedStyles={savedStyles}
     />
   );
 }

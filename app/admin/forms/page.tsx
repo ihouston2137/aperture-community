@@ -55,8 +55,15 @@ export default async function FormsPage() {
                   ) : null}
                 </h3>
                 <div className="admin-list-meta">
-                  /forms/{form.slug} · {counts[index]} submission
-                  {counts[index] === 1 ? "" : "s"}
+                  {form.kind === "test" ? "/test/" : "/forms/"}
+                  {form.slug} · {counts[index]}{" "}
+                  {form.kind === "test"
+                    ? counts[index] === 1
+                      ? "result"
+                      : "results"
+                    : counts[index] === 1
+                      ? "submission"
+                      : "submissions"}
                 </div>
               </div>
               <StatusBadge status={form.status} />
@@ -77,7 +84,15 @@ export default async function FormsPage() {
                 >
                   Submission layout
                 </Link>
-                <Link className="btn btn-sm" href={`/forms/${form.slug}`} target="_blank">
+                <Link
+                  className="btn btn-sm"
+                  href={
+                    form.kind === "test"
+                      ? `/test/${form.slug}`
+                      : `/forms/${form.slug}`
+                  }
+                  target="_blank"
+                >
                   View
                 </Link>
                 <form action={deleteFormAction}>

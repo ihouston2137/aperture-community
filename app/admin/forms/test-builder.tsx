@@ -29,6 +29,9 @@ import {
   type TestVariant,
 } from "@/lib/form-test";
 
+import { InlineStyleEditor, type SavedStyle } from "@/components/style-editor";
+import type { StyleSlot } from "@/lib/display-templates";
+
 import { saveTestAction } from "./actions";
 
 /**
@@ -70,7 +73,28 @@ export type TestRecord = {
  * already done. What is left to author is the questions, their variants, and
  * what counts as right — which is what this page is.
  */
-export function TestBuilder({ test: initial }: { test: TestRecord }) {
+/** The style slots a test dresses, all edited in one fold each. */
+const TEST_STYLE_SLOTS = [
+  { key: "titleStyle", label: "Title", where: "test" },
+  { key: "instructionsStyle", label: "Instructions", where: "test" },
+  { key: "formStyle", label: "The paper", where: "form" },
+  { key: "labelStyle", label: "Question text", where: "form" },
+  { key: "fieldStyle", label: "Answer fields", where: "form" },
+  { key: "placeholderStyle", label: "Placeholder text", where: "form" },
+  { key: "helpStyle", label: "Help text", where: "form" },
+  { key: "successStyle", label: "The result", where: "form" },
+] as const;
+
+export function TestBuilder({
+  test: initial,
+  fonts,
+  savedStyles,
+}: {
+  test: TestRecord;
+  /** Design-library fonts and named styles, for the style folds. */
+  fonts: string[];
+  savedStyles: SavedStyle[];
+}) {
   const [title, setTitle] = useState(initial.title);
   const [slug, setSlug] = useState(initial.slug);
   const [status, setStatus] = useState(initial.status);
@@ -172,6 +196,23 @@ export function TestBuilder({ test: initial }: { test: TestRecord }) {
         </div>
       </Panel>
 
+      <Panel title="What it says">
+        <div className="field">
+          <label htmlFor="test-instructions">Instructions</label>
+          <textarea
+            id="test-instructions"
+            rows={4}
+            value={test.instructions}
+            placeholder="What to do before starting, how long it should take, what is allowed."
+            onChange={(event) => patchTest({ instructions: event.target.value })}
+          />
+          <span className="help-text">
+            Shown under the title, before the questions. Line breaks are kept,
+            so a list of rules reads as a list.
+          </span>
+        </div>
+      </Panel>
+
       <Panel title="How it is given">
         <div className="inspector-grid">
           <div className="field">
@@ -216,6 +257,28 @@ export function TestBuilder({ test: initial }: { test: TestRecord }) {
           </div>
         </div>
 
+        <div className="field" style={{ maxWidth: "16rem" }}>
+          <label htmlFor="test-attempts">Times one person may sit it</label>
+          <input
+            id="test-attempts"
+            type="number"
+            min={0}
+            max={50}
+            value={test.attemptLimit}
+            onChange={(event) =>
+              patchTest({
+                attemptLimit: Math.max(0, Math.min(50, Number(event.target.value) || 0)),
+              })
+            }
+          />
+          <span className="help-text">
+            {test.attemptLimit === 0
+              ? "Zero is as often as they like."
+              : `Their best sitting is the one kept, whichever of the ${test.attemptLimit} it was.`}{" "}
+            Counted per person, which is why a test asks somebody to sign in.
+          </span>
+        </div>
+
         <label className="checkbox-row">
           <input
             type="checkbox"
@@ -238,6 +301,52 @@ export function TestBuilder({ test: initial }: { test: TestRecord }) {
           variant is picked for each question drawn, then the order is shuffled.
           Using none of them gives the same paper every time.
         </p>
+      </Panel>
+
+      <Panel title="How it looks">
+        <p className="help-text" style={{ marginBottom: "0.75rem" }}>
+          The first two dress the top of the page; the rest dress the paper and
+          the fields on it, exactly as they do on a form.
+        </p>
+
+        {TEST_STYLE_SLOTS.map((slot) => {
+          const value =
+            slot.where === "test"
+              ? test[slot.key as "titleStyle" | "instructionsStyle"]
+              : settings[slot.key as keyof FormSettings];
+          const held = value as StyleSlot;
+
+          return (
+            <details key={slot.key} className="inspector-fold is-top">
+              <summary>
+                {slot.label}
+                <span className="help-text">
+                  {held.styleSlug
+                    ? held.styleSlug
+                    : Object.keys(held.style ?? {}).length > 0
+                      ? "set"
+                      : "unset"}
+                </span>
+              </summary>
+              <div className="inspector-fold-body">
+                <InlineStyleEditor
+                  values={held.style}
+                  styleSlug={held.styleSlug}
+                  fonts={fonts}
+                  savedStyles={savedStyles}
+                  // Placeholder text is reached through a `::placeholder` rule,
+                  // which a saved style's class cannot cross into.
+                  showSavedStyles={slot.key !== "placeholderStyle"}
+                  onChange={({ values, styleSlug }) => {
+                    const next = { styleSlug, style: styleSlug ? {} : values };
+                    if (slot.where === "test") patchTest({ [slot.key]: next } as never);
+                    else setSettings((current) => ({ ...current, [slot.key]: next }));
+                  }}
+                />
+              </div>
+            </details>
+          );
+        })}
       </Panel>
 
       <Panel title={`Questions (${askable})`}>

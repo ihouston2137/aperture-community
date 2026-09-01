@@ -1421,11 +1421,37 @@ const FormSubmissionSchema = new Schema<any>(
     grade: { type: TestGradeSchema, default: undefined },
     /** Which question and which variant of it was served, in order. */
     sitting: { type: [Mixed], default: [] },
+    /**
+     * Who sat it, for a test.
+     *
+     * A form is answered by whoever opens it and may be answered anonymously;
+     * a test is sat by somebody, and a result nobody is attached to is not a
+     * result. Their name is stored alongside the id so a list of results reads
+     * without a second query, and so a member since removed still shows as
+     * whoever sat it.
+     */
+    userId: { type: String, default: "" },
+    userName: { type: String, default: "" },
+    /**
+     * How many times they have sat it, this attempt included.
+     *
+     * One row per person per test, holding their best result — so this is a
+     * count of sittings rather than a count of rows, and the two would
+     * otherwise disagree the first time somebody retook anything.
+     */
+    attempts: { type: Number, default: 1 },
   },
   { timestamps: true }
 );
 
 FormSubmissionSchema.index({ formId: 1, createdAt: -1 });
+// One row per person per test, which is what keeping the best result means.
+// Sparse, since an ordinary form submission has no `userId` and any number of
+// them may exist for one form.
+FormSubmissionSchema.index(
+  { formId: 1, userId: 1 },
+  { unique: true, sparse: true, partialFilterExpression: { userId: { $gt: "" } } }
+);
 
 export const FormSubmission = model("FormSubmission", FormSubmissionSchema);
 

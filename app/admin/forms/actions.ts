@@ -127,7 +127,8 @@ export async function saveTestAction(formData: FormData) {
     : String((await FormDefinition.create(record))._id);
 
   revalidatePath("/admin/forms");
-  revalidatePath(`/forms/${slug}`);
+  // A test lives at its own address, so that is the one to rebuild.
+  revalidatePath(`/test/${slug}`);
   redirect(`/admin/forms/${formId}/test`);
 }
 

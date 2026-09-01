@@ -46,6 +46,13 @@ export const adminNavGroups: NavGroup[] = [
         label: "Submissions",
         permission: "forms.submissions",
       },
+      // Results sit under Forms because that is where a test is built, but on
+      // their own permission — see `tests.results`.
+      {
+        href: "/admin/tests/results",
+        label: "Test results",
+        permission: "tests.results",
+      },
     ],
   },
   {

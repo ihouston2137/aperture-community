@@ -31,8 +31,18 @@ export default async function SubmissionsPage() {
   await requirePermission("forms.submissions");
   await connectDB();
 
+  /*
+   * Forms only.
+   *
+   * A test result is a mark against a named person and lives under Tests, on
+   * its own permission — mixing the two here would put results in front of
+   * everybody trusted with a contact form.
+   */
   const [forms, grouped] = await Promise.all([
-    FormDefinition.find().select("title").sort({ title: 1 }).lean<any[]>(),
+    FormDefinition.find({ kind: { $ne: "test" } })
+      .select("title")
+      .sort({ title: 1 })
+      .lean<any[]>(),
     FormSubmission.aggregate([
       {
         $group: {
@@ -65,8 +75,16 @@ export default async function SubmissionsPage() {
   // A deleted form leaves its submissions behind, and those still have to be
   // reachable — the answers people gave did not stop mattering because the
   // form asking for them was taken down.
+  const testIds = new Set(
+    (
+      await FormDefinition.find({ kind: "test" }).select("_id").lean<any[]>()
+    ).map((test) => String(test._id))
+  );
+
   for (const [formId, entry] of counts) {
     if (forms.some((form) => String(form._id) === formId)) continue;
+    // A test's results are not an orphaned form's submissions.
+    if (testIds.has(formId)) continue;
     cards.push({
       formId,
       title: entry.title || "Untitled form",

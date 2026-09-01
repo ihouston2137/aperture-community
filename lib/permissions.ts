@@ -106,6 +106,13 @@ export const permissionGroups: PermissionGroup[] = [
         label: "Open metadata reports for the groups they are named on",
       },
       { key: "registration.manage", label: "Manage registration settings" },
+      {
+        // Its own grant, and not `forms.submissions`. A form's answers are
+        // whatever it asked for; a test result is a mark against a named
+        // person, which is a different thing to be trusted with.
+        key: "tests.results",
+        label: "See test results and who scored what",
+      },
       { key: "attendance.view", label: "See who attended events" },
       { key: "attendance.record", label: "Record event attendance" },
     ],
@@ -244,6 +251,22 @@ export const communityPermissionGroups: PermissionGroup[] = [
         key: "sponsorships.closed",
         label: "View archived campaigns and what they raised",
       },
+    ],
+  },
+  {
+    /*
+     * Reading test results, offered to membership levels as well.
+     *
+     * The people who mark a course are often the people taking the next one —
+     * an instructor is a member — and a mark against a named person is a
+     * different trust from the rest of the admin, so it is granted on its own.
+     * The same key the management group offers, for the same reason the
+     * sponsorship ones are: a permission means one thing wherever it is given.
+     */
+    key: "community-tests",
+    label: "Tests",
+    permissions: [
+      { key: "tests.results", label: "See test results and who scored what" },
     ],
   },
 ];

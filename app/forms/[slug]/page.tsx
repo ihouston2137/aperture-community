@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { FormShell } from "@/components/form-shell";
 import { SiteChrome } from "@/components/site-chrome";
@@ -35,6 +35,10 @@ export default async function PublicFormPage({
   // A form can be linked in the navigation and can carry a rule of its own, so
   // it is guarded like every other kind of content — otherwise a members-only
   // form would be a members-only *link* to a public form.
+  // A test has its own address, its own heading and its own rules about who
+  // may sit it. Sending it here would render one thing under the other's name.
+  if (form.kind === "test") redirect(`/test/${slug}`);
+
   await guardContent("form", String(form._id), `/forms/${slug}`);
 
   /*

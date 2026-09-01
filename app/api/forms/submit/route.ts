@@ -1,6 +1,8 @@
 import type { NextRequest } from "next/server";
 
 import { connectDB } from "@/lib/db";
+import { fullName } from "@/lib/member-types";
+import { getSession } from "@/lib/session";
 import { sendFormSubmissionNotification } from "@/lib/email";
 import { collectFormFields, normalizeFormLayout, normalizeFormSettings } from "@/lib/form-layout";
 import {
@@ -9,7 +11,7 @@ import {
   normalizeTestSettings,
   type SittingRef,
 } from "@/lib/form-test";
-import { FormDefinition, FormSubmission } from "@/lib/models";
+import { FormDefinition, FormSubmission, User } from "@/lib/models";
 
 const MAX_VALUE_LENGTH = 20_000;
 
@@ -34,6 +36,34 @@ export async function POST(request: NextRequest) {
   const settings = normalizeFormSettings(form.settings);
   const isTest = form.kind === "test";
   const test = normalizeTestSettings(form.test);
+
+  /*
+   * A test is sat by somebody.
+   *
+   * A form may be answered by anyone who can open it; a result nobody is
+   * attached to is not a result, and an attempt limit nobody is identified
+   * against is not a limit. So a test refuses an anonymous sitting outright
+   * rather than recording one it cannot own.
+   */
+  let taker: { id: string; name: string } | null = null;
+  if (isTest) {
+    const session = await getSession();
+    if (!session) {
+      return Response.json(
+        { error: "Sign in to take this test." },
+        { status: 401 }
+      );
+    }
+
+    const user = await User.findById(session.userId)
+      .select("firstName lastName name email")
+      .lean<any>();
+    if (!user) {
+      return Response.json({ error: "Sign in to take this test." }, { status: 401 });
+    }
+
+    taker = { id: session.userId, name: fullName(user) };
+  }
 
   /*
    * A test's questions are not in its layout, and which of them were asked is
@@ -113,14 +143,67 @@ export async function POST(request: NextRequest) {
       )
     : null;
 
-  await FormSubmission.create({
-    formId: String(form._id),
-    formTitle: form.title ?? "",
-    data,
-    fields,
-    status: "new",
-    ...(grade ? { grade, sitting } : {}),
-  });
+  if (isTest && taker) {
+    /*
+     * One row per person per test, holding their best sitting.
+     *
+     * Retaking is not a second result — it is the same person trying again,
+     * and what is wanted from the list is how well they can do it. A tie goes
+     * to the later attempt, since the more recent answer is the one that
+     * reflects where they are now.
+     *
+     * The count is of sittings and survives whichever paper is kept, so a
+     * limit still means what it says after a retake that scored worse.
+     */
+    const previous = await FormSubmission.findOne({
+      formId: String(form._id),
+      userId: taker.id,
+    }).lean<any>();
+
+    const attempts = (previous?.attempts ?? 0) + 1;
+
+    if (test.attemptLimit > 0 && attempts > test.attemptLimit) {
+      return Response.json(
+        {
+          error:
+            test.attemptLimit === 1
+              ? "You have already taken this test."
+              : `You have taken this test ${test.attemptLimit} times.`,
+        },
+        { status: 403 }
+      );
+    }
+
+    const better =
+      !previous?.grade ||
+      (grade?.percent ?? 0) >= (previous.grade.percent ?? 0);
+
+    await FormSubmission.findOneAndUpdate(
+      { formId: String(form._id), userId: taker.id },
+      {
+        $set: {
+          formTitle: form.title ?? "",
+          userName: taker.name,
+          attempts,
+          // Only the kept paper's answers, so the row is one whole sitting
+          // rather than this attempt's grade against that attempt's answers.
+          ...(better
+            ? { data, fields, grade, sitting, status: "new", createdAt: new Date() }
+            : {}),
+        },
+      },
+      { upsert: true }
+    );
+  } else {
+    await FormSubmission.create({
+      formId: String(form._id),
+      formTitle: form.title ?? "",
+      data,
+      fields,
+      status: "new",
+      ...(grade ? { grade, sitting } : {}),
+    });
+  }
 
   // A failed notification must not fail the submission — it is already stored.
   const notification = await sendFormSubmissionNotification({

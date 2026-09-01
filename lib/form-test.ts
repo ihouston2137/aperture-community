@@ -22,6 +22,11 @@ import {
   type FormBlockType,
 } from "./form-layout";
 import {
+  emptyStyleSlot,
+  normalizeStyleSlot,
+  type StyleSlot,
+} from "./display-templates";
+import {
   createColumn,
   createRow,
   makeId,
@@ -119,6 +124,25 @@ export type TestQuestion = {
 export type TestSettings = {
   questions: TestQuestion[];
   /**
+   * What to do before starting, said at the top of the paper.
+   *
+   * Its own field rather than a text block among the questions: it is read
+   * before the test begins and is not part of what is marked, and a candidate
+   * scrolling back to check the rules should not have to hunt for them among
+   * the questions.
+   */
+  instructions: string;
+  /**
+   * How many times one person may sit it. Zero is as often as they like.
+   *
+   * Counted per person rather than per sitting, which is why the taker is
+   * recorded — a limit nobody is identified against is not a limit.
+   */
+  attemptLimit: number;
+  /** The title and the instructions, each dressed on their own. */
+  titleStyle: StyleSlot;
+  instructionsStyle: StyleSlot;
+  /**
    * How many questions a sitting asks. Zero asks all of them.
    *
    * Drawing ten from twenty-five is the cheapest way to make two sittings
@@ -134,6 +158,10 @@ export type TestSettings = {
 
 export const defaultTestSettings: TestSettings = {
   questions: [],
+  instructions: "",
+  attemptLimit: 0,
+  titleStyle: emptyStyleSlot,
+  instructionsStyle: emptyStyleSlot,
   askCount: 0,
   shuffleQuestions: false,
   shuffleOptions: false,
@@ -214,6 +242,12 @@ export function normalizeTestSettings(input: unknown): TestSettings {
 
   return {
     questions,
+    instructions: str(raw.instructions).slice(0, 4000),
+    // Bounded: a limit of a thousand is not a limit, and a negative one is a
+    // test nobody may sit.
+    attemptLimit: Math.max(0, Math.min(50, Math.round(num(raw.attemptLimit, 0)))),
+    titleStyle: normalizeStyleSlot(raw.titleStyle),
+    instructionsStyle: normalizeStyleSlot(raw.instructionsStyle),
     askCount: Math.max(0, Math.min(questions.length, num(raw.askCount, 0))),
     shuffleQuestions: Boolean(raw.shuffleQuestions),
     shuffleOptions: Boolean(raw.shuffleOptions),
