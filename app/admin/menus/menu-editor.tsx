@@ -4,11 +4,15 @@ import { useState, useTransition } from "react";
 
 import { Panel } from "@/components/admin-ui";
 import {
+  GROUP_DISPLAYS,
+  GROUP_DISPLAY_LABELS,
+  MAX_MENU_DEPTH,
   MENU_ITEM_VISIBILITY_MODES,
   MENU_TARGET_LABELS,
   MENU_TARGET_TYPES,
   MENU_VISIBILITY_LABELS,
   blankMenuItem,
+  type GroupDisplay,
   type MenuContentType,
   type MenuItem,
   type MenuRecord,
@@ -122,6 +126,7 @@ export function MenuEditor({
           <ItemRow
             key={item.id}
             item={item}
+            depth={0}
             targets={targets}
             roles={roles}
             first={index === 0}
@@ -176,8 +181,22 @@ export function MenuEditor({
   );
 }
 
+/**
+ * One item, and everything under it.
+ *
+ * Recursive, so a group inside a group is edited exactly as the group above it
+ * is — the same fields, the same reordering, the same remove. The old version
+ * wrote the children out separately, which is why they could never be reordered
+ * and never hold a group of their own: there was no second copy of the controls
+ * that would have done it.
+ *
+ * `depth` decides only two things: whether another group may be added inside,
+ * and whether the display setting is worth asking about. The limit itself is
+ * `MAX_MENU_DEPTH`, enforced again on save.
+ */
 function ItemRow({
   item,
+  depth,
   targets,
   roles,
   first,
@@ -187,6 +206,7 @@ function ItemRow({
   onRemove,
 }: {
   item: MenuItem;
+  depth: number;
   targets: Record<MenuContentType, TargetOption[]>;
   roles: MenuRoleOption[];
   first: boolean;
@@ -196,6 +216,7 @@ function ItemRow({
   onRemove: () => void;
 }) {
   const isGroup = item.kind === "label";
+  const canNest = depth < MAX_MENU_DEPTH - 1;
 
   const patchChild = (index: number, changes: Partial<MenuItem>) =>
     onChange({
@@ -204,8 +225,16 @@ function ItemRow({
       ),
     });
 
+  const moveChild = (index: number, by: number) => {
+    const to = index + by;
+    if (to < 0 || to >= item.children.length) return;
+    const next = [...item.children];
+    [next[index], next[to]] = [next[to], next[index]];
+    onChange({ children: next });
+  };
+
   return (
-    <div className="menu-row">
+    <div className="menu-row" data-depth={depth}>
       <div className="menu-row-top">
         <span className="badge">{isGroup ? "group" : "link"}</span>
         <div className="admin-list-actions" style={{ marginLeft: "auto" }}>
@@ -256,6 +285,30 @@ function ItemRow({
             Show the dropdown arrow
           </label>
 
+          {/* Only worth asking inside another group: at the top level the
+              group *is* the panel, and there is nothing to be inline within. */}
+          {depth > 0 ? (
+            <div className="field">
+              <label>Shown as</label>
+              <select
+                value={item.groupDisplay}
+                onChange={(changeEvent) =>
+                  onChange({ groupDisplay: changeEvent.target.value as GroupDisplay })
+                }
+              >
+                {GROUP_DISPLAYS.map((option) => (
+                  <option key={option} value={option}>
+                    {GROUP_DISPLAY_LABELS[option]}
+                  </option>
+                ))}
+              </select>
+              <span className="help-text">
+                On a phone the menu opens as one long panel, so a flyout is
+                shown as a heading there whichever is chosen.
+              </span>
+            </div>
+          ) : null}
+
           <VisibilityField
             visibility={item.visibility}
             roles={roles}
@@ -266,54 +319,48 @@ function ItemRow({
           <div className="menu-children">
             <p className="help-text">Items in this group</p>
             {item.children.map((child, index) => (
-              <div key={child.id} className="menu-child-row">
-                <div className="field-grid">
-                  <div className="field">
-                    <label>Label</label>
-                    <input
-                      type="text"
-                      value={child.label}
-                      onChange={(changeEvent) =>
-                        patchChild(index, { label: changeEvent.target.value })
-                      }
-                    />
-                  </div>
-                </div>
-
-                <TargetFields
-                  item={child}
-                  targets={targets}
-                  onChange={(changes) => patchChild(index, changes)}
-                />
-
-                <VisibilityField
-                  visibility={child.visibility}
-                  roles={roles}
-                  note="Narrowed further by the group above."
-                  onChange={(visibility) => patchChild(index, { visibility })}
-                />
-
-                <button
-                  type="button"
-                  className="btn btn-danger btn-sm"
-                  onClick={() =>
-                    onChange({ children: item.children.filter((_, i) => i !== index) })
-                  }
-                >
-                  Remove
-                </button>
-              </div>
+              <ItemRow
+                key={child.id}
+                item={child}
+                depth={depth + 1}
+                targets={targets}
+                roles={roles}
+                first={index === 0}
+                last={index === item.children.length - 1}
+                onChange={(changes) => patchChild(index, changes)}
+                onMove={(by) => moveChild(index, by)}
+                onRemove={() =>
+                  onChange({ children: item.children.filter((_, i) => i !== index) })
+                }
+              />
             ))}
 
-            <button
-              type="button"
-              className="btn btn-sm"
-              onClick={() =>
-                onChange({ children: [...item.children, blankMenuItem("link")] })
-              }
-            >
-              Add item
-            </button>
+            <div className="admin-list-actions">
+              <button
+                type="button"
+                className="btn btn-sm"
+                onClick={() =>
+                  onChange({ children: [...item.children, blankMenuItem("link")] })
+                }
+              >
+                Add link
+              </button>
+              {canNest ? (
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  onClick={() =>
+                    onChange({ children: [...item.children, blankMenuItem("label")] })
+                  }
+                >
+                  Add group
+                </button>
+              ) : (
+                <span className="help-text">
+                  This is as deep as a menu goes.
+                </span>
+              )}
+            </div>
           </div>
         </>
       ) : (
@@ -322,7 +369,11 @@ function ItemRow({
           <VisibilityField
             visibility={item.visibility}
             roles={roles}
-            note="Also decides who may open what this points at."
+            note={
+              depth > 0
+                ? "Narrowed further by the group above."
+                : "Also decides who may open what this points at."
+            }
             onChange={(visibility) => onChange({ visibility })}
           />
         </>

@@ -377,6 +377,91 @@ input, select, textarea {
   color: var(--header-accent);
 }
 
+/* ------------------------------------------------- Groups inside a dropdown
+
+   Two shapes, chosen per group. A heading keeps its items in the panel already
+   open; a flyout gives them a panel of their own beside it. Inside the
+   hamburger panel a flyout is rendered as a heading, so only the heading rules
+   have to work at both widths. */
+
+.site-nav-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.site-nav-section-label {
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.55;
+  white-space: nowrap;
+}
+
+/* Indented and ruled, so the heading reads as covering what follows rather
+   than as one more thing to click. */
+.site-nav-section-items {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding-left: 0.6rem;
+  border-left: 1px solid rgba(128, 128, 128, 0.28);
+}
+
+.site-nav-flyout {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.site-nav-flyout-label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  opacity: 0.85;
+  white-space: nowrap;
+}
+
+.site-nav-flyout-label:hover {
+  opacity: 1;
+  color: var(--header-accent);
+}
+
+.site-nav-flyout-caret {
+  width: 0;
+  height: 0;
+  /* Pointing along the way it opens, rather than down like the parent's. */
+  border-top: 0.25rem solid transparent;
+  border-bottom: 0.25rem solid transparent;
+  border-left: 0.3rem solid currentColor;
+  transition: transform 0.15s ease;
+}
+
+.site-nav-flyout[data-open="true"] .site-nav-flyout-caret {
+  transform: rotate(90deg);
+}
+
+/* Beside the panel it belongs to, not below it: a second panel starting at the
+   top of the first is how a reader tells the two apart. */
+.site-nav-flyout-panel {
+  top: -0.75rem;
+  left: calc(100% + 0.6rem);
+}
+
+/* Near the right edge the parent panel already flipped; its flyouts follow, or
+   they would open off the screen. */
+.site-header-inner .site-nav > .site-nav-menu:last-child .site-nav-flyout-panel,
+.site-header-inner[data-nav-align="right"] .site-nav-flyout-panel {
+  left: auto;
+  right: calc(100% + 0.6rem);
+}
+
 /* A dropdown near the right edge would otherwise run off the header. */
 .site-header-inner .site-nav > .site-nav-menu:last-child .site-nav-panel,
 .site-header-inner[data-nav-align="right"] .site-nav-panel {
@@ -10640,12 +10725,20 @@ html:has(.admin-shell) body::-webkit-scrollbar {
   margin-bottom: 0.6rem;
 }
 
-.menu-child-row {
+/* Rows nested inside a group. Tinted rather than indented again — the
+   `menu-children` rule already indents, and a second indent per level would
+   walk a deep menu off the right of the panel. */
+.menu-row[data-depth="1"],
+.menu-row[data-depth="2"] {
   padding: 0.7rem;
-  margin-bottom: 0.6rem;
-  border: 1px solid var(--admin-border);
   border-radius: 0.375rem;
   background: var(--admin-bg);
+}
+
+.menu-row[data-depth="2"] {
+  /* One shade further in, so the third level is told apart from the second at
+     a glance rather than by reading the labels. */
+  border-style: dashed;
 }
 
 /* ------------------------------------------------------------- Menu block

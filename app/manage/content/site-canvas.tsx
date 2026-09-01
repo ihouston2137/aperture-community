@@ -14,6 +14,7 @@ import {
 } from "@/lib/content-access";
 import { PUBLICATION_KINDS } from "@/lib/publication-layout";
 import {
+  MAX_MENU_DEPTH,
   MENU_ITEM_VISIBILITY_MODES,
   MENU_VISIBILITY_LABELS,
   type MenuContentType,
@@ -26,7 +27,9 @@ import {
   NODE_H,
   NODE_W,
   canDropUnder,
+  depthOf,
   dropIndexAt,
+  placeAmongSiblings,
   findNode,
   layoutTree,
   moveInTree,
@@ -261,7 +264,9 @@ export function SiteCanvas({
       ? nodeAt(drag.x, drag.y, drag.id)
       : null;
   const hoverVerdict =
-    draggedNode && hoverTarget ? canDropUnder(draggedNode, hoverTarget) : null;
+    draggedNode && hoverTarget
+      ? canDropUnder(draggedNode, hoverTarget, depthOf(tree, hoverTarget.id))
+      : null;
 
   // Window-level, so a drag that leaves the frame — which is most of them —
   // still tracks and still finishes.
@@ -315,7 +320,7 @@ export function SiteCanvas({
     const target = nodeAt(current.x, current.y, current.id);
     if (!target) return;
 
-    const verdict = canDropUnder(moving, target);
+    const verdict = canDropUnder(moving, target, depthOf(tree, target.id));
     if (!verdict.allowed) {
       setMessage({ ok: false, text: verdict.reason });
       return;
@@ -523,7 +528,9 @@ export function SiteCanvas({
             canAddPages={canAddPages}
             pending={pending}
             onAddGroup={(label) =>
-              run(() => addGroupAction("home", label), "Group added.")
+              // Under whatever is selected, which is now sometimes a group:
+              // the panel only offers the field where the depth allows it.
+              run(() => addGroupAction(selected.id, label), "Group added.")
             }
             onCreatePage={(title) =>
               run(
@@ -531,6 +538,30 @@ export function SiteCanvas({
                 "Page created as a draft and added to the navigation."
               )
             }
+            place={placeAmongSiblings(tree, selected.id)}
+            // A group added here lands one below the selected node. Tree depth
+            // starts at the home node, so groups may reach `MAX_MENU_DEPTH`
+            // and their links one deeper again.
+            canNestGroup={depthOf(tree, selected.id) + 1 <= MAX_MENU_DEPTH}
+            onReorder={(by) => {
+              const place = placeAmongSiblings(tree, selected.id);
+              if (!place) return;
+              const to = place.index + by;
+              if (to < 0 || to >= place.count) return;
+
+              // Applied here as well as sent, exactly as a drag is: the
+              // diagram settles at once and the server decides.
+              const before = tree;
+              setTree(moveInTree(tree, selected.id, place.parentId, to));
+              run(
+                async () => {
+                  const outcome = await moveNodeAction(selected.id, place.parentId, to);
+                  if (!outcome.ok) setTree(before);
+                  return outcome;
+                },
+                by < 0 ? "Moved earlier." : "Moved later."
+              );
+            }}
             onDetach={() =>
               run(() => detachNodeAction(selected.id), "Taken out of the navigation.")
             }
@@ -588,6 +619,9 @@ function NodePanel({
   pending,
   onAddGroup,
   onCreatePage,
+  place,
+  canNestGroup,
+  onReorder,
   onDetach,
   onVisibility,
   onContentVisibility,
@@ -599,6 +633,11 @@ function NodePanel({
   pending: boolean;
   onAddGroup: (label: string) => void;
   onCreatePage: (title: string) => void;
+  /** Where this node sits among its siblings; null for the home node. */
+  place: { parentId: string; index: number; count: number } | null;
+  /** Whether a group may still be added inside this one. */
+  canNestGroup: boolean;
+  onReorder: (by: -1 | 1) => void;
   onDetach: () => void;
   onVisibility: (mode: string, roleIds: string[]) => void;
   onContentVisibility: (
@@ -633,7 +672,38 @@ function NodePanel({
         <span className="help-text">
           {kindLabel(node)}
           {meta ? ` · ${meta.noun}` : ""}
+          {place && place.count > 1 ? ` · ${place.index + 1} of ${place.count}` : ""}
         </span>
+
+        {/* Reordering without a drag.
+            The canvas has always reordered by dropping a node between its
+            siblings, which asks for a steady hand on a wide tree and for a
+            pointer at all. One step either way is the same move, said in a
+            way that works with a keyboard. */}
+        {canArrange && node.editable && place && place.count > 1 ? (
+          <div className="admin-list-actions" style={{ marginLeft: "auto" }}>
+            <button
+              type="button"
+              className="btn btn-sm"
+              disabled={pending || place.index === 0}
+              onClick={() => onReorder(-1)}
+              aria-label="Move earlier"
+              title="Move earlier"
+            >
+              ←
+            </button>
+            <button
+              type="button"
+              className="btn btn-sm"
+              disabled={pending || place.index === place.count - 1}
+              onClick={() => onReorder(1)}
+              aria-label="Move later"
+              title="Move later"
+            >
+              →
+            </button>
+          </div>
+        ) : null}
       </div>
 
       <dl className="member-facts">
@@ -712,9 +782,11 @@ function NodePanel({
 
       {canArrange && holdsItems ? (
         <div className="canvas-adds">
-          {node.kind === "home" ? (
+          {node.kind === "home" || canNestGroup ? (
             <div className="canvas-field">
-              <label htmlFor="canvas-group">Add a dropdown group</label>
+              <label htmlFor="canvas-group">
+                {node.kind === "home" ? "Add a dropdown group" : "Add a group inside this one"}
+              </label>
               <div className="canvas-field-row">
                 <input
                   id="canvas-group"
@@ -732,6 +804,13 @@ function NodePanel({
                   Add
                 </button>
               </div>
+              {node.kind === "home" ? null : (
+                <span className="help-text">
+                  Shown inside the dropdown above it &mdash; as a heading with
+                  its items listed under it, or as its own panel opening to the
+                  side. Choose which on the menus page.
+                </span>
+              )}
             </div>
           ) : null}
 

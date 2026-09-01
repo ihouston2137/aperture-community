@@ -16,7 +16,7 @@ import {
 import { AccountMenu, SignInLink, type AccountUser } from "./account-menu";
 import type { RegistrationOptions } from "./auth-dialog";
 import { SafeModeToggle } from "./safe-mode-toggle";
-import { SiteNav, SiteNavMenu } from "./site-nav";
+import { SiteNav, SiteNavMenu, SiteNavSubmenu } from "./site-nav";
 
 function SiteHeader({
   content,
@@ -62,25 +62,11 @@ function SiteHeader({
                 showCaret={item.showCaret}
               >
                 {item.children.map((child) => (
-                  <Link
-                    key={child.id}
-                    href={child.href || "/"}
-                    target={child.newTab ? "_blank" : undefined}
-                    rel={child.newTab ? "noreferrer" : undefined}
-                  >
-                    {child.label}
-                  </Link>
+                  <MenuEntry key={child.id} item={child} />
                 ))}
               </SiteNavMenu>
             ) : (
-              <Link
-                key={item.id}
-                href={item.href || "/"}
-                target={item.newTab ? "_blank" : undefined}
-                rel={item.newTab ? "noreferrer" : undefined}
-              >
-                {item.label}
-              </Link>
+              <MenuEntry key={item.id} item={item} />
             )
           )}
           {content.availabilityEnabled && content.availabilityLabel ? (
@@ -194,6 +180,40 @@ function SiteFooter({
         ) : null}
       </div>
     </footer>
+  );
+}
+
+/**
+ * One entry of a menu, at whatever depth it sits.
+ *
+ * A link is an anchor; a group inside a dropdown is a heading or a flyout,
+ * which is the author's choice and not the renderer's. Written once and used
+ * recursively, so the second level cannot drift from the first — the depth
+ * limit lives in `normalizeMenuItems`, and nothing here needs to count.
+ */
+function MenuEntry({ item }: { item: MenuItem }) {
+  if (item.kind === "label" && item.children.length > 0) {
+    return (
+      <SiteNavSubmenu
+        label={item.label}
+        display={item.groupDisplay}
+        showCaret={item.showCaret}
+      >
+        {item.children.map((child) => (
+          <MenuEntry key={child.id} item={child} />
+        ))}
+      </SiteNavSubmenu>
+    );
+  }
+
+  return (
+    <Link
+      href={item.href || "/"}
+      target={item.newTab ? "_blank" : undefined}
+      rel={item.newTab ? "noreferrer" : undefined}
+    >
+      {item.label}
+    </Link>
   );
 }
 

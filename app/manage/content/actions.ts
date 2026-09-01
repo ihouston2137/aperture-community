@@ -12,6 +12,7 @@ import {
 import { connectDB } from "@/lib/db";
 import {
   MENU_CONTENT_TYPES,
+  MAX_MENU_DEPTH,
   blankMenuItem,
   normalizeMenuItems,
   normalizeVisibility,
@@ -29,7 +30,7 @@ import {
 } from "@/lib/models";
 import { requireSession } from "@/lib/session";
 import { loadContentCatalogue, getSiteMenuDoc, loadSiteMap } from "@/lib/site-map";
-import { canDropUnder, findNode, type SiteNode } from "@/lib/site-tree";
+import { canDropUnder, depthOf, findNode, type SiteNode } from "@/lib/site-tree";
 import { PUBLICATION_KINDS, type PublicationKind } from "@/lib/publication-layout";
 import { slugify, uniqueSlug } from "@/lib/slug";
 
@@ -70,17 +71,21 @@ function revalidate() {
 
 /* ------------------------------------------------------- Menu arithmetic */
 
-type Located = { item: MenuItem; parentId: string; index: number };
+type Located = { list: MenuItem[]; item: MenuItem; parentId: string; index: number };
 
-function locate(items: MenuItem[], id: string): Located | null {
+/**
+ * Where an item sits, at any depth.
+ *
+ * Hands back the list it lives in as well as its index, so a caller does not
+ * have to find the parent a second time to change it. Written recursively
+ * because the menu is now two levels deep and a hand-unrolled two-level search
+ * is a third level waiting to be forgotten.
+ */
+function locate(items: MenuItem[], id: string, parentId = "home"): Located | null {
   for (let i = 0; i < items.length; i += 1) {
-    if (items[i].id === id) return { item: items[i], parentId: "home", index: i };
-    const children = items[i].children;
-    for (let j = 0; j < children.length; j += 1) {
-      if (children[j].id === id) {
-        return { item: children[j], parentId: items[i].id, index: j };
-      }
-    }
+    if (items[i].id === id) return { list: items, item: items[i], parentId, index: i };
+    const found = locate(items[i].children, id, items[i].id);
+    if (found) return found;
   }
   return null;
 }
@@ -89,14 +94,7 @@ function locate(items: MenuItem[], id: string): Located | null {
 function detach(items: MenuItem[], id: string): MenuItem | null {
   const found = locate(items, id);
   if (!found) return null;
-
-  if (found.parentId === "home") {
-    items.splice(found.index, 1);
-    return found.item;
-  }
-
-  const parent = items.find((item) => item.id === found.parentId);
-  parent?.children.splice(found.index, 1);
+  found.list.splice(found.index, 1);
   return found.item;
 }
 
@@ -113,11 +111,22 @@ function insertUnder(
     return true;
   }
 
-  const parent = items.find((entry) => entry.id === parentId);
+  // At any depth: the parent may itself be inside a group now.
+  const parent = locate(items, parentId)?.item;
   if (!parent) return false;
   const at = clamp(index, parent.children.length);
   parent.children.splice(at, 0, item);
   return true;
+}
+
+/** How far down an item sits: 0 at the top level, 1 inside a group. */
+function depthOfList(items: MenuItem[], id: string, depth = 0): number {
+  for (const item of items) {
+    if (item.id === id) return depth;
+    const found = depthOfList(item.children, id, depth + 1);
+    if (found >= 0) return found;
+  }
+  return -1;
 }
 
 function clamp(index: number | undefined, length: number): number {
@@ -199,7 +208,7 @@ export async function moveNodeAction(
     if (cannotAccept) return cannotAccept;
   }
 
-  const verdict = canDropUnder(dragged!, target);
+  const verdict = canDropUnder(dragged!, target, depthOf(map.root, target.id));
   if (!verdict.allowed) return { ok: false, error: verdict.reason };
 
   return editMenu((items) => {
@@ -225,19 +234,29 @@ export async function addGroupAction(
 
   const name = label.trim();
   if (!name) return { ok: false, error: "Give the group a name." };
-  // A group holds items, and the header shows one level of them, so a group
-  // only ever belongs at the top.
-  if (parentId !== "home") {
-    return {
-      ok: false,
-      error: "The site header shows one level of dropdowns, so a group goes at the top.",
-    };
-  }
 
   return editMenu((items) => {
+    if (parentId !== "home") {
+      const parent = locate(items, parentId);
+      if (!parent) return { ok: false, error: "That group has already gone." };
+      if (parent.item.kind !== "label") {
+        return { ok: false, error: "Only a group holds other items." };
+      }
+      // Depth is counted from the top: a group at depth 1 may hold links, but
+      // a group inside it would be depth 2, which is past what a menu shows.
+      if (depthOfList(items, parentId) + 1 >= MAX_MENU_DEPTH) {
+        return {
+          ok: false,
+          error: `A menu goes ${MAX_MENU_DEPTH} groups deep, and this is already the last one.`,
+        };
+      }
+    }
+
     const item = blankMenuItem("label");
     item.label = name.slice(0, 120);
-    items.push(item);
+    if (!insertUnder(items, parentId, item)) {
+      return { ok: false, error: "That group has already gone." };
+    }
     return { ok: true };
   });
 }

@@ -216,6 +216,42 @@ export function narrowVisibility(
 
 /* ------------------------------------------------------------------ Items */
 
+/**
+ * How a group inside a group is shown.
+ *
+ * The question a second level raises, and one the author has to answer rather
+ * than the renderer: the two are different menus, not two looks of one.
+ *
+ * `inline` prints the group's name as a heading in the panel already open and
+ * lists its items underneath. Everything stays on screen at once, nothing has
+ * to be hovered to be found, and it works on a phone, where there is no
+ * hovering to do. It is the right answer for a long dropdown that wants
+ * dividing into sections.
+ *
+ * `flyout` gives it its own panel, opening to the side. It keeps the parent
+ * short, and it is what a deep menu of many branches wants. It also asks the
+ * reader to keep a pointer inside a corridor, which is why it is not the
+ * default.
+ *
+ * Meaningless on a top-level group, which is already the panel.
+ */
+export const GROUP_DISPLAYS = ["inline", "flyout"] as const;
+export type GroupDisplay = (typeof GROUP_DISPLAYS)[number];
+
+export const GROUP_DISPLAY_LABELS: Record<GroupDisplay, string> = {
+  inline: "A heading in the panel above, with its items listed under it",
+  flyout: "Its own panel, opening to the side",
+};
+
+/**
+ * How deep a menu may go: a group, a group inside it, and links in that.
+ *
+ * A limit rather than none. Every level past this one is a level somebody has
+ * to find by hovering something they already had to hover, and no header on
+ * any site is improved by a fourth.
+ */
+export const MAX_MENU_DEPTH = 2;
+
 export type MenuItem = {
   id: string;
   /** A `label` is not a link; it opens a group of the items beneath it. */
@@ -229,6 +265,8 @@ export type MenuItem = {
   newTab: boolean;
   showCaret: boolean;
   visibility: MenuVisibility;
+  /** Groups only, and only inside another group. See `GROUP_DISPLAYS`. */
+  groupDisplay: GroupDisplay;
   children: MenuItem[];
 };
 
@@ -258,6 +296,7 @@ export function blankMenuItem(kind: "link" | "label" = "link"): MenuItem {
     newTab: false,
     showCaret: true,
     visibility: { ...publicVisibility },
+    groupDisplay: "inline",
     children: [],
   };
 }
@@ -266,7 +305,13 @@ function str(value: unknown): string {
   return typeof value === "string" ? value : "";
 }
 
-/** One level of nesting only, matching what the header has always rendered. */
+/**
+ * The stored items, bounded to `MAX_MENU_DEPTH`.
+ *
+ * Anything deeper is dropped here rather than rendered and then ignored: a
+ * level that cannot be shown should not survive a save, or an author goes on
+ * editing something nobody will ever see.
+ */
 export function normalizeMenuItems(input: unknown, depth = 0): MenuItem[] {
   if (!Array.isArray(input)) return [];
 
@@ -286,7 +331,13 @@ export function normalizeMenuItems(input: unknown, depth = 0): MenuItem[] {
       // arrow it was already showing.
       showCaret: row.showCaret !== false,
       visibility: normalizeVisibility(row.visibility),
-      children: depth === 0 && kind === "label" ? normalizeMenuItems(row.children, 1) : [],
+      // Absent means a heading, which is what a group inside a group did
+      // before there was a choice to make about it.
+      groupDisplay: row.groupDisplay === "flyout" ? "flyout" : "inline",
+      children:
+        kind === "label" && depth < MAX_MENU_DEPTH
+          ? normalizeMenuItems(row.children, depth + 1)
+          : [],
     };
   });
 }
@@ -304,8 +355,22 @@ export function visibleMenuItems(items: MenuItem[], viewer: MenuViewer): MenuIte
     if (!visibilityAllows(item.visibility, viewer)) continue;
 
     if (item.kind === "label") {
-      const children = item.children.filter((child) =>
-        visibilityAllows(narrowVisibility(item.visibility, child.visibility), viewer)
+      /*
+       * Down through the nesting, narrowing as it goes.
+       *
+       * Each level's rule is combined with the one above it before the viewer
+       * is tested, so a link in a members-only section of a members-only group
+       * is not reachable by anybody the outer group already shut out. The
+       * empty-group rule then applies at every level rather than only the
+       * first: a heading with nothing under it is as much a dead end as a
+       * dropdown with nothing in it.
+       */
+      const children = visibleMenuItems(
+        item.children.map((child) => ({
+          ...child,
+          visibility: narrowVisibility(item.visibility, child.visibility),
+        })),
+        viewer
       );
       if (children.length === 0) continue;
       out.push({ ...item, children });

@@ -1,5 +1,9 @@
 import type { ContentAudience, ContentState } from "./content-access";
-import type { MenuContentType, MenuVisibility } from "./menu-types";
+import {
+  MAX_MENU_DEPTH,
+  type MenuContentType,
+  type MenuVisibility,
+} from "./menu-types";
 
 /**
  * The site as a tree, and where each node sits on the canvas.
@@ -247,20 +251,79 @@ export function countNodes(root: SiteNode): number {
 export type DropVerdict = { allowed: boolean; reason: string };
 
 /**
+ * A node's place among its siblings.
+ *
+ * What the reorder buttons need and the drag does not: a drag picks a position
+ * from a pointer, while a button has to know where the node already is to ask
+ * for one step either way.
+ */
+export function placeAmongSiblings(
+  root: SiteNode,
+  id: string
+): { parentId: string; index: number; count: number } | null {
+  const walk = (node: SiteNode): ReturnType<typeof placeAmongSiblings> => {
+    const index = node.children.findIndex((child) => child.id === id);
+    if (index >= 0) {
+      return { parentId: node.id, index, count: node.children.length };
+    }
+    for (const child of node.children) {
+      const found = walk(child);
+      if (found) return found;
+    }
+    return null;
+  };
+  return walk(root);
+}
+
+/** Where a node sits, the home node being 0. -1 when it is not in the tree. */
+export function depthOf(root: SiteNode, id: string, depth = 0): number {
+  if (root.id === id) return depth;
+  for (const child of root.children) {
+    const found = depthOf(child, id, depth + 1);
+    if (found >= 0) return found;
+  }
+  return -1;
+}
+
+/**
+ * How far below a node its deepest *group* sits. -1 when it holds none and is
+ * not one itself.
+ *
+ * Groups are what the depth limit is about; links are not. A group holding
+ * fifty links is one level of dropdown, and measuring the branch by its links
+ * would refuse a drop that renders perfectly well.
+ */
+export function deepestGroupDepth(node: SiteNode): number {
+  const below = node.children.map(deepestGroupDepth);
+  const deepestBelow = below.length > 0 ? Math.max(...below) : -1;
+  const fromChildren = deepestBelow >= 0 ? deepestBelow + 1 : -1;
+  return node.kind === "group" ? Math.max(0, fromChildren) : fromChildren;
+}
+
+/**
  * Whether one node may be dragged under another.
  *
- * The hard limit is the site header itself: it renders **one** level of
- * dropdowns, and `normalizeMenuItems` drops anything deeper on save. Rather
- * than let somebody build a third level that silently disappears, the canvas
- * refuses the drop and says why.
+ * The hard limit is what a menu can show: `MAX_MENU_DEPTH` levels of groups,
+ * and `normalizeMenuItems` drops anything deeper on save. Rather than let
+ * somebody build a level that silently disappears, the canvas refuses the drop
+ * and says why.
+ *
+ * The test is on the whole branch, not on the dragged node alone: dropping a
+ * group that holds a group is dropping three levels at once, and only counting
+ * the top of it would let exactly the thing this prevents through the door.
  *
  * Shared by the canvas and the server action on purpose. The canvas uses it to
  * grey out an impossible target; the action uses it because a refusal that
  * lives only in the browser is a suggestion.
+ *
+ * @param targetDepth how far down the target sits, the home node being 0.
+ * Absent where the caller cannot say, which allows the drop and leaves the
+ * depth to the save.
  */
 export function canDropUnder(
   dragged: SiteNode,
-  target: SiteNode
+  target: SiteNode,
+  targetDepth?: number
 ): DropVerdict {
   if (dragged.id === target.id) {
     return { allowed: false, reason: "That is where it already is." };
@@ -282,18 +345,29 @@ export function canDropUnder(
     };
   }
 
-  if (dragged.kind === "group") {
-    return {
-      allowed: false,
-      reason: "The site header shows one level of dropdowns, so a group cannot go inside a group.",
-    };
-  }
-
-  if (dragged.children.length > 0) {
-    return {
-      allowed: false,
-      reason: "This holds items of its own, and they would end up a level too deep.",
-    };
+  /*
+   * Deep enough for the branch being dropped.
+   *
+   * Counted in tree depth, where the home node is 0 and a top-level group is
+   * 1 — one more than `MAX_MENU_DEPTH` counts, which starts at the top-level
+   * items. So a group may sit as deep as `MAX_MENU_DEPTH` here, and the links
+   * under it one deeper again.
+   *
+   * The measure is the deepest *group* in what is being dragged, not its
+   * deepest link. A group of fifty links is still one dropdown; refusing that
+   * drop would be refusing something that renders perfectly well.
+   */
+  if (targetDepth !== undefined) {
+    const deepestGroup = targetDepth + 1 + deepestGroupDepth(dragged);
+    if (deepestGroup > MAX_MENU_DEPTH) {
+      return {
+        allowed: false,
+        reason:
+          deepestGroupDepth(dragged) > 0
+            ? "This holds a group of its own, and it would end up a level too deep."
+            : `A menu goes ${MAX_MENU_DEPTH} groups deep, and this is already the last one.`,
+      };
+    }
   }
 
   return { allowed: true, reason: "" };

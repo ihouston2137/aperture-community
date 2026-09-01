@@ -275,11 +275,26 @@ export async function loadContentAccess(): Promise<ContentAccess> {
 
   const collected = new Map<string, MenuVisibility[]>();
 
+  /*
+   * Down the whole menu, narrowing at every level.
+   *
+   * Recursive rather than a link and its children, because a menu now nests
+   * twice: a link inside a group inside a group has *two* ways in above it,
+   * and recording only the nearer one would leave the outer group's rule off
+   * the way in — which is the one case this whole map exists to catch.
+   */
   const record = (item: MenuItem, inherited: MenuVisibility) => {
-    if (item.kind === "link" && item.targetType !== "url" && item.targetId) {
+    const rule = narrowVisibility(inherited, item.visibility);
+
+    if (item.kind === "label") {
+      for (const child of item.children) record(child, rule);
+      return;
+    }
+
+    if (item.targetType !== "url" && item.targetId) {
       const key = contentKey(item.targetType as MenuContentType, item.targetId);
       const rules = collected.get(key) ?? [];
-      rules.push(narrowVisibility(inherited, item.visibility));
+      rules.push(rule);
       collected.set(key, rules);
     }
   };
@@ -287,9 +302,6 @@ export async function loadContentAccess(): Promise<ContentAccess> {
   for (const doc of docs) {
     for (const item of normalizeMenuItems(doc.items)) {
       record(item, publicVisibility);
-      if (item.kind === "label") {
-        for (const child of item.children) record(child, item.visibility);
-      }
     }
   }
 

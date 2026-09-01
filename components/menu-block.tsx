@@ -48,22 +48,13 @@ export function MenuBlockView({
       data-direction={direction}
     >
       {items.map((item) => (
-        <li key={item.id} className="pb-menu-item">
-          {isMenuGroup(item) ? (
-            <>
-              <span className="pb-menu-group-label">{item.label}</span>
-              <ul className="pb-menu-sublist">
-                {item.children.map((child) => (
-                  <li key={child.id}>
-                    <MenuLink item={child} className={linkStyle.className} style={linkStyle.style} interactive={interactive} />
-                  </li>
-                ))}
-              </ul>
-            </>
-          ) : (
-            <MenuLink item={item} className={linkStyle.className} style={linkStyle.style} interactive={interactive} />
-          )}
-        </li>
+        <MenuEntry
+          key={item.id}
+          item={item}
+          linkClassName={linkStyle.className}
+          linkStyle={linkStyle.style}
+          interactive={interactive}
+        />
       ))}
     </ul>
   );
@@ -79,6 +70,57 @@ export function MenuBlockView({
     >
       {body}
     </MenuDropdown>
+  );
+}
+
+/**
+ * One entry, at whatever depth it sits.
+ *
+ * Recursive, so a group inside a group prints as a heading and its list — the
+ * same shape the first level takes, one indent further in. The block is an
+ * open list rather than a hovering panel, so `groupDisplay` has nothing to
+ * choose between here: everything is already on screen, which is what `inline`
+ * asks for and the only thing a list can do.
+ */
+function MenuEntry({
+  item,
+  linkClassName,
+  linkStyle,
+  interactive,
+}: {
+  item: MenuItem;
+  linkClassName: string;
+  linkStyle: React.CSSProperties | undefined;
+  interactive: boolean;
+}) {
+  if (isMenuGroup(item)) {
+    return (
+      <li className="pb-menu-item">
+        <span className="pb-menu-group-label">{item.label}</span>
+        <ul className="pb-menu-sublist">
+          {item.children.map((child) => (
+            <MenuEntry
+              key={child.id}
+              item={child}
+              linkClassName={linkClassName}
+              linkStyle={linkStyle}
+              interactive={interactive}
+            />
+          ))}
+        </ul>
+      </li>
+    );
+  }
+
+  return (
+    <li className="pb-menu-item">
+      <MenuLink
+        item={item}
+        className={linkClassName}
+        style={linkStyle}
+        interactive={interactive}
+      />
+    </li>
   );
 }
 

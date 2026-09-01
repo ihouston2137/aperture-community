@@ -2,6 +2,8 @@
 
 import { createContext, useContext, useEffect, useId, useRef, useState } from "react";
 
+import type { GroupDisplay } from "@/lib/menu-types";
+
 /**
  * Client behaviour for the header navigation: the mobile hamburger panel and
  * the dropdown menus.
@@ -79,6 +81,73 @@ export function SiteNav({ children }: { children: React.ReactNode }) {
         <MobilePanelContext value={open}>{children}</MobilePanelContext>
       </nav>
     </>
+  );
+}
+
+/**
+ * A group inside a dropdown.
+ *
+ * Two shapes, chosen by the author. A heading keeps everything on screen at
+ * once; a flyout gives the group its own panel and keeps the parent short.
+ *
+ * The flyout opens on a press rather than on hover, like the dropdown above
+ * it. Hover would mean steering a pointer down a corridor without leaving it,
+ * which is the part of deep menus everybody hates, and it would mean nothing
+ * at all on a phone.
+ *
+ * Inside the hamburger panel it is always a heading whatever was chosen: there
+ * is no room to fly out to and nothing to fly out over.
+ */
+export function SiteNavSubmenu({
+  label,
+  display,
+  showCaret = true,
+  children,
+}: {
+  label: string;
+  display: GroupDisplay;
+  showCaret?: boolean;
+  children: React.ReactNode;
+}) {
+  const inPanel = useContext(MobilePanelContext);
+  const [open, setOpen] = useState(false);
+  const root = useRef<HTMLDivElement>(null);
+
+  const asHeading = display === "inline" || inPanel;
+
+  useEffect(() => {
+    if (asHeading || !open) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (!root.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [asHeading, open]);
+
+  if (asHeading) {
+    return (
+      <div className="site-nav-section">
+        <span className="site-nav-section-label">{label}</span>
+        <div className="site-nav-section-items">{children}</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="site-nav-flyout" ref={root} data-open={open ? "true" : "false"}>
+      <button
+        type="button"
+        className="site-nav-flyout-label"
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+      >
+        {label}
+        {showCaret ? <span className="site-nav-flyout-caret" aria-hidden="true" /> : null}
+      </button>
+      <div className="site-nav-panel site-nav-flyout-panel" hidden={!open}>
+        {children}
+      </div>
+    </div>
   );
 }
 
