@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server";
 import { connectDB } from "@/lib/db";
 import { fullName } from "@/lib/member-types";
 import { getSession } from "@/lib/session";
-import { sendFormSubmissionNotification } from "@/lib/email";
+import { sendFormSubmissionNotification, sendTestResultEmail } from "@/lib/email";
 import { collectFormFields, normalizeFormLayout, normalizeFormSettings } from "@/lib/form-layout";
 import {
   gradeForTaker,
@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
    * against is not a limit. So a test refuses an anonymous sitting outright
    * rather than recording one it cannot own.
    */
-  let taker: { id: string; name: string } | null = null;
+  let taker: { id: string; name: string; email: string } | null = null;
   if (isTest) {
     const session = await getSession();
     if (!session) {
@@ -62,7 +62,11 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: "Sign in to take this test." }, { status: 401 });
     }
 
-    taker = { id: session.userId, name: fullName(user) };
+    taker = {
+      id: session.userId,
+      name: fullName(user),
+      email: typeof user.email === "string" ? user.email : "",
+    };
   }
 
   /*
@@ -86,6 +90,16 @@ export async function POST(request: NextRequest) {
           )
         )
     : [];
+
+  /*
+   * Which attempt this was, and whether it is the one being kept.
+   *
+   * Read out of the branch below so the letter can say so. Somebody marking a
+   * retake needs to know they are looking at attempt three and whether the
+   * list will now show this paper or the earlier, better one.
+   */
+  let attemptNumber = 1;
+  let keptThis = true;
 
   const layout = isTest ? [] : normalizeFormLayout(form.layout);
   const definedFields = isTest
@@ -171,6 +185,7 @@ export async function POST(request: NextRequest) {
     }).lean<any>();
 
     const attempts = (previous?.attempts ?? 0) + 1;
+    attemptNumber = attempts;
 
     if (test.attemptLimit > 0 && attempts > test.attemptLimit) {
       return Response.json(
@@ -187,6 +202,7 @@ export async function POST(request: NextRequest) {
     const better =
       !previous?.grade ||
       (grade?.percent ?? 0) >= (previous.grade.percent ?? 0);
+    keptThis = better;
 
     await FormSubmission.findOneAndUpdate(
       { formId: String(form._id), userId: taker.id },
@@ -212,6 +228,28 @@ export async function POST(request: NextRequest) {
       fields,
       status: "new",
       ...(grade ? { grade, sitting } : {}),
+    });
+  }
+
+  /*
+   * The marked paper, posted.
+   *
+   * After the record is written and never in place of it: a mail server being
+   * slow or unreachable must not cost somebody the test they just took. The
+   * result of the send is not reported back to the page either — the candidate
+   * has no use for whether an administrator's inbox accepted it.
+   */
+  if (isTest && grade && taker) {
+    await sendTestResultEmail({
+      testTitle: form.title ?? "",
+      takerName: taker.name,
+      grade,
+      markers: test.resultEmails,
+      taker: test.emailTaker && taker.email
+        ? { email: taker.email, grade: gradeForTaker(grade, test.resultMode) }
+        : null,
+      attempts: attemptNumber,
+      kept: keptThis,
     });
   }
 

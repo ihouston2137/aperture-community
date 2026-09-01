@@ -1469,11 +1469,19 @@ input, select, textarea {
   width: 4.5rem;
 }
 
-/* The question as the site will ask it, shown inert under its settings. */
-.test-question-preview {
+/* The question as the site will ask it, shown inert on the paper it will be
+   printed on. The dashed edge and the padding are only a default: the test's
+   own "paper" style is laid over this, and a border or a padding set there has
+   to be able to beat what is here — hence the zero-specificity `:where`. The
+   margin stays outside it, since that is the gap between two previews in the
+   admin and not part of the paper. */
+:where(.test-question-preview) {
   border: 1px dashed var(--admin-border);
   border-radius: var(--radius);
   padding: 0.75rem;
+}
+
+.test-question-preview {
   margin-bottom: 0.75rem;
 }
 

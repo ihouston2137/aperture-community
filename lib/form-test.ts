@@ -175,6 +175,27 @@ export type TestSettings = {
   /** Shuffles the choices inside a question, not the questions themselves. */
   shuffleOptions: boolean;
   resultMode: TestResultMode;
+  /**
+   * Who is posted the marked paper when a test is handed in.
+   *
+   * The test's own list rather than the form-notification one, because they
+   * are different messages to different people: that one says a submission
+   * arrived, this one says who scored what. It is also not gated by the
+   * site-wide "notify on form submission" switch — an address typed into this
+   * box is a person asking for these results, and a switch about forms should
+   * not quietly cancel it.
+   */
+  resultEmails: string[];
+  /**
+   * Whether the person who took it is posted their own result.
+   *
+   * Sent shaped by `resultMode`, exactly as the screen is: a test that will
+   * not show somebody the answers must not post them either, or the setting
+   * would mean one thing on the page and another in the inbox. Under
+   * `silent` that leaves a receipt with no mark on it, which is what "the
+   * result is recorded only" means when it is put in an envelope.
+   */
+  emailTaker: boolean;
 };
 
 export const defaultTestSettings: TestSettings = {
@@ -188,6 +209,8 @@ export const defaultTestSettings: TestSettings = {
   shuffleQuestions: false,
   shuffleOptions: false,
   resultMode: "score",
+  resultEmails: [],
+  emailTaker: false,
 };
 
 /* ---------------------------------------------------------- Normalization */
@@ -199,6 +222,23 @@ function str(value: unknown, fallback = ""): string {
 function num(value: unknown, fallback: number): number {
   const parsed = typeof value === "number" ? value : Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+/**
+ * A list of addresses, kept only where an address is what was typed.
+ *
+ * Checked here rather than at the point of sending: a typo saved is a person
+ * who never receives the results and never finds out why, and the editor is
+ * the one place where somebody is looking at what they wrote.
+ */
+function emailList(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  for (const entry of value) {
+    const address = str(entry).trim();
+    if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address)) seen.add(address);
+  }
+  return [...seen].slice(0, 25);
 }
 
 function stringList(value: unknown): string[] {
@@ -279,6 +319,8 @@ export function normalizeTestSettings(input: unknown): TestSettings {
     resultMode: TEST_RESULT_MODES.includes(raw.resultMode as TestResultMode)
       ? (raw.resultMode as TestResultMode)
       : "score",
+    resultEmails: emailList(raw.resultEmails),
+    emailTaker: Boolean(raw.emailTaker),
   };
 }
 

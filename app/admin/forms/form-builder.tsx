@@ -102,6 +102,7 @@ type GlobalStyleKey =
   | "formStyle"
   | "successStyle"
   | "labelStyle"
+  | "textFieldStyle"
   | "fieldStyle"
   | "placeholderStyle"
   | "helpStyle";
@@ -110,7 +111,8 @@ const GLOBAL_STYLE_TITLES: Record<GlobalStyleKey, string> = {
   formStyle: "Form container",
   successStyle: "Thank-you message",
   labelStyle: "Labels",
-  fieldStyle: "Fields",
+  textFieldStyle: "Typed-in fields",
+  fieldStyle: "Other fields",
   placeholderStyle: "Placeholder text",
   helpStyle: "Help text",
 };
@@ -306,9 +308,14 @@ export function FormBuilder({
             <h4 className="inspector-title">Field styles</h4>
             <p className="help-text" style={{ marginTop: 0 }}>
               Applied to every field. A block&rsquo;s own style is laid over
-              these, so one field can still depart from the rest.
+              these, so one field can still depart from the rest.{" "}
+              <em>Typed-in fields</em> dresses every box somebody writes in
+              &mdash; short and long text, email, phone, number, date;{" "}
+              <em>Other fields</em> dresses the dropdowns, choices, tick boxes
+              and uploads.
             </p>
             {globalStyle("labelStyle")}
+            {globalStyle("textFieldStyle")}
             {globalStyle("fieldStyle")}
             {globalStyle("placeholderStyle")}
             {globalStyle("helpStyle")}

@@ -9,7 +9,9 @@ import {
   FORM_BLOCK_TYPES,
   FORM_FIELD_BLOCK_TYPES,
   FORM_VISUAL_BLOCK_TYPES,
+  TYPED_FIELD_BLOCK_TYPES,
   isFieldBlock,
+  isTypedField,
   type FormBlockType,
 } from "./form-block-types";
 import { CONTENT_WIDTHS, type ContentWidth } from "./site-values";
@@ -34,7 +36,9 @@ export {
   FORM_VISUAL_BLOCK_TYPES,
   FORM_FIELD_BLOCK_TYPES,
   FORM_BLOCK_TYPES,
+  TYPED_FIELD_BLOCK_TYPES,
   isFieldBlock,
+  isTypedField,
 };
 export type { FormBlockType };
 
@@ -113,6 +117,18 @@ export type FormSettings = {
    * over these, so one field can still depart from the form's look.
    */
   labelStyle: StyleSlot;
+  /**
+   * Every box somebody types into — short and long text, email, phone,
+   * number, date. See `TYPED_FIELD_BLOCK_TYPES`.
+   *
+   * Parted from `fieldStyle` because they are not the same kind of thing to
+   * dress. A written answer is a rectangle of somebody's own words and wants
+   * room, a line height and often a different face; a dropdown or a set of
+   * choices is furniture, and the size that suits one makes the other look
+   * wrong. One style over both meant every change to either was a compromise.
+   */
+  textFieldStyle: StyleSlot;
+  /** Every other control — dropdowns, choices, tick boxes, uploads. */
   fieldStyle: StyleSlot;
   /**
    * Placeholder text can only be reached through a `::placeholder` rule, so
@@ -131,6 +147,7 @@ export const defaultFormSettings: FormSettings = {
   formStyle: emptyStyleSlot,
   successStyle: emptyStyleSlot,
   labelStyle: emptyStyleSlot,
+  textFieldStyle: emptyStyleSlot,
   fieldStyle: emptyStyleSlot,
   placeholderStyle: emptyStyleSlot,
   helpStyle: emptyStyleSlot,
@@ -314,6 +331,9 @@ export function normalizeFormSettings(input: unknown): FormSettings {
     formStyle: normalizeStyleSlot(raw.formStyle),
     successStyle: normalizeStyleSlot(raw.successStyle),
     labelStyle: normalizeStyleSlot(raw.labelStyle),
+    // A form saved before the two were parted carries one field style; it
+    // becomes both, so nothing changes look until somebody sets them apart.
+    textFieldStyle: normalizeStyleSlot(raw.textFieldStyle ?? raw.fieldStyle),
     fieldStyle: normalizeStyleSlot(raw.fieldStyle),
     placeholderStyle: normalizeStyleSlot(raw.placeholderStyle),
     helpStyle: normalizeStyleSlot(raw.helpStyle),

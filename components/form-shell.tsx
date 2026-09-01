@@ -8,6 +8,7 @@ import { UPLOAD_KIND_PREFIXES } from "@/lib/upload-kinds";
 import {
   collectFormFields,
   isFieldBlock,
+  isTypedField,
   normalizeFormLayout,
   normalizeFormSettings,
   type FormBlock,
@@ -215,7 +216,22 @@ export function FormFieldView({
    */
   const own = blockTextProps(block);
   const labelStyled = styleSlotProps(settings.labelStyle);
-  const fieldStyled = styleSlotProps(settings.fieldStyle);
+
+  /*
+   * Which of the two field styles dresses this control.
+   *
+   * A box somebody writes into is not the same kind of thing as a dropdown or
+   * a row of choices: the first is a rectangle of their own words and wants
+   * room and a line height, the second is furniture. One style over both made
+   * every change to either a compromise, so they are set apart here.
+   *
+   * The line is drawn at "has a text box in it", not at the keyboard a phone
+   * puts up: an email and a telephone number are the same object to dress as a
+   * line of short text, and dressing them apart from it was never the point.
+   */
+  const fieldStyled = styleSlotProps(
+    isTypedField(block.type) ? settings.textFieldStyle : settings.fieldStyle
+  );
 
   const className = `${labelStyled.className} ${own.className}`.trim();
   const style = { ...labelStyled.style, ...own.style };

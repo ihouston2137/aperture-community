@@ -30,7 +30,7 @@ import {
 } from "@/lib/form-test";
 
 import { InlineStyleEditor, type SavedStyle } from "@/components/style-editor";
-import type { StyleSlot } from "@/lib/display-templates";
+import { styleSlotProps, type StyleSlot } from "@/lib/display-templates";
 
 import { saveTestAction } from "./actions";
 
@@ -41,6 +41,22 @@ import { saveTestAction } from "./actions";
  * photograph, and that question simply counts towards nothing.
  */
 const QUESTION_TYPES: FormBlockType[] = [...GRADABLE_TYPES, "file"];
+
+/**
+ * A typed list of addresses, split the way somebody writes one.
+ *
+ * Everything that was written comes back, sorted by the caller — the model
+ * keeps only addresses, and dropping a typo without saying so is how a marker
+ * never gets the post and nobody ever finds out why.
+ */
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function splitEmails(text: string): string[] {
+  return text
+    .split(/[,;\n]/)
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
 
 const TYPE_LABELS: Record<string, string> = {
   shortText: "Short text",
@@ -79,7 +95,8 @@ const TEST_STYLE_SLOTS = [
   { key: "instructionsStyle", label: "Instructions", where: "test" },
   { key: "formStyle", label: "The paper", where: "form" },
   { key: "labelStyle", label: "Question text", where: "form" },
-  { key: "fieldStyle", label: "Answer fields", where: "form" },
+  { key: "textFieldStyle", label: "Typed-in answers", where: "form" },
+  { key: "fieldStyle", label: "Other answer fields", where: "form" },
   { key: "placeholderStyle", label: "Placeholder text", where: "form" },
   { key: "helpStyle", label: "Help text", where: "form" },
   { key: "successStyle", label: "The result", where: "form" },
@@ -100,6 +117,25 @@ export function TestBuilder({
   const [status, setStatus] = useState(initial.status);
   const [settings, setSettings] = useState<FormSettings>(initial.settings);
   const [test, setTest] = useState<TestSettings>(initial.test);
+
+  /*
+   * The address box, held as typed.
+   *
+   * A list parsed on every keystroke cannot be typed into: the comma between
+   * two addresses arrives before the second one does, and a half-written
+   * address is not an address. So it is kept as text and parsed when the box
+   * is left, and anything that was not an address is named rather than
+   * silently dropped.
+   */
+  const [emailText, setEmailText] = useState(initial.test.resultEmails.join(", "));
+  const [dropped, setDropped] = useState<string[]>([]);
+
+  function readEmails() {
+    const all = splitEmails(emailText);
+    const good = all.filter((entry) => EMAIL.test(entry));
+    setDropped(all.filter((entry) => !EMAIL.test(entry)));
+    patchTest({ resultEmails: [...new Set(good)] });
+  }
 
   const previewSettings = normalizeFormSettings(settings);
 
@@ -326,10 +362,55 @@ export function TestBuilder({
         </p>
       </Panel>
 
+      <Panel title="Who is sent the result">
+        <div className="field">
+          <label htmlFor="test-emails">Send each result to</label>
+          <input
+            id="test-emails"
+            value={emailText}
+            placeholder="marker@example.org, office@example.org"
+            onChange={(event) => setEmailText(event.target.value)}
+            onBlur={readEmails}
+          />
+          <span className="help-text">
+            Separated by commas. Each is posted the marked paper as soon as a
+            test is handed in &mdash; who took it, what they scored, and which
+            questions they got wrong. This is the test&rsquo;s own list, not
+            the form-notification one, and the site setting for notifying on
+            form submissions does not switch it off.
+          </span>
+          {dropped.length > 0 ? (
+            <span className="help-text" style={{ color: "#f28b82" }}>
+              Not an address, so not kept: {dropped.join(", ")}
+            </span>
+          ) : null}
+        </div>
+
+        <label className="checkbox-row">
+          <input
+            type="checkbox"
+            checked={test.emailTaker}
+            onChange={(event) => patchTest({ emailTaker: event.target.checked })}
+          />
+          Email the result to the person who took it
+        </label>
+        <span className="help-text">
+          {test.resultMode === "silent"
+            ? "As the test shows them nothing, this posts a receipt with no mark on it."
+            : `They are sent exactly what the page shows them — ${TEST_RESULT_LABELS[
+                test.resultMode
+              ].toLowerCase()}.`}{" "}
+          Sent to the address on their account.
+        </span>
+      </Panel>
+
       <Panel title="How it looks">
         <p className="help-text" style={{ marginBottom: "0.75rem" }}>
           The first two dress the top of the page; the rest dress the paper and
-          the fields on it, exactly as they do on a form.
+          the fields on it, exactly as they do on a form. Typed-in answers are
+          every box a candidate writes in &mdash; short and long text, email,
+          phone, number, date &mdash; dressed apart from the dropdowns and
+          choice lists, which want a different size to look right.
         </p>
 
         {TEST_STYLE_SLOTS.map((slot) => {
@@ -537,6 +618,10 @@ function VariantCard({
 }) {
   const { block, key } = variant;
   const kind = keyKindFor(block.type);
+
+  // The paper the question is printed on, so the preview is read against what
+  // the candidate will read it against.
+  const paper = styleSlotProps(settings.formStyle);
 
   const patchBlock = (patch: Partial<FormBlock>) =>
     onPatch({ block: { ...block, ...patch } });
@@ -768,9 +853,16 @@ function VariantCard({
         ) : null}
 
         {/* The question as it will be asked. Not a second renderer — the same
-            view the public page uses, made inert. */}
+            view the public page uses, made inert, and standing on the same
+            paper: a question is only ever read against the background it is
+            printed on, so a preview on the admin's own card was showing pale
+            text on a pale card and dark text on a dark one whatever the paper
+            said. */}
         <h4 className="inspector-title">As it is asked</h4>
-        <div className="test-question-preview" style={{ pointerEvents: "none" }}>
+        <div
+          className={`test-question-preview form-shell ${paper.className}`.trim()}
+          style={{ ...paper.style, pointerEvents: "none" }}
+        >
           <FormFieldView block={block} settings={settings} disabled />
         </div>
 

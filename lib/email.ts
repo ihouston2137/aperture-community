@@ -10,6 +10,7 @@ import {
   type EmailTemplateOverride,
 } from "./email-templates";
 import { EmailSettings } from "./models";
+import type { MarkedQuestion, TestGrade } from "./form-test";
 import { richTextToPlainText } from "./rich-text";
 import { mergeSettings } from "./settings-merge";
 import { type VerificationPurpose } from "./verification-types";
@@ -297,6 +298,134 @@ export type SubmissionField = {
   type?: string;
   value: unknown;
 };
+
+/* ------------------------------------------------------- Test results */
+
+/**
+ * One question as a line of a posted paper.
+ *
+ * Prints only what it was handed. A grade shaped for the person who took it
+ * has the answers taken out of it, and the same renderer then prints a paper
+ * without them — so what arrives in an inbox can never say more than what the
+ * screen said, without anybody having to keep two sets of rules in step.
+ */
+function markedLine(question: MarkedQuestion, index: number): string {
+  const lines = [
+    `${index + 1}. ${question.label || "(untitled)"} — ${
+      question.correct ? "correct" : "wrong"
+    }`,
+  ];
+  if (question.given !== undefined && !question.correct) {
+    lines.push(`     They wrote: ${question.given || "(nothing)"}`);
+  }
+  if (question.expected !== undefined && !question.correct) {
+    lines.push(`     Correct: ${question.expected}`);
+  }
+  return lines.join("\n");
+}
+
+function scoreLines(grade: TestGrade): string[] {
+  const lines = [`Scored ${grade.percent}% — ${grade.right} of ${grade.marked} correct.`];
+  if (grade.passed !== null) {
+    lines.push(
+      grade.passed
+        ? `Passed — ${grade.passMark}% was needed.`
+        : `Did not pass — ${grade.passMark}% was needed.`
+    );
+  }
+  return lines;
+}
+
+/**
+ * The marked paper, posted.
+ *
+ * Two different letters rather than one with names hidden in it: the people
+ * marking are told who sat it and what the whole paper looked like, and the
+ * person who sat it is told exactly what the screen told them and no more.
+ * Neither is gated by the site-wide form-notification switch — an address
+ * typed into a test is somebody asking for these results, and a setting about
+ * form submissions has no business cancelling it.
+ *
+ * Failures are returned, never thrown. A result is already recorded by the
+ * time this runs, and losing it because a mail server was busy would be much
+ * the worse outcome.
+ */
+export async function sendTestResultEmail(input: {
+  testTitle: string;
+  takerName: string;
+  /** The whole marking, for whoever holds the test. */
+  grade: TestGrade;
+  markers: string[];
+  /**
+   * The person who took it: their address, and their result already shaped by
+   * the test's result mode. A null grade is the silent mode — a receipt, with
+   * no mark on it.
+   */
+  taker?: { email: string; grade: TestGrade | null } | null;
+  /** Which attempt this was, and whether it is the one being kept. */
+  attempts: number;
+  kept: boolean;
+}): Promise<{ markers: boolean; taker: boolean }> {
+  const sent = { markers: false, taker: false };
+
+  const attempt =
+    input.attempts > 1
+      ? `Attempt ${input.attempts}. ${
+          input.kept
+            ? "This is the result being kept."
+            : "An earlier, better result is the one being kept."
+        }`
+      : "";
+
+  if (input.markers.length > 0) {
+    const paper = input.grade.questions.map(markedLine).join("\n");
+    const body = [
+      `${input.takerName} took "${input.testTitle}".`,
+      scoreLines(input.grade).join("\n"),
+      attempt,
+      paper,
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+
+    const result = await sendMail({
+      to: input.markers,
+      subject: `Test result: ${input.testTitle} — ${input.takerName} (${input.grade.percent}%)`,
+      text: body,
+    });
+    sent.markers = result.ok;
+  }
+
+  if (input.taker?.email) {
+    const shown = input.taker.grade;
+    const body = shown
+      ? [
+          `Here is your result for "${input.testTitle}".`,
+          scoreLines(shown).join("\n"),
+          attempt,
+          shown.questions.map(markedLine).join("\n"),
+        ]
+          .filter(Boolean)
+          .join("\n\n")
+      : [
+          `Your attempt at "${input.testTitle}" has been received and recorded.`,
+          attempt,
+        ]
+          .filter(Boolean)
+          .join("\n\n");
+
+    const result = await sendMail({
+      to: input.taker.email,
+      subject: shown
+        ? `Your result: ${input.testTitle} (${shown.percent}%)`
+        : `Received: ${input.testTitle}`,
+      text: body,
+    });
+    sent.taker = result.ok;
+  }
+
+  return sent;
+}
 
 /**
  * Sends the form-submission notification. Failures are reported but never
