@@ -795,6 +795,31 @@ export function PageBlockInspector({
               value={Boolean(block.newTab)}
               onChange={(value) => update({ newTab: value })}
             />
+
+            {/*
+              * The same `align` the Placement section below sets, offered here
+              * as well.
+              *
+              * A button is one of the few blocks narrower than its column, so
+              * where it sits in that column is part of designing the button —
+              * and looking for it under the button is what anybody does first.
+              * One field, written from two places, so the two can never say
+              * different things.
+              */}
+            <SelectField
+              label="Sits"
+              value={block.align ?? "left"}
+              options={[
+                { value: "left", label: "Left of the column" },
+                { value: "center", label: "Centred in the column" },
+                { value: "right", label: "Right of the column" },
+              ]}
+              onChange={(value) => update({ align: value })}
+            />
+            <span className="help-text">
+              Where the button sits across whatever it is in. Use the text
+              style&rsquo;s own alignment for the words inside it.
+            </span>
           </>
         ) : null}
 

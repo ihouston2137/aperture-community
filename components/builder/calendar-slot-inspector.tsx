@@ -160,14 +160,17 @@ export function CalendarSlotInspector({
             ) : null}
 
             <CheckField
-              label="Show the notes people left"
+              label="Open with the notes showing"
               value={block.showNotes ?? false}
               onChange={(value) => update({ showNotes: value } as Partial<PageBlock>)}
             />
             <span className="help-text">
-              A note usually explains an absence, and this list appears on
-              whatever page the template is put on. Whoever takes the register
-              sees them either way.
+              Notes are only ever shown to somebody whose role holds{" "}
+              <strong>Read the notes people leave with an RSVP</strong>, and
+              they get a button to show and hide them. This decides whether
+              that button starts on — worth it for a page only organisers open,
+              and not otherwise. Whoever takes the register sees them either
+              way.
             </span>
 
             <TextField

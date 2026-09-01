@@ -340,6 +340,17 @@ export function CalendarRsvpList({
 }) {
   const { view } = useEventRsvp(event._id, true);
 
+  /*
+   * Whether the notes are on screen.
+   *
+   * Only ever offered to somebody holding the grant, and the notes are absent
+   * from the payload entirely for everybody else — so this is a control over
+   * what is shown, never over what was sent. The block's own setting decides
+   * whether they start open, since a template built for the organiser's page
+   * should not need a press every time it is opened.
+   */
+  const [showNotes, setShowNotes] = useState(Boolean(block.showNotes));
+
   const shows = block.rsvpShows ?? "both";
   const asCounts = block.namesOrCounts === "counts";
 
@@ -349,7 +360,14 @@ export function CalendarRsvpList({
   const levels = namedLevels(block.levelIds, view?.levels ?? []);
   const grouped = Boolean(block.groupByLevels) && levels.length > 0;
 
-  const withNotes = Boolean(block.showNotes);
+  const withNotes = Boolean(view?.canSeeNotes) && showNotes;
+
+  // Nothing to offer where nobody wrote anything: a button that reveals an
+  // empty column is a button that looks broken.
+  const anyNotes = Boolean(
+    view?.canSeeNotes &&
+      [...(view.yes ?? []), ...(view.no ?? [])].some((person) => person.note)
+  );
 
   const names = (people: RsvpPerson[]) => (
     <ul className="cal-rsvp-names">
@@ -403,6 +421,22 @@ export function CalendarRsvpList({
 
   return (
     <div className={`cal-slot cal-rsvp-list ${className}`.trim()} style={style}>
+      {anyNotes ? (
+        <button
+          type="button"
+          className="cal-rsvp-notes-toggle"
+          aria-pressed={showNotes}
+          onClick={(clickEvent) => {
+            // An event box is itself clickable; reading the notes must not
+            // also open the lightbox behind them.
+            clickEvent.stopPropagation();
+            setShowNotes((current) => !current);
+          }}
+        >
+          {showNotes ? "Hide notes" : "Show notes"}
+        </button>
+      ) : null}
+
       {shows !== "no"
         ? section(block.yesHeading || "Going", yes, view?.yesCount ?? 0, "yes")
         : null}

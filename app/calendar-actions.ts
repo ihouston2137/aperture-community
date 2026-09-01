@@ -49,6 +49,13 @@ export type RsvpView = {
   /** This viewer's own note, so the box opens with what they last wrote. */
   myNote: string;
   /**
+   * Whether this viewer may read anybody else's.
+   *
+   * The notes are left out of the payload entirely when they may not — hiding
+   * them in the markup would hide them from the reader and nobody else.
+   */
+  canSeeNotes: boolean;
+  /**
    * Every membership level on the site, so a block naming them by id can print
    * their names.
    *
@@ -70,6 +77,7 @@ const emptyRsvpView: RsvpView = {
   signedIn: false,
   reason: "",
   myNote: "",
+  canSeeNotes: false,
   levels: [],
 };
 
@@ -85,10 +93,12 @@ async function loadRsvpView(eventId: string): Promise<RsvpView> {
   const signedIn = Boolean(session);
 
   let canRsvp = false;
+  let canSeeNotes = false;
   let reason = "Sign in to answer.";
 
   if (session) {
     const { permissions, membershipStatus } = await getUserAccess(session.userId);
+    canSeeNotes = permissions.includes("events.rsvp.notes");
     if (membershipStatus !== "active") {
       reason = "Your membership is not active yet.";
     } else if (!permissions.includes("community.events.rsvp")) {
@@ -110,7 +120,10 @@ async function loadRsvpView(eventId: string): Promise<RsvpView> {
 
   const personOf = (rsvp: any): RsvpPerson => {
     const user = users.find((candidate) => String(candidate._id) === String(rsvp.userId));
-    const note = String(rsvp.note ?? "").trim();
+    // Their own note always; everybody else's only where it is allowed.
+    const mine = session ? String(rsvp.userId) === session.userId : false;
+    const note =
+      canSeeNotes || mine ? String(rsvp.note ?? "").trim() : "";
     if (!user) return { name: "A member", levelIds: [], note };
 
     const { community } = splitRoles((user.roleIds ?? []).map(String), roles);
@@ -140,6 +153,7 @@ async function loadRsvpView(eventId: string): Promise<RsvpView> {
     signedIn,
     reason,
     myNote: String(own?.note ?? ""),
+    canSeeNotes,
     levels: roles
       .filter((role) => role.kind === "community")
       .map((role) => ({ _id: role._id, name: role.name })),

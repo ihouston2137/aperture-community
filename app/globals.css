@@ -10242,6 +10242,30 @@ html:has(.admin-shell) body::-webkit-scrollbar {
   letter-spacing: 0;
 }
 
+/* The control that shows and hides the notes, for whoever may read them.
+   Quiet and at the top of the list, since most of the time the answer to
+   "who is coming" is the list itself and the notes are the follow-up. */
+.cal-rsvp-notes-toggle {
+  align-self: flex-start;
+  flex-basis: 100%;
+  order: -1;
+  padding: 0.15rem 0.5rem;
+  border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
+  border-radius: 0.35rem;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 0.8em;
+  opacity: 0.75;
+  cursor: pointer;
+}
+
+.cal-rsvp-notes-toggle:hover,
+.cal-rsvp-notes-toggle[aria-pressed="true"] {
+  opacity: 1;
+  border-color: color-mix(in srgb, currentColor 55%, transparent);
+}
+
 /* What somebody wrote alongside their answer. Set under the name and quieter
    than it: the name is who, the note is a detail about them. */
 .cal-rsvp-person-note {

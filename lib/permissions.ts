@@ -115,6 +115,14 @@ export const permissionGroups: PermissionGroup[] = [
       },
       { key: "attendance.view", label: "See who attended events" },
       { key: "attendance.record", label: "Record event attendance" },
+      {
+        // A note explains an absence — an illness, a funeral, a job — and is
+        // written to the organiser rather than to the room. Its own grant, so
+        // seeing who is coming and reading why somebody is not are two
+        // different things to be trusted with.
+        key: "events.rsvp.notes",
+        label: "Read the notes people leave with an RSVP",
+      },
     ],
   },
   {
@@ -217,6 +225,13 @@ export const communityPermissionGroups: PermissionGroup[] = [
       { key: "community.forms", label: "Submit member forms" },
       { key: "community.events.rsvp", label: "RSVP to events" },
       { key: "community.events.host", label: "Propose events" },
+      {
+        // The same key the management group offers: whoever organises an
+        // evening needs to read why somebody cannot make it, and an organiser
+        // is usually a member rather than an administrator.
+        key: "events.rsvp.notes",
+        label: "Read the notes people leave with an RSVP",
+      },
       { key: "community.upload", label: "Upload to member collections" },
     ],
   },
