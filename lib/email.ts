@@ -336,6 +336,16 @@ function scoreLines(grade: TestGrade): string[] {
   return lines;
 }
 
+/** What became of the two letters, so a silent failure can be seen. */
+export type TestResultSend = {
+  markers: boolean;
+  taker: boolean;
+  /** How many addresses the test named, and whether a taker copy was asked for. */
+  markerCount: number;
+  takerAsked: boolean;
+  errors: string[];
+};
+
 /**
  * The marked paper, posted.
  *
@@ -365,8 +375,14 @@ export async function sendTestResultEmail(input: {
   /** Which attempt this was, and whether it is the one being kept. */
   attempts: number;
   kept: boolean;
-}): Promise<{ markers: boolean; taker: boolean }> {
-  const sent = { markers: false, taker: false };
+}): Promise<TestResultSend> {
+  const sent: TestResultSend = {
+    markers: false,
+    taker: false,
+    markerCount: input.markers.length,
+    takerAsked: Boolean(input.taker?.email),
+    errors: [],
+  };
 
   const attempt =
     input.attempts > 1
@@ -394,6 +410,7 @@ export async function sendTestResultEmail(input: {
       text: body,
     });
     sent.markers = result.ok;
+    if (!result.ok) sent.errors.push(`markers: ${result.error ?? "send failed"}`);
   }
 
   if (input.taker?.email) {
@@ -422,6 +439,22 @@ export async function sendTestResultEmail(input: {
       text: body,
     });
     sent.taker = result.ok;
+    if (!result.ok) sent.errors.push(`taker: ${result.error ?? "send failed"}`);
+  }
+
+  /*
+   * Said out loud when it fails.
+   *
+   * This is the one send nobody is watching: the candidate is shown their mark
+   * whatever happens to the post, and the people expecting the paper only find
+   * out it never came by not receiving it. A swallowed error here is a setting
+   * that looks switched on and does nothing, so it goes to the server log with
+   * enough in it to tell "nobody was addressed" from "the mail server said no".
+   */
+  if (sent.errors.length > 0) {
+    console.error(
+      `Test result email for "${input.testTitle}" failed: ${sent.errors.join("; ")}`
+    );
   }
 
   return sent;

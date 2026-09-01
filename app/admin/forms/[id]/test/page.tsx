@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { requirePermission } from "@/lib/access";
 import { connectDB } from "@/lib/db";
+import { getEmailSettings } from "@/lib/email";
 import { normalizeFormSettings } from "@/lib/form-layout";
 import { normalizeTestSettings } from "@/lib/form-test";
 import { CustomStyle, FontFamily, FormDefinition } from "@/lib/models";
@@ -19,6 +20,14 @@ export default async function EditTestPage({
   const { id } = await params;
 
   await connectDB();
+
+  /*
+   * Whether the site can post anything at all, so the result-email settings
+   * can say so rather than looking as though they work.
+   */
+  const { enabled, host, fromEmail } = await getEmailSettings();
+  const emailReady = enabled && Boolean(host) && Boolean(fromEmail);
+
   const doc = await FormDefinition.findById(id).lean<any>();
   if (!doc) notFound();
 
@@ -54,6 +63,7 @@ export default async function EditTestPage({
       }}
       fonts={fonts}
       savedStyles={savedStyles}
+      emailReady={emailReady}
     />
   );
 }

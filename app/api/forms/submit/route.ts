@@ -240,7 +240,7 @@ export async function POST(request: NextRequest) {
    * has no use for whether an administrator's inbox accepted it.
    */
   if (isTest && grade && taker) {
-    await sendTestResultEmail({
+    const posted = await sendTestResultEmail({
       testTitle: form.title ?? "",
       takerName: taker.name,
       grade,
@@ -251,6 +251,21 @@ export async function POST(request: NextRequest) {
       attempts: attemptNumber,
       kept: keptThis,
     });
+
+    /*
+     * Why nothing was posted, when nothing was posted.
+     *
+     * Named recipients and a taker asked for but neither sent is a mail server
+     * saying no, which `sendTestResultEmail` has already logged. Nobody named
+     * and nobody asked for is the test not being configured to post anything —
+     * which looks identical from outside and is worth being able to tell apart
+     * without reading the record.
+     */
+    if (posted.markerCount === 0 && !posted.takerAsked) {
+      console.info(
+        `Test "${form.title}" submitted by ${taker.name}: no result email is configured.`
+      );
+    }
   }
 
   // A failed notification must not fail the submission — it is already stored.

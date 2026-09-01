@@ -106,11 +106,21 @@ export function TestBuilder({
   test: initial,
   fonts,
   savedStyles,
+  emailReady,
 }: {
   test: TestRecord;
   /** Design-library fonts and named styles, for the style folds. */
   fonts: string[];
   savedStyles: SavedStyle[];
+  /**
+   * Whether the site can send mail at all.
+   *
+   * Read here so a list of addresses is never left looking like it works. A
+   * test that posts nothing because SMTP was never set up is indistinguishable
+   * from one that posts nothing because of a bug, and the person filling this
+   * box in is the one who can do something about the first.
+   */
+  emailReady: boolean;
 }) {
   const [title, setTitle] = useState(initial.title);
   const [slug, setSlug] = useState(initial.slug);
@@ -119,21 +129,25 @@ export function TestBuilder({
   const [test, setTest] = useState<TestSettings>(initial.test);
 
   /*
-   * The address box, held as typed.
+   * The address box, held as typed and committed as it is typed.
    *
-   * A list parsed on every keystroke cannot be typed into: the comma between
-   * two addresses arrives before the second one does, and a half-written
-   * address is not an address. So it is kept as text and parsed when the box
-   * is left, and anything that was not an address is named rather than
-   * silently dropped.
+   * Two pieces of state, because they answer different questions. What is on
+   * screen has to be exactly what was typed — a list re-joined on every
+   * keystroke cannot be typed into, since the comma between two addresses
+   * arrives before the second one does. What is *saved* has to keep up with
+   * the keystrokes all the same: parsing only when the box was left meant an
+   * address typed and then saved straight away was an address that never
+   * reached the record, which is a setting that silently does nothing.
+   *
+   * What was thrown away is only named once the box is left, so a half-written
+   * address is not called a mistake while it is still being written.
    */
   const [emailText, setEmailText] = useState(initial.test.resultEmails.join(", "));
   const [dropped, setDropped] = useState<string[]>([]);
 
-  function readEmails() {
-    const all = splitEmails(emailText);
-    const good = all.filter((entry) => EMAIL.test(entry));
-    setDropped(all.filter((entry) => !EMAIL.test(entry)));
+  function readEmails(text: string) {
+    setEmailText(text);
+    const good = splitEmails(text).filter((entry) => EMAIL.test(entry));
     patchTest({ resultEmails: [...new Set(good)] });
   }
 
@@ -363,14 +377,23 @@ export function TestBuilder({
       </Panel>
 
       <Panel title="Who is sent the result">
+        {!emailReady ? (
+          <p className="admin-notice is-error">
+            The site is not sending email, so nothing here will be posted. Turn
+            it on and set the server under Settings &rarr; Email.
+          </p>
+        ) : null}
+
         <div className="field">
           <label htmlFor="test-emails">Send each result to</label>
           <input
             id="test-emails"
             value={emailText}
             placeholder="marker@example.org, office@example.org"
-            onChange={(event) => setEmailText(event.target.value)}
-            onBlur={readEmails}
+            onChange={(event) => readEmails(event.target.value)}
+            onBlur={() =>
+              setDropped(splitEmails(emailText).filter((entry) => !EMAIL.test(entry)))
+            }
           />
           <span className="help-text">
             Separated by commas. Each is posted the marked paper as soon as a
