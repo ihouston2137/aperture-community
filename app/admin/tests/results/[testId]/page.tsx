@@ -55,6 +55,13 @@ export default async function TestResultPage({
       name: name ? surnameFirst(name) : "Not recorded",
       attempts: submission.attempts ?? 1,
       percent: submission.grade?.percent ?? 0,
+      passMark: submission.grade?.passMark ?? 0,
+      // A sitting recorded before the threshold existed was judged by nothing,
+      // which is what `null` says.
+      passed:
+        typeof submission.grade?.passed === "boolean"
+          ? submission.grade.passed
+          : null,
       scored: submission.grade?.scored ?? 0,
       available: submission.grade?.available ?? 0,
       right: submission.grade?.right ?? 0,
@@ -74,6 +81,12 @@ export default async function TestResultPage({
           records.reduce((total, row) => total + row.percent, 0) / records.length
         );
 
+  // Only those actually judged: a sitting from before the threshold was set is
+  // neither a pass nor a fail, and counting it as either would be a made-up
+  // number in the one place the figures have to be trusted.
+  const judged = records.filter((row) => row.passed !== null);
+  const passes = judged.filter((row) => row.passed).length;
+
   return (
     <>
       <nav className="manager-crumbs" aria-label="Breadcrumb">
@@ -89,7 +102,9 @@ export default async function TestResultPage({
             ? "Nobody has sat this yet."
             : `${records.length} ${
                 records.length === 1 ? "person" : "people"
-              } · ${average}% average · each person's best sitting`
+              } · ${average}% average${
+                judged.length > 0 ? ` · ${passes} of ${judged.length} passed` : ""
+              } · each person's best sitting`
         }
         actions={
           test ? (

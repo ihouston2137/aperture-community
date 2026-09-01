@@ -139,6 +139,15 @@ export type TestSettings = {
    * recorded — a limit nobody is identified against is not a limit.
    */
   attemptLimit: number;
+  /**
+   * The lowest percentage that passes. Zero means the test does not pass or
+   * fail anybody — it just reports a mark.
+   *
+   * A minimum rather than a boundary to be above: set to 70, seventy passes.
+   * Somebody told "you need 70%" and given 70% has passed, and a rule that
+   * disagreed with the sentence describing it would be the wrong rule.
+   */
+  passMark: number;
   /** The title and the instructions, each dressed on their own. */
   titleStyle: StyleSlot;
   instructionsStyle: StyleSlot;
@@ -160,6 +169,7 @@ export const defaultTestSettings: TestSettings = {
   questions: [],
   instructions: "",
   attemptLimit: 0,
+  passMark: 0,
   titleStyle: emptyStyleSlot,
   instructionsStyle: emptyStyleSlot,
   askCount: 0,
@@ -246,6 +256,7 @@ export function normalizeTestSettings(input: unknown): TestSettings {
     // Bounded: a limit of a thousand is not a limit, and a negative one is a
     // test nobody may sit.
     attemptLimit: Math.max(0, Math.min(50, Math.round(num(raw.attemptLimit, 0)))),
+    passMark: Math.max(0, Math.min(100, Math.round(num(raw.passMark, 0)))),
     titleStyle: normalizeStyleSlot(raw.titleStyle),
     instructionsStyle: normalizeStyleSlot(raw.instructionsStyle),
     askCount: Math.max(0, Math.min(questions.length, num(raw.askCount, 0))),
@@ -424,6 +435,20 @@ export type TestGrade = {
   scored: number;
   available: number;
   percent: number;
+  /**
+   * The mark this sitting was judged against, and whether it made it.
+   *
+   * Both recorded rather than worked out when the result is read, for the same
+   * reason the grade itself is: the threshold can be changed afterwards, and a
+   * pass that quietly becomes a fail because somebody raised the bar in March
+   * is not a record of what happened in February.
+   *
+   * `passMark` of zero means the test passes nobody and fails nobody, and
+   * `passed` is null there rather than false — "no such judgement" and "did
+   * not pass" are different things to show.
+   */
+  passMark: number;
+  passed: boolean | null;
   /** Questions right, and questions marked — headcounts, not points. */
   right: number;
   marked: number;
@@ -491,11 +516,17 @@ export function gradeSitting(
     });
   }
 
+  // A test with nothing markable scores nothing rather than dividing by zero.
+  const percent = available > 0 ? Math.round((scored / available) * 100) : 0;
+
   return {
     scored,
     available,
-    // A test with nothing markable scores nothing rather than dividing by zero.
-    percent: available > 0 ? Math.round((scored / available) * 100) : 0,
+    percent,
+    passMark: test.passMark,
+    // At or above, not above: somebody told "you need 70%" and given 70% has
+    // passed. A test with no mark set judges nobody.
+    passed: test.passMark > 0 ? percent >= test.passMark : null,
     right,
     marked,
     questions,

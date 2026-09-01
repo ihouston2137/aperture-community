@@ -279,6 +279,29 @@ export function TestBuilder({
           </span>
         </div>
 
+        <div className="field" style={{ maxWidth: "16rem" }}>
+          <label htmlFor="test-pass">Pass mark (%)</label>
+          <input
+            id="test-pass"
+            type="number"
+            min={0}
+            max={100}
+            value={test.passMark}
+            onChange={(event) =>
+              patchTest({
+                passMark: Math.max(0, Math.min(100, Number(event.target.value) || 0)),
+              })
+            }
+          />
+          <span className="help-text">
+            {test.passMark === 0
+              ? "Zero passes nobody and fails nobody — the test just reports a mark."
+              : `${test.passMark}% and above passes.`}{" "}
+            Recorded with each sitting, so raising it later does not turn a
+            past pass into a fail.
+          </span>
+        </div>
+
         <label className="checkbox-row">
           <input
             type="checkbox"

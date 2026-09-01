@@ -10,6 +10,9 @@ export type ResultRecord = {
   name: string;
   attempts: number;
   percent: number;
+  /** The threshold the sitting was judged against, and whether it made it. */
+  passMark: number;
+  passed: boolean | null;
   scored: number;
   available: number;
   right: number;
@@ -58,6 +61,7 @@ export function TestResultsList({ records }: { records: ResultRecord[] }) {
             <tr>
               <th>Name</th>
               <th className="is-figure">Result</th>
+              <th>Outcome</th>
               <th className="is-figure">Attempts</th>
               <th>Best sitting</th>
               <th />
@@ -88,6 +92,19 @@ export function TestResultsList({ records }: { records: ResultRecord[] }) {
                   <span className="help-text">
                     {row.right} of {row.marked}
                   </span>
+                </td>
+
+                <td>
+                  {row.passed === null ? (
+                    <span className="help-text">not judged</span>
+                  ) : (
+                    <span
+                      className="test-result-verdict"
+                      data-passed={row.passed ? "true" : "false"}
+                    >
+                      {row.passed ? "Passed" : "Not passed"}
+                    </span>
+                  )}
                 </td>
 
                 <td className="is-figure">{row.attempts}</td>
@@ -141,6 +158,18 @@ function ResultDialog({
                 {record.scored} of {record.available} points &middot; {record.right}{" "}
                 of {record.marked} questions
               </span>
+
+              {record.passed !== null ? (
+                <span
+                  className="test-result-verdict"
+                  data-passed={record.passed ? "true" : "false"}
+                >
+                  {record.passed ? "Passed" : "Not passed"}
+                  <span className="help-text">
+                    {record.passMark}% needed at the time
+                  </span>
+                </span>
+              ) : null}
             </p>
 
             {record.questions.length === 0 ? (

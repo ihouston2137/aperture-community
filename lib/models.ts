@@ -1403,6 +1403,10 @@ const TestGradeSchema = new Schema<any>(
     scored: { type: Number, default: 0 },
     available: { type: Number, default: 0 },
     percent: { type: Number, default: 0 },
+    /** The threshold this sitting was judged against, and whether it made it. */
+    passMark: { type: Number, default: 0 },
+    // `null` where the test passes nobody, which is not the same as failing.
+    passed: { type: Boolean, default: null },
     right: { type: Number, default: 0 },
     marked: { type: Number, default: 0 },
     questions: { type: [Mixed], default: [] },

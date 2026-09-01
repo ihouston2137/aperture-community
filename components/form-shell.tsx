@@ -702,6 +702,18 @@ function TestResult({ grade }: { grade: TestGrade }) {
         <span>
           {grade.right} of {grade.marked} correct
         </span>
+
+        {/* Said in a word as well as a colour: somebody who cannot tell the
+            two apart still has to be told whether they passed. */}
+        {grade.passed !== null ? (
+          <span
+            className="test-result-verdict"
+            data-passed={grade.passed ? "true" : "false"}
+          >
+            {grade.passed ? "Passed" : "Not passed"}
+            <span className="help-text">{grade.passMark}% needed</span>
+          </span>
+        ) : null}
       </p>
 
       {grade.questions.length > 0 ? (
