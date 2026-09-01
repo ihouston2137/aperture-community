@@ -133,14 +133,21 @@ export function MediaManager({
     refreshAfterChange();
   }
 
-  async function handleDelete() {
+  /**
+   * @param force Delete even what is in use, unhooking profiles that point at
+   * it. For a photograph that should not be on the site at all, where being in
+   * use is the reason to remove it rather than a reason to keep it.
+   */
+  async function handleDelete(force = false) {
     if (selectedIds.length === 0) return;
     setBusy(true);
     setError("");
     setMessage("");
 
     const response = await fetch(
-      `/api/admin/media?ids=${encodeURIComponent(selectedIds.join(","))}`,
+      `/api/admin/media?ids=${encodeURIComponent(selectedIds.join(","))}${
+        force ? "&force=1" : ""
+      }`,
       { method: "DELETE" }
     );
     const result = await response.json();
@@ -154,7 +161,9 @@ export function MediaManager({
     setMessage(
       result.blocked > 0
         ? `Deleted ${result.deleted}. ${result.blocked} still in use were kept.`
-        : `Deleted ${result.deleted}.`
+        : result.forced
+          ? `Deleted ${result.deleted}, in use or not.`
+          : `Deleted ${result.deleted}.`
     );
     setSelectedIds([]);
     refreshAfterChange();

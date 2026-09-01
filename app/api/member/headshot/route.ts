@@ -64,7 +64,18 @@ export async function POST(request: NextRequest) {
       title: result.originalName,
       mediaType: mediaTypeForMime(result.mimeType),
       provider: "local",
-      usage: [{ kind: "bio-headshot", label: "Member headshot" }],
+      /*
+       * No usage entry here.
+       *
+       * Usage is keyed by the document that references an asset, and at this
+       * point nothing does — the profile is only changed by the action that
+       * saves the form, which records the usage properly against the bio's id.
+       *
+       * An entry written here carried no `refId`, so `clearMediaUsage` — which
+       * pulls by `refId` — could never remove it. That is why taking a headshot
+       * off a profile left the picture marked as still in use, and why it then
+       * could not be deleted from the library.
+       */
     });
 
     return Response.json({ url: result.url, mediaId: String(asset._id) });

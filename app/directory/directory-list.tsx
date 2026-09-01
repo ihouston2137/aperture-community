@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 
 import { formatPhone, telHref } from "@/lib/member-types";
 import type { MemberLink } from "@/lib/relationships";
+import { protectedMediaUrl } from "@/lib/protected-media-url";
 
 export type DirectoryLevel = { _id: string; name: string };
 
@@ -177,7 +178,7 @@ export function DirectoryList({
               {entry.headshotUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src={entry.headshotUrl}
+                  src={protectedMediaUrl(entry.headshotUrl)}
                   alt=""
                   className="directory-headshot is-small"
                 />
@@ -234,7 +235,7 @@ export function DirectoryList({
                 {entry.headshotUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
-                    src={entry.headshotUrl}
+                    src={protectedMediaUrl(entry.headshotUrl)}
                     alt=""
                     className="directory-headshot"
                   />

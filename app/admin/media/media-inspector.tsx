@@ -147,7 +147,7 @@ function SingleInspector({
   canDelete: boolean;
   busy: boolean;
   onSave: (form: HTMLFormElement) => void;
-  onDelete: () => void;
+  onDelete: (force?: boolean) => void;
 }) {
   return (
     <>
@@ -198,10 +198,13 @@ function SingleInspector({
               type="button"
               className="btn btn-danger btn-sm"
               disabled={busy}
-              onClick={onDelete}
+              onClick={() => onDelete()}
             >
               Delete
             </button>
+          ) : null}
+          {canDelete && (asset.usedIn ?? []).length > 0 ? (
+            <ForceDelete busy={busy} onDelete={onDelete} />
           ) : null}
         </div>
       </form>
@@ -258,7 +261,7 @@ function BulkInspector({
   canDelete: boolean;
   busy: boolean;
   onApply: (payload: BulkPayload) => void;
-  onDelete: () => void;
+  onDelete: (force?: boolean) => void;
 }) {
   const [fields, setFields] = useState<Record<string, boolean>>({});
   const [values, setValues] = useState<Record<string, string>>({});
@@ -443,10 +446,13 @@ function BulkInspector({
             type="button"
             className="btn btn-danger btn-sm"
             disabled={busy}
-            onClick={onDelete}
+            onClick={() => onDelete()}
           >
             Delete selected
           </button>
+        ) : null}
+        {canDelete && inUse > 0 ? (
+          <ForceDelete busy={busy} onDelete={onDelete} />
         ) : null}
       </div>
 
@@ -482,7 +488,7 @@ export function MediaInspector({
   busy: boolean;
   onSaveSingle: (form: HTMLFormElement) => void;
   onApplyBulk: (payload: BulkPayload) => void;
-  onDelete: () => void;
+  onDelete: (force?: boolean) => void;
   onClearSelection: () => void;
 }) {
   // Remount the bulk form when the selection changes so stale field choices
@@ -548,3 +554,59 @@ export function MediaInspector({
 }
 
 export { formatBytes };
+
+/**
+ * Delete something that is in use.
+ *
+ * Two presses, because the guard it overrides is there for a reason: the usual
+ * way to remove a picture is to take it off whatever is using it first, and
+ * this is for the case where that cannot wait — a headshot somebody put on
+ * their own profile that should not be on the site at all. Profiles pointing at
+ * it are unhooked by the server, so nothing is left showing a missing file.
+ */
+function ForceDelete({
+  busy,
+  onDelete,
+}: {
+  busy: boolean;
+  onDelete: (force?: boolean) => void;
+}) {
+  const [confirming, setConfirming] = useState(false);
+
+  if (!confirming) {
+    return (
+      <button
+        type="button"
+        className="btn btn-sm"
+        disabled={busy}
+        onClick={() => setConfirming(true)}
+      >
+        Delete even if in use
+      </button>
+    );
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        className="btn btn-danger btn-sm"
+        disabled={busy}
+        onClick={() => {
+          setConfirming(false);
+          onDelete(true);
+        }}
+      >
+        Yes, delete it anyway
+      </button>
+      <button
+        type="button"
+        className="btn btn-sm"
+        disabled={busy}
+        onClick={() => setConfirming(false)}
+      >
+        Cancel
+      </button>
+    </>
+  );
+}

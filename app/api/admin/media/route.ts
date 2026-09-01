@@ -4,7 +4,7 @@ import type { NextRequest } from "next/server";
 
 import { checkPermission } from "@/lib/access";
 import { connectDB } from "@/lib/db";
-import { MediaAsset } from "@/lib/models";
+import { Bio, MediaAsset } from "@/lib/models";
 import {
   buildMediaQuery,
   MEDIA_LIST_PROJECTION,
@@ -242,6 +242,15 @@ export async function PATCH(request: NextRequest) {
 /**
  * Bulk delete. Assets still referenced by content are skipped and reported
  * rather than failing the whole request.
+ *
+ * `force=1` deletes them anyway, and unhooks whatever pointed at them.
+ *
+ * The in-use guard exists to stop somebody deleting a picture out from under a
+ * page that is using it — a mistake worth preventing. It is the wrong answer
+ * for a photograph that should not be on the site at all: any member may put a
+ * headshot on their own profile, and the whole point of taking one down is that
+ * it *is* in use. So the guard can be overridden, and doing so tidies up after
+ * itself rather than leaving profiles pointing at a file that is gone.
  */
 export async function DELETE(request: NextRequest) {
   const session = await getSession();
@@ -259,13 +268,43 @@ export async function DELETE(request: NextRequest) {
     return Response.json({ error: "No media selected." }, { status: 400 });
   }
 
+  const force = request.nextUrl.searchParams.get("force") === "1";
+
   await connectDB();
   const assets = await MediaAsset.find({ _id: { $in: ids } })
     .select("url thumbnailUrl provider usage")
     .lean<any[]>();
 
-  const deletable = assets.filter((asset) => (asset.usage ?? []).length === 0);
-  const blocked = assets.filter((asset) => (asset.usage ?? []).length > 0);
+  const deletable = force
+    ? assets
+    : assets.filter((asset) => (asset.usage ?? []).length === 0);
+  const blocked = force
+    ? []
+    : assets.filter((asset) => (asset.usage ?? []).length > 0);
+
+  /*
+   * Take the picture off whatever was using it, before the file goes.
+   *
+   * Only profiles: they are the one thing a member can put a picture on
+   * themselves, and so the one place a forced delete is for. A page or a story
+   * still holding a deleted asset shows a broken image, which is a visible
+   * problem somebody can go and fix; a profile is somebody else's page and
+   * they may never look at it again.
+   */
+  if (force && deletable.length > 0) {
+    const urls = deletable.map((asset) => asset.url).filter(Boolean);
+    const assetIds = deletable.map((asset) => String(asset._id));
+
+    await Bio.updateMany(
+      {
+        $or: [
+          { headshotMediaId: { $in: assetIds } },
+          { headshotUrl: { $in: urls } },
+        ],
+      },
+      { $set: { headshotMediaId: "", headshotUrl: "" } }
+    );
+  }
 
   for (const asset of deletable) {
     for (const file of [asset.url, asset.thumbnailUrl]) {
@@ -283,5 +322,6 @@ export async function DELETE(request: NextRequest) {
     ok: true,
     deleted: deletable.length,
     blocked: blocked.length,
+    forced: force,
   });
 }

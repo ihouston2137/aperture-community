@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { protectedMediaUrl } from "@/lib/protected-media-url";
 
 export type OwnBio = {
   name: string;
@@ -100,7 +101,11 @@ export function BioForm({
         <div className="headshot-field">
           {headshotUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={headshotUrl} alt="" className="headshot-preview" />
+            <img
+              src={protectedMediaUrl(headshotUrl)}
+              alt=""
+              className="headshot-preview"
+            />
           ) : (
             <div className="headshot-preview is-empty" aria-hidden="true" />
           )}

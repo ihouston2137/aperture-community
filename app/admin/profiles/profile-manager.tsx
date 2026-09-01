@@ -9,6 +9,7 @@ import { BIO_TYPES, BIO_TYPE_LABELS, normalizeBioType } from "@/lib/bio-types";
 
 import { deleteBioAction, saveBioAction } from "./actions";
 import { BioFields, type BioRecord } from "./bio-form";
+import { protectedMediaUrl } from "@/lib/protected-media-url";
 
 /** Rendered at once. Past this the filters are the way to find one. */
 const PAGE_SIZE = 60;
@@ -111,7 +112,11 @@ export function ProfileManager({ profiles }: { profiles: BioRecord[] }) {
             <li key={bio._id} className="admin-list-item">
               {bio.headshotUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={bio.headshotUrl} alt="" className="profile-row-headshot" />
+                <img
+                  src={protectedMediaUrl(bio.headshotUrl)}
+                  alt=""
+                  className="profile-row-headshot"
+                />
               ) : (
                 <div className="profile-row-headshot is-empty" aria-hidden="true" />
               )}
