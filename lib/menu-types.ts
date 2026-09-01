@@ -45,18 +45,48 @@ export function menuTargetType(value: unknown): MenuTargetType {
  * Who an item is for.
  *
  * `public` is everyone, signed in or not. `signedIn` is any active account
- * whatever it holds. `roles` names membership levels and management roles —
- * both kinds live in one list, because a menu does not care which kind grants
- * the access, only that the viewer has it.
+ * whatever it holds. `signedOut` is the other half of the same line: visitors
+ * with no account in play, which is what a "join us" panel or a sign-in
+ * prompt is for and what makes it disappear the moment it has done its job.
+ * `roles` names membership levels and management roles — both kinds live in
+ * one list, because nothing here cares which kind grants the access, only that
+ * the viewer has it.
+ *
+ * `signedOut` is not a restriction like the others. The rest withhold
+ * something from people who have not earned it; this one addresses a state,
+ * and the audience it names is precisely the people the others exclude.
+ * That difference is why it is answered before the administrator exemption in
+ * `visibilityAllows`, and why the menu and content editors do not offer it —
+ * see `MENU_ITEM_VISIBILITY_MODES`.
  */
-export const MENU_VISIBILITY_MODES = ["public", "signedIn", "roles"] as const;
+export const MENU_VISIBILITY_MODES = [
+  "public",
+  "signedIn",
+  "signedOut",
+  "roles",
+] as const;
 export type MenuVisibilityMode = (typeof MENU_VISIBILITY_MODES)[number];
 
 export const MENU_VISIBILITY_LABELS: Record<MenuVisibilityMode, string> = {
   public: "Everyone",
   signedIn: "Anyone signed in",
+  signedOut: "Anyone not signed in",
   roles: "Only these roles",
 };
+
+/**
+ * The modes a menu link or a whole piece of content may take.
+ *
+ * Everything but `signedOut`, and for two reasons. A menu is a way in, and a
+ * way in that closes the moment somebody signs in is a way in that strands
+ * them; and content-level rules are stored against a schema whose `mode` enum
+ * does not admit it, so offering it there would write a rule the database
+ * refuses. Rows and columns inside a page carry no such baggage: they are one
+ * piece of a page among others, and the page is still there either way.
+ */
+export const MENU_ITEM_VISIBILITY_MODES = MENU_VISIBILITY_MODES.filter(
+  (mode) => mode !== "signedOut"
+);
 
 export type MenuVisibility = {
   mode: MenuVisibilityMode;
@@ -100,6 +130,19 @@ export function visibilityAllows(
   viewer: MenuViewer
 ): boolean {
   if (visibility.mode === "public") return true;
+
+  /*
+   * Answered before the administrator exemption, and deliberately.
+   *
+   * That exemption exists so nothing on the site can be kept from an
+   * administrator. This rule keeps nothing from anybody — it names an
+   * audience, and an administrator is signed in, so they are simply not in it.
+   * Lifting it for them would show the sign-in prompt to the one person who
+   * most obviously does not need it, alongside the signed-in panel it was
+   * written to replace.
+   */
+  if (visibility.mode === "signedOut") return !viewer.signedIn;
+
   if (viewer.isAdministrator) return true;
   if (!viewer.signedIn) return false;
   if (visibility.mode === "signedIn") return true;
@@ -116,6 +159,21 @@ export function visibilityAllows(
 export function widestVisibility(rules: MenuVisibility[]): MenuVisibility {
   if (rules.length === 0) return { ...publicVisibility };
   if (rules.some((rule) => rule.mode === "public")) return { ...publicVisibility };
+
+  /*
+   * `signedOut` beside anything else is everyone.
+   *
+   * The two halves of the line put back together, and the vocabulary has no
+   * way to say "these people and those" other than by naming all of them. On
+   * its own it stays as it is. Unreachable while menus and content do not
+   * offer the mode, but the rule is the rule wherever it is asked.
+   */
+  if (rules.some((rule) => rule.mode === "signedOut")) {
+    return rules.every((rule) => rule.mode === "signedOut")
+      ? { mode: "signedOut", roleIds: [] }
+      : { ...publicVisibility };
+  }
+
   if (rules.some((rule) => rule.mode === "signedIn")) {
     return { mode: "signedIn", roleIds: [] };
   }
@@ -138,6 +196,17 @@ export function narrowVisibility(
 ): MenuVisibility {
   if (parent.mode === "public") return child;
   if (child.mode === "public") return parent;
+
+  /*
+   * `signedOut` under anything else, or anything else under it, is nobody.
+   *
+   * There is no mode for nobody, and inventing one to serve a combination the
+   * editors cannot produce would be worse than answering conservatively: the
+   * outer rule stands, which never opens the inner one to people the outer had
+   * already shut out.
+   */
+  if (parent.mode === "signedOut" || child.mode === "signedOut") return parent;
+
   if (parent.mode === "signedIn") return child;
   if (child.mode === "signedIn") return parent;
   // Both name roles: only the roles in both can reach it.

@@ -14,8 +14,8 @@ import {
 } from "@/lib/content-access";
 import { PUBLICATION_KINDS } from "@/lib/publication-layout";
 import {
+  MENU_ITEM_VISIBILITY_MODES,
   MENU_VISIBILITY_LABELS,
-  MENU_VISIBILITY_MODES,
   type MenuContentType,
   type MenuVisibility,
   type MenuVisibilityMode,
@@ -814,7 +814,7 @@ function VisibilityForm({
           value={mode}
           onChange={(event) => setMode(event.target.value as MenuVisibilityMode)}
         >
-          {MENU_VISIBILITY_MODES.map((option) => (
+          {MENU_ITEM_VISIBILITY_MODES.map((option) => (
             <option key={option} value={option}>
               {MENU_VISIBILITY_LABELS[option]}
             </option>

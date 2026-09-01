@@ -817,9 +817,11 @@ function RestrictedMark({
   const label =
     mode === "signedIn"
       ? "Signed-in visitors only"
-      : `Restricted to ${settings.visibility?.roleIds.length ?? 0} role${
-          settings.visibility?.roleIds.length === 1 ? "" : "s"
-        }`;
+      : mode === "signedOut"
+        ? "Signed-out visitors only"
+        : `Restricted to ${settings.visibility?.roleIds.length ?? 0} role${
+            settings.visibility?.roleIds.length === 1 ? "" : "s"
+          }`;
 
   return (
     <span className="outline-restricted" title={label}>

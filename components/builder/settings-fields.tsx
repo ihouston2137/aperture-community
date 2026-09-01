@@ -123,6 +123,15 @@ export function VisibilityFields({
         </>
       ) : null}
 
+      {visibility.mode === "signedOut" ? (
+        <span className="help-text">
+          For the half of a page that only has a job to do before somebody
+          signs in &mdash; an invitation to join, a sign-in prompt, a notice
+          about accounts. It disappears the moment they do, administrators
+          included.
+        </span>
+      ) : null}
+
       <span className="help-text">
         Anything restricted is left out of the page before it is sent, not
         hidden once it arrives — so it is a rule, not a suggestion.

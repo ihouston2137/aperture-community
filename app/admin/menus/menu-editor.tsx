@@ -4,10 +4,10 @@ import { useState, useTransition } from "react";
 
 import { Panel } from "@/components/admin-ui";
 import {
+  MENU_ITEM_VISIBILITY_MODES,
   MENU_TARGET_LABELS,
   MENU_TARGET_TYPES,
   MENU_VISIBILITY_LABELS,
-  MENU_VISIBILITY_MODES,
   blankMenuItem,
   type MenuContentType,
   type MenuItem,
@@ -449,7 +449,7 @@ function VisibilityField({
           })
         }
       >
-        {MENU_VISIBILITY_MODES.map((mode) => (
+        {MENU_ITEM_VISIBILITY_MODES.map((mode) => (
           <option key={mode} value={mode}>
             {MENU_VISIBILITY_LABELS[mode]}
           </option>
