@@ -3,7 +3,6 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-import { withExit } from "@/lib/admin-exit";
 import { requirePermission } from "@/lib/access";
 import { connectDB } from "@/lib/db";
 import { clearMediaUsage, syncMediaUsage } from "@/lib/media-usage-sync";
@@ -111,14 +110,21 @@ export async function toggleTemplateAction(formData: FormData) {
   revalidatePath("/admin/publications");
 }
 
-export async function savePublicationAction(formData: FormData) {
+/** What the editor is told, so it can report back without leaving the page. */
+export type PublicationSaveResult =
+  | { ok: true; slug: string }
+  | { ok: false; error: string };
+
+export async function savePublicationAction(
+  formData: FormData
+): Promise<PublicationSaveResult> {
   await guard();
 
   const id = String(formData.get("id") ?? "");
-  if (!id) return;
+  if (!id) return { ok: false, error: "That publication could not be found." };
 
   const title = String(formData.get("title") ?? "").trim();
-  if (!title) return;
+  if (!title) return { ok: false, error: "Give the publication a title." };
 
   const kindInput = String(formData.get("kind") ?? "zine");
   const kind: PublicationKind = PUBLICATION_KINDS.includes(kindInput as PublicationKind)
@@ -180,17 +186,21 @@ export async function savePublicationAction(formData: FormData) {
   revalidatePath("/admin/publications");
   revalidatePath(publicationHref(kind, slug));
 
-  // Carries the open post view through the remount, so saving does not swap
-  // the canvas for a different size and orientation.
-  const editorView = String(formData.get("editorView") ?? "").trim();
-  redirect(
-    withExit(
-      `/admin/publications/${id}/edit?saved=1${
-        editorView ? `&view=${encodeURIComponent(editorView)}` : ""
-      }`,
-      formData.get("from")
-    )
-  );
+  /*
+   * Nothing is redirected to.
+   *
+   * This used to end in a redirect back to the editor, which remounted it —
+   * and a remounted editor is a new one: the page being worked on, what was
+   * selected on it, the zoom and the scroll all went back to their defaults,
+   * every time somebody pressed Save. The open post view was carried across
+   * by hand in the address, which fixed the loudest symptom and none of the
+   * rest.
+   *
+   * The editor calls this and stays where it is instead. The slug comes back
+   * because `uniqueSlug` may have changed it, and the editor has a field
+   * showing the old one.
+   */
+  return { ok: true as const, slug };
 }
 
 export async function deletePublicationAction(formData: FormData) {

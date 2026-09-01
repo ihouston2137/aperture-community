@@ -3793,6 +3793,14 @@ ol.doc-list ol.doc-list ol.doc-list {
   color: var(--admin-text);
 }
 
+/* A save that refused, said beside the button that refused it — there is no
+   navigation to carry the news any more. */
+.builder-save-error {
+  font-size: 0.8125rem;
+  color: #f28b82;
+  max-width: 22rem;
+}
+
 .builder-topbar {
   display: flex;
   align-items: center;

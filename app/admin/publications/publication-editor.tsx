@@ -8,6 +8,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useTransition,
 } from "react";
 
 import { MediaField } from "@/app/admin/media/media-picker";
@@ -268,9 +269,11 @@ export function PublicationEditor({
   sources: BuilderSources;
   publicationSources: PublicationSources;
   /**
-   * Which post view to open on. Saving redirects, which remounts the editor —
-   * without this the canvas would come back as the first view, a different
-   * size and orientation from the one being worked on.
+   * Which post view to open on.
+   *
+   * Saving no longer navigates, so this is only for arriving with one named —
+   * a preview link coming back, or an address somebody kept. The open view is
+   * still saved onto the record, which is what the published page uses.
    */
   initialView?: string;
 }) {
@@ -289,6 +292,15 @@ export function PublicationEditor({
       ? initialView
       : postViews[0]?.id ?? "square"
   );
+  const [saving, startSaving] = useTransition();
+  /**
+   * True for a few seconds after a save.
+   *
+   * An acknowledgement that never goes away stops being one — by the tenth
+   * edit, a button reading "Saved" is a button reading nothing.
+   */
+  const [justSaved, setJustSaved] = useState(false);
+  const [saveError, setSaveError] = useState("");
   const [slideshow, setSlideshow] = useState(publication.slideshow);
   const [audio, setAudio] = useState(publication.audio);
   const [pages, setPages] = useState<PublicationPage[]>(
@@ -649,6 +661,37 @@ export function PublicationEditor({
   }
 
   /** Turns the current page's blocks into a layout other pages can be built on. */
+  /*
+   * Save, and stay.
+   *
+   * The slug is taken back from the server because `uniqueSlug` may have
+   * changed it — two publications cannot share one — and the field on screen
+   * would otherwise go on showing the name that was refused.
+   */
+  // Set where the saving happens and cleared on a timer, rather than both in
+  // an effect — a state change is what an effect reacts to, not its job.
+  useEffect(() => {
+    if (!justSaved) return;
+    const timer = setTimeout(() => setJustSaved(false), 2500);
+    return () => clearTimeout(timer);
+  }, [justSaved]);
+
+  function handleSave(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+
+    startSaving(async () => {
+      const result = await savePublicationAction(formData);
+      if (!result.ok) {
+        setSaveError(result.error);
+        return;
+      }
+      setSaveError("");
+      if (result.slug !== slug) setSlug(result.slug);
+      setJustSaved(true);
+    });
+  }
+
   function savePageAsTemplate() {
     const template: PublicationPageTemplate = {
       ...emptyBackground,
@@ -1037,10 +1080,17 @@ export function PublicationEditor({
 
   return (
     <div className="builder">
-      <form action={savePublicationAction} id="publication-form">
-        {/* The way-back token, carried through the save's own redirect —
-            without it, pressing Save silently sends you back to the admin
-            list instead of wherever you came from. */}
+      {/*
+        * The form is a bag of values to post, not a navigation.
+        *
+        * `onSubmit` rather than `action`: a server action given to `action`
+        * navigates, and a navigation remounts the editor — which is a new
+        * editor, on page one, with nothing selected and the zoom back to
+        * default. Called from here it just saves, and everything on screen
+        * stays where it was.
+        */}
+      <form onSubmit={handleSave} id="publication-form">
+        {/* Still carried, so the way back out is whatever it was. */}
         <input type="hidden" name="from" value={exit.token} />
         <input type="hidden" name="id" value={publication._id} />
         <input type="hidden" name="title" value={title} />
@@ -1204,9 +1254,28 @@ export function PublicationEditor({
         >
           Preview
         </a>
-        <button type="submit" form="publication-form" className="btn btn-primary btn-sm">
-          Save
+        {/*
+          * The button says what happened, since nothing else does any more.
+          *
+          * A redirect used to be the acknowledgement — the page moved, so
+          * plainly something had been saved. Staying put means the save has to
+          * announce itself, and the button is where somebody is already
+          * looking when they want to know.
+          */}
+        <button
+          type="submit"
+          form="publication-form"
+          className="btn btn-primary btn-sm"
+          disabled={saving}
+        >
+          {saving ? "Saving\u2026" : justSaved ? "Saved" : "Save"}
         </button>
+
+        {saveError ? (
+          <span className="builder-save-error" role="alert">
+            {saveError}
+          </span>
+        ) : null}
       </div>
 
       <div className="builder-body">
