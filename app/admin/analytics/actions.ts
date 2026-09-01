@@ -25,6 +25,7 @@ export async function saveAnalyticsSettingsAction(formData: FormData) {
     retentionDays: Number(formData.get("retentionDays") ?? 400),
     intervalMinutes: Number(formData.get("intervalMinutes") ?? 15),
     excludeLoggedInByDefault: formData.get("excludeLoggedInByDefault") === "on",
+    recordSignedInNames: formData.get("recordSignedInNames") === "on",
   });
 
   revalidate();

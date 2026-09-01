@@ -1,5 +1,6 @@
 import { connectDB } from "@/lib/db";
-import { AnalyticsDayIds, AnalyticsState, AnalyticsSummary } from "@/lib/models";
+import { fullName } from "@/lib/member-types";
+import { AnalyticsDayIds, AnalyticsState, AnalyticsSummary, User } from "@/lib/models";
 
 import { getAnalyticsSettings } from "./settings";
 import { dayKeyOf, dayKeyRange, zonedParts } from "./time";
@@ -35,6 +36,23 @@ export type SourceRow = {
 };
 
 export type PageRow = { path: string; pageViews: number };
+
+/**
+ * One signed-in account's activity in the window.
+ *
+ * The name is resolved when the report is read, never stored in the buckets:
+ * a name belongs to the account and is the account's to change, and a copy
+ * taken at processing time would have the reports quoting whatever somebody
+ * was called that month.
+ */
+export type PersonRow = {
+  userId: string;
+  name: string;
+  visits: number;
+  pageViews: number;
+  imageViews: number;
+  downloads: number;
+};
 /** A collection picture, by `Collection Name - Image Title`. */
 export type LabelRow = { label: string; count: number };
 
@@ -63,6 +81,14 @@ export type AnalyticsOverview = {
   excludeLoggedIn: boolean;
   /** Distinct signed-in visitors in the window — reported even when excluded. */
   loggedInVisitors: number;
+  /**
+   * Who those visitors were, when the site is set to record names.
+   *
+   * Empty for a window that predates the setting being turned on, which is not
+   * the same as nobody having visited — `namesRecorded` tells the two apart.
+   */
+  people: PersonRow[];
+  namesRecorded: boolean;
   identity: IdentityQuality;
   state: {
     lastRunAt: Date | null;
@@ -103,8 +129,31 @@ function labelFor(period: AnalyticsPeriod, key: string): string {
  * database holds — which is what keeps a chart's x-axis stable between a day
  * with traffic and one without.
  */
-function keysFor(period: AnalyticsPeriod, count: number, timezone: string): string[] {
+function keysFor(
+  period: AnalyticsPeriod,
+  count: number,
+  timezone: string,
+  /**
+   * A `YYYY-MM-DD` key to fill with its own hours, instead of walking back
+   * from now. What "today" and "yesterday" mean: a calendar day rather than a
+   * rolling window, which is the difference between "since midnight" and "the
+   * last 24 hours" and the reason they were asked for separately.
+   */
+  day?: string
+): string[] {
   const now = new Date();
+
+  if (period === "hour" && day) {
+    // Today stops at the hour in progress; a day already over shows all of it.
+    // An axis running out to 11pm at nine in the morning is fourteen hours of
+    // nothing, said as though something ought to have happened.
+    const last =
+      day === dayKeyOf(now, timezone) ? zonedParts(now, timezone).hour : 23;
+    return Array.from(
+      { length: last + 1 },
+      (_, hour) => `${day}T${pad(hour)}`
+    );
+  }
 
   if (period === "hour") {
     // Walked back through real instants, so a daylight-saving change shortens
@@ -205,12 +254,23 @@ function view(row: any, excludeLoggedIn: boolean) {
 export async function getAnalyticsOverview(
   period: AnalyticsPeriod = "day",
   count = 30,
-  options: { excludeLoggedIn?: boolean } = {}
+  options: { excludeLoggedIn?: boolean; day?: string } = {}
 ): Promise<AnalyticsOverview> {
   const settings = await getAnalyticsSettings();
   const excludeLoggedIn =
     options.excludeLoggedIn ?? settings.excludeLoggedInByDefault;
-  const keys = keysFor(period, count, settings.timezone);
+  const keys = keysFor(period, count, settings.timezone, options.day);
+
+  /*
+   * An hourly window over one whole calendar day counts each visitor once.
+   *
+   * The usual caveat on hourly windows is that they are a slice of a day, so
+   * the day's id sets cover more ground than the window asks about and the
+   * bucket sum is the honest answer. A day-anchored window has no such
+   * mismatch: it *is* the day, up to the hour in progress, and the ids stored
+   * against that day are exactly the people in it.
+   */
+  const wholeDay = Boolean(options.day);
 
   const empty: AnalyticsOverview = {
     timezone: settings.timezone,
@@ -233,6 +293,8 @@ export async function getAnalyticsOverview(
     files: [],
     excludeLoggedIn,
     loggedInVisitors: 0,
+    people: [],
+    namesRecorded: settings.recordSignedInNames,
     identity: { hits: 0, fallbackHits: 0 },
     state: { lastRunAt: null, lastFinalizedDay: "", lastError: "" },
   };
@@ -264,9 +326,7 @@ export async function getAnalyticsOverview(
     const sumOf = (field: keyof SummaryPoint) =>
       points.reduce((total, point) => total + (point[field] as number), 0);
 
-    // An hour window is a slice of a day, so the day id sets cover more ground
-    // than it asks about; there the bucket sum is the honest answer, flagged.
-    const exact = period !== "hour";
+    const exact = period !== "hour" || wholeDay;
     const unioned = exact ? await distinctVisitors(period, keys) : null;
 
     return {
@@ -291,6 +351,7 @@ export async function getAnalyticsOverview(
           0
         ),
       },
+      people: await namePeople(rows),
       sources: mergeSources(views),
       pages: mergeRanked(views, "pages", "path", "pageViews") as PageRow[],
       images: mergeRanked(views, "images", "label", "count") as LabelRow[],
@@ -305,6 +366,55 @@ export async function getAnalyticsOverview(
     // An unreachable database shows an empty report rather than an error page.
     return empty;
   }
+}
+
+/**
+ * The accounts seen across the window, with their names.
+ *
+ * Read from the unfiltered rows, never the anonymous ones: the `anon` block is
+ * what is left once every signed-in visitor is taken out, so asking it who was
+ * signed in would always answer nobody. That means this list stands whichever
+ * way the visitor filter is set — which is right, since it answers a
+ * different question from the figures the filter scopes.
+ *
+ * An account since deleted keeps its row rather than disappearing: it is a
+ * record of a visit that happened, and dropping it would quietly change the
+ * past. It is simply named as gone.
+ */
+async function namePeople(rows: any[]): Promise<PersonRow[]> {
+  const merged = new Map<string, PersonRow>();
+  for (const row of rows) {
+    for (const person of row?.people ?? []) {
+      if (!person?.userId) continue;
+      const entry = merged.get(person.userId) ?? {
+        userId: String(person.userId),
+        name: "",
+        visits: 0,
+        pageViews: 0,
+        imageViews: 0,
+        downloads: 0,
+      };
+      entry.visits += person.visits ?? 0;
+      entry.pageViews += person.pageViews ?? 0;
+      entry.imageViews += person.imageViews ?? 0;
+      entry.downloads += person.downloads ?? 0;
+      merged.set(entry.userId, entry);
+    }
+  }
+
+  if (merged.size === 0) return [];
+
+  const users = await User.find({ _id: { $in: [...merged.keys()] } })
+    .select("firstName lastName name email")
+    .lean<any[]>();
+  const names = new Map(users.map((user) => [String(user._id), fullName(user)]));
+
+  return [...merged.values()]
+    .map((person) => ({
+      ...person,
+      name: names.get(person.userId) || "Account since removed",
+    }))
+    .sort((a, b) => b.pageViews - a.pageViews || a.name.localeCompare(b.name));
 }
 
 function mergeSources(rows: any[]): SourceRow[] {

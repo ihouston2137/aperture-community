@@ -451,6 +451,13 @@ const AnalyticsSettingsSchema = new Schema<any>(
      * the view can be switched either way at any time.
      */
     excludeLoggedInByDefault: { type: Boolean, default: false },
+    /**
+     * Whether each bucket keeps a tally per signed-in account, so the reports
+     * can name who visited rather than only counting them. Off by default:
+     * naming members is a different undertaking from counting them, and it
+     * should be chosen rather than discovered.
+     */
+    recordSignedInNames: { type: Boolean, default: false },
   },
   { timestamps: true }
 );
@@ -509,6 +516,21 @@ const AnalyticsSummarySchema = new Schema<any>(
 
     /** Distinct visitors who were signed in at some point in this bucket. */
     loggedInVisitors: { type: Number, default: 0 },
+
+    /**
+     * `[{ userId, visits, pageViews, imageViews, downloads }]` — one row per
+     * signed-in account seen in this bucket, written only while
+     * `recordSignedInNames` is on.
+     *
+     * Ids, not names. A name is the account's to change and belongs wherever
+     * it is stored once; copying it into every hour bucket would leave the
+     * reports quoting whatever somebody was called last March. Resolved when
+     * the report is read.
+     *
+     * Absent from the `anon` block by construction, since that block is what
+     * is left once every signed-in visitor is removed.
+     */
+    people: { type: Mixed, default: [] },
 
     /**
      * The same figures with every signed-in visitor's traffic removed.

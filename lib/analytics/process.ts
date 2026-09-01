@@ -45,6 +45,14 @@ function prefixRange(prefix: string) {
 /** Kept per bucket, ordered by page views. */
 const TOP_PAGES = 25;
 const TOP_SOURCES = 25;
+/**
+ * Signed-in accounts kept per bucket.
+ *
+ * High enough that no real hour is cut, since this is a register of who was
+ * here rather than a ranking; low enough that one bad day cannot grow a
+ * document without bound.
+ */
+const MAX_PEOPLE = 500;
 
 export type ProcessResult = {
   ok: boolean;
@@ -57,6 +65,14 @@ export type ProcessResult = {
   hits: number;
   prunedLogs: number;
   error?: string;
+};
+
+/** One signed-in account's activity inside a bucket. */
+type PersonEntry = {
+  visits: Set<string>;
+  pageViews: number;
+  imageViews: number;
+  downloads: number;
 };
 
 type SourceEntry = {
@@ -79,6 +95,8 @@ type Tally = {
   images: Map<string, number>;
   files: Map<string, number>;
   sources: Map<string, SourceEntry>;
+  /** Keyed by account id, and empty unless the naming setting is on. */
+  people: Map<string, PersonEntry>;
 };
 
 function newTally(): Tally {
@@ -93,16 +111,38 @@ function newTally(): Tally {
     images: new Map(),
     files: new Map(),
     sources: new Map(),
+    people: new Map(),
   };
 }
 
 const bump = (map: Map<string, number>, key: string) =>
   map.set(key, (map.get(key) ?? 0) + 1);
 
-function record(tally: Tally, hit: HitRecord) {
+/**
+ * @param userId the account this hit belongs to, when it is being tallied by
+ * name. Resolved from the day's identity map rather than read off the hit, so
+ * the hits somebody made before signing in that day are counted as theirs —
+ * which is the same person, and the same rule the anonymous filter follows.
+ */
+function record(tally: Tally, hit: HitRecord, userId?: string) {
   tally.visitors.add(hit.v);
   tally.visits.add(hit.s);
   if (hit.f) tally.fallbackHits += 1;
+
+  if (userId) {
+    const person = tally.people.get(userId) ?? {
+      visits: new Set<string>(),
+      pageViews: 0,
+      imageViews: 0,
+      downloads: 0,
+    };
+    person.visits.add(hit.s);
+    const of = hit.k ?? "page";
+    if (of === "image") person.imageViews += 1;
+    else if (of === "download") person.downloads += 1;
+    else person.pageViews += 1;
+    tally.people.set(userId, person);
+  }
 
   // Records written before kinds existed are page views; that is all there was.
   const kind = hit.k ?? "page";
@@ -143,6 +183,27 @@ function topOf(map: Map<string, number>, labelKey: string, countKey: string) {
     .map(([label, count]) => ({ [labelKey]: label, [countKey]: count }));
 }
 
+/**
+ * Every account seen, not a top slice.
+ *
+ * The ranked lists above are cut at a dozen because nobody reads the long tail
+ * of a page list. This one is a register of who was here, and a register that
+ * quietly stops at twelve is worse than none — so it is bounded only by the
+ * cap that keeps a runaway bucket from growing without limit.
+ */
+function topPeople(tally: Tally) {
+  return [...tally.people.entries()]
+    .map(([userId, entry]) => ({
+      userId,
+      visits: entry.visits.size,
+      pageViews: entry.pageViews,
+      imageViews: entry.imageViews,
+      downloads: entry.downloads,
+    }))
+    .sort((a, b) => b.pageViews - a.pageViews || b.visits - a.visits)
+    .slice(0, MAX_PEOPLE);
+}
+
 function topSources(tally: Tally) {
   return [...tally.sources.values()]
     .map((entry) => ({
@@ -168,6 +229,7 @@ function figures(tally: Tally) {
     images: topOf(tally.images, "label", "count"),
     files: topOf(tally.files, "label", "count"),
     sources: topSources(tally),
+    people: topPeople(tally),
   };
 }
 
@@ -203,7 +265,12 @@ async function writeSummary(
  * so a chart can tell "nobody came" from "we have not processed that yet" by
  * the presence of the day summary alone.
  */
-async function processDay(day: string, timezone: string, finalize: boolean) {
+async function processDay(
+  day: string,
+  timezone: string,
+  finalize: boolean,
+  namePeople: boolean
+) {
   const hits = await readHits(day);
 
   /*
@@ -235,13 +302,16 @@ async function processDay(day: string, timezone: string, finalize: boolean) {
     if (Number.isNaN(at.getTime())) continue;
 
     const anonymous = !loggedInVisitors.has(hit.v);
+    // Undefined for an anonymous visitor, and undefined for everybody while
+    // the naming setting is off — which is what leaves `people` empty.
+    const userId = namePeople ? identities.get(hit.v) : undefined;
 
-    record(dayTally, hit);
+    record(dayTally, hit, userId);
     if (anonymous) record(anonDayTally, hit);
 
     const key = hourKey(zonedParts(at, timezone));
     const hour = hourTallies.get(key) ?? { all: newTally(), anon: newTally() };
-    record(hour.all, hit);
+    record(hour.all, hit, userId);
     if (anonymous) record(hour.anon, hit);
     hourTallies.set(key, hour);
   }
@@ -369,6 +439,41 @@ async function rollup(
       .map(([label, count]) => ({ [labelKey]: label, [countKey]: count }));
   };
 
+  /*
+   * The accounts seen across the month or year, added up from its days.
+   *
+   * Visits are added rather than unioned, for the same reason the source rows
+   * are: a visit is day-scoped and cannot span two days by more than the half
+   * hour that ends it. Page views, image views and downloads are counts of
+   * events and add exactly.
+   */
+  const mergePeople = () => {
+    const merged = new Map<
+      string,
+      { userId: string; visits: number; pageViews: number; imageViews: number; downloads: number }
+    >();
+    for (const day of days) {
+      for (const person of day.people ?? []) {
+        if (!person?.userId) continue;
+        const entry = merged.get(person.userId) ?? {
+          userId: person.userId,
+          visits: 0,
+          pageViews: 0,
+          imageViews: 0,
+          downloads: 0,
+        };
+        entry.visits += person.visits ?? 0;
+        entry.pageViews += person.pageViews ?? 0;
+        entry.imageViews += person.imageViews ?? 0;
+        entry.downloads += person.downloads ?? 0;
+        merged.set(person.userId, entry);
+      }
+    }
+    return [...merged.values()]
+      .sort((a, b) => b.pageViews - a.pageViews || b.visits - a.visits)
+      .slice(0, MAX_PEOPLE);
+  };
+
   const mergeSources = (anonymous: boolean) => {
     const merged = new Map<
       string,
@@ -406,6 +511,7 @@ async function rollup(
     images: merge("images", "label", "count", anonymous),
     files: merge("files", "label", "count", anonymous),
     sources: mergeSources(anonymous),
+    people: anonymous ? [] : mergePeople(),
   });
 
   await AnalyticsSummary.findOneAndUpdate(
@@ -477,7 +583,7 @@ export async function processAnalytics(): Promise<ProcessResult> {
     let nextMarker = effectiveMarker;
     for (const day of pending) {
       const seal = day < graceDay;
-      const { hits } = await processDay(day, timezone, seal);
+      const { hits } = await processDay(day, timezone, seal, settings.recordSignedInNames);
       result.hits += hits;
       result.processed.push(day);
       // Left unsealed inside the grace window, so the next run picks it up
@@ -489,7 +595,12 @@ export async function processAnalytics(): Promise<ProcessResult> {
     }
 
     if (days.includes(today)) {
-      const { hits } = await processDay(today, timezone, false);
+      const { hits } = await processDay(
+        today,
+        timezone,
+        false,
+        settings.recordSignedInNames
+      );
       result.hits += hits;
       result.processed.push(today);
     }

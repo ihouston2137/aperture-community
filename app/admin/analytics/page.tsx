@@ -4,7 +4,7 @@ import { AdminHeader, Panel } from "@/components/admin-ui";
 import { AnalyticsChart } from "@/components/admin/analytics-chart";
 import { getAnalyticsOverview, type AnalyticsPeriod } from "@/lib/analytics/report";
 import { getAnalyticsSettings } from "@/lib/analytics/settings";
-import { ANALYTICS_TIMEZONES } from "@/lib/analytics/time";
+import { ANALYTICS_TIMEZONES, dayKeyOf, previousDayKey } from "@/lib/analytics/time";
 import { getAccessContext, requireAnyPermission } from "@/lib/access";
 
 import { AnalyticsTools } from "./analytics-tools";
@@ -24,7 +24,17 @@ const PERIODS: {
   value: AnalyticsPeriod;
   label: string;
   count: number;
+  /**
+   * Anchored to a calendar day rather than counted back from now.
+   *
+   * `0` is today and `1` is yesterday. A rolling 24 hours and "since midnight"
+   * are different questions — at nine in the morning the first is mostly
+   * yesterday — and an editor asking how today is going means the second.
+   */
+  daysAgo?: number;
 }[] = [
+  { id: "today", value: "hour", label: "Today", count: 24, daysAgo: 0 },
+  { id: "yesterday", value: "hour", label: "Yesterday", count: 24, daysAgo: 1 },
   { id: "48h", value: "hour", label: "Last 48 hours", count: 48 },
   { id: "7d", value: "day", label: "Last 7 days", count: 7 },
   { id: "30d", value: "day", label: "Last 30 days", count: 30 },
@@ -62,8 +72,25 @@ export default async function AnalyticsPage({
       ? settings.excludeLoggedInByDefault
       : params.loggedIn === "exclude";
 
+  /*
+   * The calendar day a day-anchored range means, in the analytics zone.
+   *
+   * Worked out here rather than in the report so the two agree on which day
+   * "today" is: the report already derives every key in this zone, and a
+   * second opinion about the boundary is exactly how an evening's traffic ends
+   * up on the wrong page.
+   */
+  const day =
+    selected.daysAgo === undefined
+      ? undefined
+      : Array.from({ length: selected.daysAgo }).reduce<string>(
+          (key) => previousDayKey(key),
+          dayKeyOf(new Date(), settings.timezone)
+        );
+
   const overview = await getAnalyticsOverview(selected.value, selected.count, {
     excludeLoggedIn,
+    day,
   });
 
   const canManage = can("analytics.manage");
@@ -85,7 +112,7 @@ export default async function AnalyticsPage({
 
       {/* One row, above everything it scopes, as a filter belongs. */}
       <div className="viz-filters">
-        <div className="builder-tabs" style={{ maxWidth: "34rem", marginBottom: 0 }}>
+        <div className="builder-tabs" style={{ maxWidth: "46rem", marginBottom: 0 }}>
           {PERIODS.map((period) => (
             <Link
               key={period.id}
@@ -215,6 +242,64 @@ export default async function AnalyticsPage({
         </Panel>
       </div>
 
+      {/* Named, not counted — so it sits apart from the figures above and
+          says which window it is answering for. */}
+      <Panel title={`Signed-in visitors — ${selected.label.toLowerCase()}`}>
+        {!overview.namesRecorded && overview.people.length === 0 ? (
+          <p className="admin-subtitle">
+            Names are not being recorded. Turn on{" "}
+            <em>Record which signed-in members visited, by name</em> in the
+            settings below; a rebuild fills in the past, since the raw logs
+            have always carried the account behind a hit.
+          </p>
+        ) : overview.people.length === 0 ? (
+          <p className="admin-subtitle">
+            No signed-in members visited in this period.
+          </p>
+        ) : (
+          <>
+            <p className="admin-subtitle" style={{ marginBottom: "0.75rem" }}>
+              {overview.people.length.toLocaleString()} member
+              {overview.people.length === 1 ? "" : "s"} visited
+              {overview.loggedInVisitors > overview.people.length ? (
+                <>
+                  {" "}
+                  from {overview.loggedInVisitors.toLocaleString()} browsers —
+                  one person on a phone and a laptop is two of those and one of
+                  these
+                </>
+              ) : null}
+              . Shown whichever way the visitor filter above is set, since it
+              answers a different question from the figures it scopes.
+            </p>
+            <div style={{ overflowX: "auto" }}>
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>Member</th>
+                    <th>Visits</th>
+                    <th>Page views</th>
+                    <th>Image views</th>
+                    <th>Downloads</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {overview.people.map((person) => (
+                    <tr key={person.userId}>
+                      <td>{person.name}</td>
+                      <td>{person.visits.toLocaleString()}</td>
+                      <td>{person.pageViews.toLocaleString()}</td>
+                      <td>{person.imageViews.toLocaleString()}</td>
+                      <td>{person.downloads.toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+      </Panel>
+
       {/* Reported apart from page views: opening a picture full screen and
           taking a copy of it are different acts, and neither is arriving
           somewhere. Both are named `Collection - Image`. */}
@@ -335,6 +420,21 @@ export default async function AnalyticsPage({
             <input type="checkbox" name="enabled" defaultChecked={settings.enabled} />
             Record page views, image views and downloads
           </label>
+
+          <label className="checkbox-row" style={{ marginBottom: "0.75rem" }}>
+            <input
+              type="checkbox"
+              name="recordSignedInNames"
+              defaultChecked={settings.recordSignedInNames}
+            />
+            Record which signed-in members visited, by name
+          </label>
+          <p className="help-text" style={{ marginTop: "-0.4rem", marginBottom: "0.75rem" }}>
+            Everything else here counts people; this names them, so it is off
+            until somebody turns it on. It changes what is kept from now on —
+            rebuild to fill in the past, which the raw logs can do because they
+            have always carried the account behind a hit.
+          </p>
 
           <label className="checkbox-row" style={{ marginBottom: "0.75rem" }}>
             <input

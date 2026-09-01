@@ -10,6 +10,19 @@ export type AnalyticsSettingsValues = {
   intervalMinutes: number;
   /** Which set of figures the reports open with; both are always stored. */
   excludeLoggedInByDefault: boolean;
+  /**
+   * Whether each bucket keeps a tally per signed-in account.
+   *
+   * Off by default, and deliberately: everything else here counts people, and
+   * this names them. That is a different undertaking about a member's browsing
+   * than the rest of the section makes, and it should be a decision somebody
+   * took rather than something they discover is already running.
+   *
+   * Only affects what is written from here on. Turning it on names nobody
+   * retroactively unless the logs are rebuilt — the raw hits have always
+   * carried the account id, so a rebuild does fill in the past.
+   */
+  recordSignedInNames: boolean;
 };
 
 export const defaultAnalyticsSettings: AnalyticsSettingsValues = {
@@ -18,6 +31,7 @@ export const defaultAnalyticsSettings: AnalyticsSettingsValues = {
   retentionDays: 400,
   intervalMinutes: 15,
   excludeLoggedInByDefault: false,
+  recordSignedInNames: false,
 };
 
 /**
@@ -59,6 +73,7 @@ export async function getAnalyticsSettings(): Promise<AnalyticsSettingsValues> {
           ? Math.min(1440, Math.max(1, Math.trunc(doc.intervalMinutes)))
           : defaultAnalyticsSettings.intervalMinutes,
         excludeLoggedInByDefault: Boolean(doc.excludeLoggedInByDefault),
+        recordSignedInNames: Boolean(doc.recordSignedInNames),
       };
     }
   } catch {
@@ -83,6 +98,7 @@ export async function saveAnalyticsSettings(
       retentionDays: Math.max(0, Math.trunc(values.retentionDays) || 0),
       intervalMinutes: Math.min(1440, Math.max(1, Math.trunc(values.intervalMinutes) || 15)),
       excludeLoggedInByDefault: Boolean(values.excludeLoggedInByDefault),
+      recordSignedInNames: Boolean(values.recordSignedInNames),
     },
     { upsert: true, returnDocument: "after" }
   );
