@@ -83,6 +83,21 @@ export function CalendarEventBox({
       tabIndex={0}
       onClick={() => onSelect(event)}
       onKeyDown={(keyEvent) => {
+        /*
+         * Only when the box itself has the focus.
+         *
+         * React sends events up the tree it built, not the one in the page —
+         * so a dialog portalled to `document.body` from a block inside this
+         * box is still a child of it here, and its keystrokes arrive at this
+         * handler. Without the check, a space typed into the RSVP note was
+         * swallowed by `preventDefault` before the textarea could take it, and
+         * Enter opened the event from inside its own popup.
+         *
+         * Comparing target with currentTarget is the whole fix: a key pressed
+         * in anything nested belongs to that thing, not to this box.
+         */
+        if (keyEvent.target !== keyEvent.currentTarget) return;
+
         if (keyEvent.key === "Enter" || keyEvent.key === " ") {
           keyEvent.preventDefault();
           onSelect(event);

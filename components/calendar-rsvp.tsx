@@ -105,7 +105,9 @@ export function CalendarRsvpButton({
         }}
         onKeyDown={(keyEvent) => {
           // Same again for the keyboard: the box opens on Enter and Space, and
-          // those are exactly the keys that press this button.
+          // those are exactly the keys that press this button. Belt and braces
+          // now — the box also ignores keys that did not start on it — but a
+          // button saying which keys are its own is worth keeping.
           if (keyEvent.key === "Enter" || keyEvent.key === " ") {
             keyEvent.stopPropagation();
           }
