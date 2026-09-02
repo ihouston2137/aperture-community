@@ -90,7 +90,9 @@ export function InspectorStylePanel({
 
   /** Writes the edited values back to whichever view is active. */
   function writeValues(next: StyleValues) {
-    if (isBaseView) {
+    // One set of settings, whichever viewport the canvas happens to be on:
+    // a values-only slot has no per-view rules to write into.
+    if (isBaseView || target.valuesOnly) {
       // Local settings and a named style are exclusive; typing here means the
       // block is no longer using the named one.
       update({ [slugKey]: "", [valuesKey]: next } as Partial<PageBlock>);
@@ -146,6 +148,7 @@ export function InspectorStylePanel({
         </p>
       </div>
 
+      {target.valuesOnly ? null : (
       <div className="inspector-section">
         <div className="field">
           <label>Saved style</label>
@@ -167,10 +170,11 @@ export function InspectorStylePanel({
           </span>
         </div>
       </div>
+      )}
 
       {usingSavedStyle ? null : (
         <>
-          {isBaseView ? null : (
+          {isBaseView || target.valuesOnly ? null : (
             <div className="inspector-section">
               <label className="checkbox-row">
                 <input
@@ -192,7 +196,13 @@ export function InspectorStylePanel({
 
           {/* A view that is off is shown read-only: the values on screen belong
               to a wider view, and editing them here would silently change it. */}
-          <fieldset className="inspector-fieldset" disabled={!overrideOn}>
+          {/* A slot with no per-view overrides is one set of settings, so it
+              stays editable whichever viewport the canvas is showing — the
+              alternative is a panel that goes read-only for no stated reason. */}
+          <fieldset
+            className="inspector-fieldset"
+            disabled={!overrideOn && !target.valuesOnly}
+          >
             {isBaseView && hoverEnabled ? (
               <div className="builder-tabs">
                 <button

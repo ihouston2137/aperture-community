@@ -131,6 +131,83 @@ export const CORNER_KEYS = [
   "borderRadiusBottomLeft",
 ] as const;
 
+/**
+ * The families of a style that describe a *shape* rather than a box.
+ *
+ * A shape block is a drawing inside a rectangle it very often does not fill —
+ * a circle, a star, a speech bubble. Its fill, outline, corner and shadow have
+ * to be handed to the drawing; painted on the rectangle instead they show as a
+ * coloured panel behind the shape, a border around a circle that is a square,
+ * and a shadow in the shape of nothing anybody drew.
+ *
+ * The rest of a style — spacing, opacity, scale, and the typography the shape's
+ * own text wears — belongs to the box as it always did, which is why this is a
+ * split rather than a redirection.
+ */
+const SHAPE_SURFACE_KEYS = [
+  "backgroundColor",
+  "backgroundOpacity",
+  "borderWidth",
+  "borderStyle",
+  "borderColor",
+  "borderSides",
+  "borderRadius",
+  ...CORNER_KEYS,
+  "shadowEnabled",
+  "shadowX",
+  "shadowY",
+  "shadowBlur",
+  "shadowColor",
+] as const;
+
+/**
+ * A style with the shape-describing families taken out, for the box to wear.
+ *
+ * The complement of what `shapeSurfaceOf` hands to the drawing, so between them
+ * every setting is used exactly once and none is used twice.
+ */
+export function boxStyleWithoutShape(values: StyleValues | undefined): StyleValues {
+  if (!values) return {};
+  const rest: Record<string, unknown> = { ...values };
+  for (const key of SHAPE_SURFACE_KEYS) delete rest[key];
+  return rest as StyleValues;
+}
+
+/** What a shape is drawn with, read off a style. */
+export type ShapeSurface = {
+  /** The fill. */
+  color?: string;
+  /** The outline, in rem. */
+  borderWidth?: number;
+  borderColor?: string;
+  /** A rectangle's corner, in rem. */
+  radius?: number;
+  /** The silhouette's own shadow, ready to spread onto the shape's box. */
+  shadow?: StyleValues;
+};
+
+export function shapeSurfaceOf(values: StyleValues | undefined): ShapeSurface {
+  if (!values) return {};
+
+  return {
+    color: values.backgroundColor,
+    // A width with no colour would draw a black outline nobody asked for, and
+    // a colour with no width draws nothing — so both or neither.
+    borderWidth: values.borderStyle === "none" ? 0 : values.borderWidth,
+    borderColor: values.borderColor,
+    radius: values.borderRadius,
+    shadow: values.shadowEnabled
+      ? {
+          shadowEnabled: true,
+          shadowX: values.shadowX,
+          shadowY: values.shadowY,
+          shadowBlur: values.shadowBlur,
+          shadowColor: values.shadowColor,
+        }
+      : undefined,
+  };
+}
+
 export const SPACING_KEYS = [
   "paddingTop",
   "paddingRight",

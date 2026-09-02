@@ -3,6 +3,12 @@
 import Link from "next/link";
 import { useState, type CSSProperties, type ReactNode } from "react";
 
+import {
+  boxStyleWithoutShape,
+  shapeSurfaceOf,
+  styleValuesToCss,
+} from "@/lib/style-values";
+
 import { customStyleClassName } from "@/lib/custom-style-css";
 import {
   containerCss,
@@ -194,10 +200,20 @@ function ImageWithClick({
 /**
  * A shape, and the text that goes with it.
  *
- * Two style slots meet here. The block's own — `Shape style` in the inspector —
- * dresses the box the shape is drawn in; `shapeTextStyle` dresses the writing.
- * Keeping them apart is what lets a shape carry a shadow while its label
- * carries a typeface.
+ * The style describes the **shape**, not the box it is drawn in — the same way
+ * the publication builder has always treated one. Its background colour is the
+ * fill, its border is the outline, its radius rounds a rectangle's corners, and
+ * its shadow is cast by the silhouette. Applied to the box instead, as this
+ * used to, a fill was a coloured panel behind the shape, an outline was a
+ * rectangle drawn around a circle, and a shadow fell in the shape of nothing
+ * anybody had drawn.
+ *
+ * What is left of the style — spacing, opacity, scale — still dresses the box,
+ * because that is what those mean. `shapeSurfaceOf` and `boxStyleWithoutShape`
+ * are the two halves of one split, so every setting is used once.
+ *
+ * The block's own fill, outline and corner fields stay as the fallback, which
+ * is what a shape drawn before there was a style panel is still wearing.
  *
  * Text placed `inside` is handed to the shape itself, which clips it to its
  * outline. `above` puts it in the flow instead, where the shape has no say over
@@ -206,16 +222,28 @@ function ImageWithClick({
 function ShapeBlockView({ block, sources }: { block: PageBlock; sources: PageSources }) {
   const text = (block.text ?? "").trim();
   const placement = block.textPlacement ?? "inside";
-  const box = blockTextProps(block);
   const label = styleSlotProps(block, "shapeTextStyle");
+
+  /*
+   * Read as values, never as a saved style's class.
+   *
+   * A class can only be laid on an element; there is no way to take a fill out
+   * of one and hand it to an SVG. So the shape slot offers no saved styles —
+   * the same choice the publication builder made — and reads what was set here.
+   */
+  const surface = shapeSurfaceOf(block.textStyle);
+  const boxValues = boxStyleWithoutShape(block.textStyle);
+
+  const shadow = surface.shadow
+    ? (styleValuesToCss(surface.shadow, "drop") as CSSProperties)
+    : undefined;
 
   const inside = placement === "inside" ? text : "";
   const common = {
-    color: block.color ?? "#2b6cb0",
-    borderWidth: block.borderWidth,
-    borderColor: block.borderColor,
-    className: box.className || undefined,
-    style: box.style,
+    color: surface.color ?? block.color ?? "#2b6cb0",
+    borderWidth: surface.borderWidth ?? block.borderWidth,
+    borderColor: surface.borderColor ?? block.borderColor,
+    style: { ...styleValuesToCss(boxValues), ...shadow } as CSSProperties,
     text: inside,
     textClassName: label.className || undefined,
     textStyle: label.style,
@@ -228,7 +256,7 @@ function ShapeBlockView({ block, sources }: { block: PageBlock; sources: PageSou
         kind={block.shapeKind ?? "rectangle"}
         width={block.width ?? 12}
         height={block.height ?? 8}
-        radius={block.radius}
+        radius={surface.radius ?? block.radius}
         strokeWidth={block.strokeWidth}
       />
     ) : (

@@ -253,6 +253,11 @@ export function slotIsStyled(host: StyleHost, valuesKey: string): boolean {
 }
 
 /** Every overridden slot on one block. Empty for a block with no overrides. */
+/** Blocks whose style describes a drawing rather than the box holding it. */
+function isShapeBlock(type: unknown): boolean {
+  return type === "shape" || type === "customShape";
+}
+
 export function blockResponsiveCss(block: StyleHost & { id?: string }): string {
   if (!block.id) return "";
 
@@ -261,6 +266,16 @@ export function blockResponsiveCss(block: StyleHost & { id?: string }): string {
     // A named style replaces every local setting, per-view ones included.
     if (block[slugKeyFor(valuesKey)]) continue;
     if (!hasResponsiveStyle(block, valuesKey)) continue;
+    /*
+     * A shape's own style is not worn, it is read.
+     *
+     * Its fill goes to an SVG's `fill` and its shadow to a filter cast by the
+     * silhouette, neither of which a class on the container can express — so
+     * the shape blocks take their style as values and nothing here applies.
+     * Emitting the rule anyway would leave a stylesheet full of selectors that
+     * look as though they should be doing something.
+     */
+    if (valuesKey === "textStyle" && isShapeBlock(block.type)) continue;
     parts.push(slotCss(block.id, block, valuesKey));
   }
 

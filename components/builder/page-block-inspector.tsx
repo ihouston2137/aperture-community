@@ -436,7 +436,12 @@ export function PageBlockInspector({
             type="button"
             className="btn btn-sm"
             style={{ marginRight: "0.25rem", marginBottom: "0.25rem" }}
-            onClick={() => onEditStyle(blockStyleTarget(block, "Shape style", false), update)}
+            onClick={() =>
+              // Values only: the fill, outline, corner and shadow are read
+              // apart and handed to the drawing, which a saved style's class
+              // could never be.
+              onEditStyle(blockStyleTarget(block, "Shape style", false, true), update)
+            }
           >
             Shape style…
           </button>
@@ -449,9 +454,13 @@ export function PageBlockInspector({
             Text style…
           </button>
           <p className="help-text">
-            Shadow, spacing, opacity and scale dress the shape&rsquo;s box; its
-            fill, outline and size are below. The text style sets the typeface,
-            size, colour and padding of the shape&rsquo;s own text.
+            The shape style describes the <em>shape</em>, not the box around it:
+            its background colour is the fill, its border is the outline, its
+            radius rounds a rectangle&rsquo;s corners, and its shadow is cast by
+            the silhouette. Spacing, opacity and scale still dress the box. The
+            fill, outline and size below are what it falls back to. The text
+            style sets the typeface, size, colour and padding of the
+            shape&rsquo;s own text.
           </p>
         </div>
       ) : STYLEABLE_BLOCKS.has(block.type) ? (

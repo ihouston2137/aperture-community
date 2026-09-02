@@ -5,7 +5,7 @@ import type { CSSProperties } from "react";
 import { customStyleClassName } from "@/lib/custom-style-css";
 import type { PublicationBlock } from "@/lib/publication-layout";
 import { protectedMediaUrl } from "@/lib/protected-media-url";
-import { styleValuesToCss } from "@/lib/style-values";
+import { shapeSurfaceOf, styleValuesToCss } from "@/lib/style-values";
 
 import { LucideIconView } from "./lucide-icon";
 import { QrCode } from "./qr-code";
@@ -204,7 +204,15 @@ export function PublicationBlockView({
        * handed to the shape, which clips it to its outline — the same
        * constraint a page block gets, from the same component.
        */
-      const shapeStyle = block.shapeStyle ?? {};
+      /*
+       * Read apart by the same function the page builder uses.
+       *
+       * The two used to describe a shape in two places that happened to agree;
+       * one of them can stop agreeing. `shapeSurfaceOf` is now the only place
+       * that says what a fill, an outline, a corner and a shadow mean on a
+       * drawing.
+       */
+      const surface = shapeSurfaceOf(block.shapeStyle);
       const text = (block.text ?? "").trim();
       const above = Boolean(text) && (block.textPlacement ?? "inside") === "above";
 
@@ -215,23 +223,14 @@ export function PublicationBlockView({
        * shape of it — a circle, a star, a speech bubble — so a shadow of the
        * box would sit behind the shape in a rectangle nobody drew.
        */
-      const shapeShadow = shapeStyle.shadowEnabled
-        ? (styleValuesToCss(
-            {
-              shadowEnabled: true,
-              shadowX: shapeStyle.shadowX,
-              shadowY: shapeStyle.shadowY,
-              shadowBlur: shapeStyle.shadowBlur,
-              shadowColor: shapeStyle.shadowColor,
-            },
-            "drop"
-          ) as CSSProperties)
+      const shapeShadow = surface.shadow
+        ? (styleValuesToCss(surface.shadow, "drop") as CSSProperties)
         : undefined;
 
       const common = {
-        color: shapeStyle.backgroundColor ?? block.color ?? "#2b6cb0",
-        borderWidth: shapeStyle.borderWidth ?? 0,
-        borderColor: shapeStyle.borderColor ?? "#000000",
+        color: surface.color ?? block.color ?? "#2b6cb0",
+        borderWidth: surface.borderWidth ?? 0,
+        borderColor: surface.borderColor ?? "#000000",
         text: above ? "" : text,
         textClassName: textProps.className || undefined,
         textStyle: textProps.style,
@@ -255,7 +254,7 @@ export function PublicationBlockView({
             kind={(block.shapeKind ?? "rectangle") as ShapeKind}
             width={block.width / 16}
             height={block.height / 16}
-            radius={shapeStyle.borderRadius ?? (block.radius ?? 0) / 16}
+            radius={surface.radius ?? (block.radius ?? 0) / 16}
           />
         ) : (
           <CustomShapeView

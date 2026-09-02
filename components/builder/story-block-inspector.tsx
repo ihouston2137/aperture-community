@@ -34,6 +34,15 @@ export type StyleTarget = {
   slug?: string;
   values?: StyleValues;
   showTypography: boolean;
+  /**
+   * No saved styles and no per-view overrides for this slot.
+   *
+   * Both of those arrive as a CSS class, and a class can only be laid on an
+   * element. A shape's style is not laid on anything — it is read apart and
+   * handed to the drawing, so its fill can be the fill and its shadow can
+   * follow the silhouette. There is no way to take a fill back out of a class.
+   */
+  valuesOnly?: boolean;
 };
 
 export type OpenStyleEditor = (
@@ -45,7 +54,8 @@ export type OpenStyleEditor = (
 export function blockStyleTarget(
   block: { styleSlug?: string; textStyle?: StyleValues },
   title = "Block style",
-  showTypography = true
+  showTypography = true,
+  valuesOnly = false
 ): StyleTarget {
   return {
     title,
@@ -54,6 +64,7 @@ export function blockStyleTarget(
     slug: block.styleSlug,
     values: block.textStyle,
     showTypography,
+    valuesOnly,
   };
 }
 
