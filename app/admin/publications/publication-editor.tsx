@@ -555,7 +555,14 @@ export function PublicationEditor({
     });
 
     const from = at(event.clientX, event.clientY);
-    const additive = event.ctrlKey || event.metaKey || event.shiftKey;
+    /*
+     * Ctrl or ⌘ alone, now that shift is what starts a marquee at all.
+     *
+     * Shift used to mean "add to the selection" here as well; leaving it in
+     * would have made every marquee additive and left no way to draw one that
+     * replaces what is chosen.
+     */
+    const additive = event.ctrlKey || event.metaKey;
     const held = additive ? selectedIds : [];
     if (!additive) setSelectedIds([]);
 
@@ -2022,23 +2029,29 @@ export function PublicationEditor({
             setOpenGroupId(null);
 
             /*
-             * Plain drag draws a marquee; holding space, or the middle button,
-             * pans as it always did.
+             * Shift draws a marquee; a plain drag moves the canvas.
              *
-             * Selecting is what somebody does on a canvas fifty times an hour
-             * and panning is what they do occasionally, so the plain gesture
-             * belongs to the common one. The modifier is announced under the
-             * zoom control rather than left to be discovered.
+             * The canvas is bigger than the window at any zoom worth working
+             * at, so reaching a part of the page is the gesture that comes
+             * first and the one the hand should already be doing. Selecting
+             * several blocks at once is deliberate, and asking for a key is
+             * how it stays out of the way of simply moving about. Space and
+             * the middle button still pan, so a hand already holding either
+             * keeps working.
              */
-            if (event.button === 1 || spaceDown.current) {
-              setSelectedId(null);
-              startPan(event);
-              return;
-            }
-            // The right button opens the menu; the marquee belongs to the left.
+            // The right button opens the menu; neither gesture belongs to it.
             if (event.button === 2) return;
             setMenu(null);
-            startMarquee(event);
+
+            // Shift is the marquee. Space and the middle button say "pan"
+            // outright, so they win over it.
+            if (event.shiftKey && event.button !== 1 && !spaceDown.current) {
+              startMarquee(event);
+              return;
+            }
+
+            setSelectedId(null);
+            startPan(event);
           }}
           onContextMenu={(event) => {
             event.preventDefault();
@@ -2397,9 +2410,11 @@ export function PublicationEditor({
               ) : null}
 
               <span className="help-text">
-                Drag on the page to select several; hold ctrl, ⌘ or shift to add
-                one. Hold space to pan instead. Double-click a block in a group
-                to pick it out on its own.
+                Drag on the page to move the canvas about. Hold shift and drag
+                to select several at once; hold ctrl or ⌘ as well to add to
+                what is already chosen. Click a block with ctrl, ⌘ or shift to
+                add it on its own, and double-click a block in a group to pick
+                it out.
               </span>
             </div>
           ) : null}
