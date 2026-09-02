@@ -101,6 +101,10 @@ export function EmailSettingsForm({
           />
           Send a notification on every form submission
         </label>
+        <span className="help-text">
+          Governs the recipients above. A form that names its own notify
+          addresses always posts to them.
+        </span>
 
         {settings.lastVerifiedAt ? (
           <p className="help-text" style={{ marginTop: "0.75rem" }}>

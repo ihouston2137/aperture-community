@@ -202,6 +202,17 @@ export function FormBuilder({
   const [slug, setSlug] = useState(form.slug);
   const [status, setStatus] = useState(form.status);
   const [settings, setSettings] = useState<FormSettings>(form.settings);
+  /*
+   * What is typed, kept beside what is stored.
+   *
+   * The stored value is a list of addresses, and a list cannot hold a
+   * half-written one. Rendering the box straight from it meant every
+   * separator was swallowed the moment it was typed — the split dropped the
+   * empty tail, the join put back what was there before, and the caret sat
+   * after an address that could never be followed by a second one. So the box
+   * owns its own text and the list is derived from it on each keystroke.
+   */
+  const [notifyText, setNotifyText] = useState(() => form.settings.notifyEmails.join("\n"));
   const [styleTarget, setStyleTarget] = useState<FormBlock | null>(null);
   const [applyStyle, setApplyStyle] = useState<((patch: Partial<PageBlock>) => void) | null>(
     null
@@ -303,6 +314,31 @@ export function FormBuilder({
             <p className="help-text" style={{ marginTop: 0 }}>
               Shown in place of the form once it has been sent. Ignored when a
               redirect is set.
+            </p>
+
+            <h4 className="inspector-title">Notifications</h4>
+            <div className="field">
+              <label>Notify these addresses</label>
+              <textarea
+                rows={3}
+                value={notifyText}
+                placeholder={"you@example.com\nsomebody@example.com"}
+                onChange={(event) => {
+                  setNotifyText(event.target.value);
+                  setSettings((current) => ({
+                    ...current,
+                    notifyEmails: event.target.value
+                      .split(/[,\n]/)
+                      .map((email) => email.trim())
+                      .filter(Boolean),
+                  }));
+                }}
+              />
+            </div>
+            <p className="help-text" style={{ marginTop: 0 }}>
+              One address per line, or separated by commas. They are emailed
+              every submission to this form, on top of the site-wide
+              recipients set in Email settings.
             </p>
 
             <h4 className="inspector-title">Field styles</h4>
@@ -594,21 +630,6 @@ export function FormBuilder({
               <option value="draft">Draft</option>
               <option value="published">Published</option>
             </select>
-            <input
-              className="input"
-              style={{ maxWidth: "16rem" }}
-              value={settings.notifyEmails.join(", ")}
-              placeholder="Notify emails (comma separated)"
-              onChange={(event) =>
-                setSettings((current) => ({
-                  ...current,
-                  notifyEmails: event.target.value
-                    .split(",")
-                    .map((email) => email.trim())
-                    .filter(Boolean),
-                }))
-              }
-            />
             <button type="submit" form="form-form" className="btn btn-primary btn-sm">
               Save
             </button>

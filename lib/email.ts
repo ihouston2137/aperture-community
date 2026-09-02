@@ -473,15 +473,39 @@ export async function sendFormSubmissionNotification(input: {
 }): Promise<{ sent: boolean; error?: string }> {
   const settings = await getEmailSettings();
 
-  if (!settings.enabled || !settings.notifyOnFormSubmission) {
-    return { sent: false };
+  if (!settings.enabled) {
+    console.info(
+      `Submission to "${input.formTitle}" not notified: email sending is switched off in the admin.`
+    );
+    return { sent: false, error: "Email sending is switched off in the admin." };
   }
 
-  const recipients = [
-    ...settings.notificationRecipients,
-    ...(input.extraRecipients ?? []),
-  ].filter(Boolean);
-  if (recipients.length === 0) return { sent: false };
+  /*
+   * Two kinds of recipient, and only one of them is a default.
+   *
+   * `notifyOnFormSubmission` decides whether the site's standing recipients
+   * hear about every form there is — it is a blanket, and switching it off is
+   * a statement about forms in general. Addresses typed into one form's own
+   * settings are not that: somebody named them on that form, for that form,
+   * and silently dropping them because a site-wide default is off left the
+   * setting looking switched on while doing nothing. So the toggle gates the
+   * standing list alone; a form's own addresses are always posted to.
+   */
+  const named = (input.extraRecipients ?? []).filter(Boolean);
+  const standing = settings.notifyOnFormSubmission
+    ? settings.notificationRecipients.filter(Boolean)
+    : [];
+  const recipients = [...standing, ...named];
+
+  if (recipients.length === 0) {
+    console.info(
+      `Submission to "${input.formTitle}" not notified: nobody is set to be told. ` +
+        (settings.notifyOnFormSubmission
+          ? "Add recipients in Email settings, or notify addresses on the form itself."
+          : "Submission notifications are switched off in Email settings, and the form names nobody of its own.")
+    );
+    return { sent: false };
+  }
 
   const lines = input.fields.map((field) => {
     const value = Array.isArray(field.value)
@@ -501,6 +525,15 @@ export async function sendFormSubmissionNotification(input: {
       : `New submission: ${input.formTitle}`,
     text: `A new submission was received for “${input.formTitle}”.\n\n${scored}${lines.join("\n")}`,
   });
+
+  // Nobody is watching this send: the person who filled the form is thanked
+  // either way, and the people expecting the entry only find out it never came
+  // by not receiving it.
+  if (!result.ok) {
+    console.error(
+      `Submission notification for "${input.formTitle}" failed: ${result.error ?? "send failed"}`
+    );
+  }
 
   return { sent: result.ok, error: result.error };
 }
