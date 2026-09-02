@@ -18,6 +18,34 @@ function pageSizeOf(node: HTMLElement) {
  * copy of the capture: the awkward parts below were learned once and should
  * not have to be learned again.
  */
+/**
+ * What every capture is taken with.
+ *
+ * **`includeQueryParams` is not optional here.** `html-to-image` caches each
+ * fetched image under a key it builds from the URL, and by default it strips
+ * the query string off first. Every picture on the site is served through
+ * `/api/media?i=<token>` — the path is the same for all of them and the token
+ * is the whole of what distinguishes one from another — so every image in a
+ * publication was landing on the single key `/api/media`, and whichever was
+ * fetched first was drawn in place of all the rest. That cache is module-level
+ * and never cleared, so the wrong picture then followed you from one export to
+ * the next until the page was reloaded.
+ *
+ * **`cacheBust` is off, and that is what makes the cache work.** It appends a
+ * timestamp to every request, which with a correct key means no image is ever
+ * reused — a twenty-page publication would refetch the same logo twenty
+ * times. It was there to dodge a stale HTTP cache; these are same-origin
+ * requests to our own route, which is not a hazard the exporter has to solve.
+ *
+ * A failed fetch is drawn as nothing at all and only warns to the console, so
+ * a blank picture in a PDF is worth looking for there first.
+ */
+const CAPTURE_OPTIONS = {
+  cacheBust: false,
+  includeQueryParams: true,
+  pixelRatio: 1,
+} as const;
+
 export async function capturePublicationPages(
   onProgress?: (message: string) => void
 ): Promise<string[]> {
@@ -41,8 +69,7 @@ export async function capturePublicationPages(
 
     frames.push(
       await toPng(node, {
-        cacheBust: true,
-        pixelRatio: 1,
+        ...CAPTURE_OPTIONS,
         // Captured at the authored size, not at whatever the stage has been
         // scaled to on screen.
         width,
@@ -189,8 +216,7 @@ export function PublicationExport({
 
       const { width, height } = pageSize(node);
       const frame = await toPng(node, {
-        cacheBust: true,
-        pixelRatio: 1,
+        ...CAPTURE_OPTIONS,
         width,
         height,
         style: { opacity: "1", visibility: "visible", transform: "none", transition: "none" },
