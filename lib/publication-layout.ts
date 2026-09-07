@@ -58,22 +58,26 @@ export const POST_VIEW_PRESETS = [
 ] as const;
 
 /**
- * What a table cell holds: ordinary blocks, laid out in flow.
+ * What a table cell holds: one block, filling the cell.
  *
- * A cell is a box rather than a canvas, so the blocks in it stack down the
- * cell in the order they are listed and their `x`, `y` and `zIndex` are
- * ignored. That is the whole difference between a cell and the page: content
- * placed by coordinate would be stranded the moment a column was resized, and
- * resizing columns is most of what anybody does to a table.
+ * One rather than a list, because a cell is one thing — a heading, a figure, a
+ * picture. A stack inside a box that is already a box in a grid is a layout
+ * nobody asked a table for, and it made every cell a small page to be managed.
+ * Changing what a cell holds is changing its kind, not adding to it.
  *
- * They are `PublicationBlock`s and not a smaller shape of their own so that
+ * A cell starts as rich text, because that is what nearly every cell is, and
+ * writing in it should not begin with choosing to.
+ *
+ * The block is a `PublicationBlock` and not a smaller shape of its own so that
  * every content type a page can hold — words, a picture, an icon, a shape, an
  * uploaded outline — is already renderable inside a cell, by the same renderer,
- * with the same styles and the same toolbar.
+ * with the same controls and the same toolbar. Its `x`, `y` and `zIndex` say
+ * nothing: a cell is a box, not a canvas, and content placed by coordinate
+ * would be stranded the moment a column was resized.
  */
 export type PublicationTableCell = {
   id: string;
-  content: PublicationBlock[];
+  block: PublicationBlock;
   /** Dresses this cell alone, over the table's own cell style. */
   style?: StyleValues;
 };
@@ -89,6 +93,8 @@ export type PublicationTable = {
   headerColumn: boolean;
   /** Every other row tinted, which is what makes a wide table readable. */
   bandedRows: boolean;
+  /** The tint itself, so banding is a choice rather than one fixed grey. */
+  bandColor?: string;
   /** The grid itself: its outline, its rules and its background. */
   tableStyle?: StyleValues;
   /** The default for every cell, and for the heading cells over it. */
@@ -110,6 +116,21 @@ export const TABLE_CELL_BLOCK_TYPES = [
 
 export const MAX_TABLE_COLUMNS = 20;
 export const MAX_TABLE_ROWS = 60;
+
+/** How a cell's block is labelled where its kind is chosen. */
+export const TABLE_CELL_BLOCK_LABELS: Record<
+  (typeof TABLE_CELL_BLOCK_TYPES)[number],
+  string
+> = {
+  richText: "Text",
+  image: "Image",
+  icon: "Icon",
+  shape: "Shape",
+  customShape: "Custom shape",
+  button: "Button",
+  video: "Video",
+  qrCode: "QR code",
+};
 
 export type PublicationBlock = {
   id: string;
@@ -361,9 +382,43 @@ function pick<T extends string>(value: unknown, allowed: readonly T[], fallback:
 /** Default column width and row height, in canvas units. */
 const TABLE_COLUMN_WIDTH = 240;
 const TABLE_ROW_HEIGHT = 90;
+/** A tint faint enough to read as banding rather than as a coloured row. */
+const DEFAULT_BAND_COLOR = "rgba(148, 163, 184, 0.18)";
+
+/**
+ * A block sized for a cell rather than placed on a canvas.
+ *
+ * The cell decides where it goes and how wide it is, so only its height is
+ * really its own — and words do not even own that, taking as much as they need.
+ */
+export function createCellBlock(
+  type: (typeof TABLE_CELL_BLOCK_TYPES)[number]
+): PublicationBlock {
+  const block = createPublicationBlock(type);
+  block.x = 0;
+  block.y = 0;
+  block.zIndex = 1;
+  block.width = 240;
+  block.height = type === "richText" || type === "button" ? 40 : 120;
+  if (type === "richText") {
+    block.html = "";
+    // A cell inherits its look from the table, so its words start plain.
+    delete block.textStyle;
+  }
+  return block;
+}
 
 export function createTableCell(): PublicationTableCell {
-  return { id: makeId("pubcell"), content: [] };
+  return { id: makeId("pubcell"), block: createCellBlock("richText") };
+}
+
+/** Changes what a cell holds, keeping its own dressing. */
+export function withCellKind(
+  cell: PublicationTableCell,
+  type: (typeof TABLE_CELL_BLOCK_TYPES)[number]
+): PublicationTableCell {
+  if (cell.block.type === type) return cell;
+  return { ...cell, block: createCellBlock(type) };
 }
 
 export function createTable(columns = 3, rows = 3): PublicationTable {
@@ -379,6 +434,7 @@ export function createTable(columns = 3, rows = 3): PublicationTable {
     headerRow: true,
     headerColumn: false,
     bandedRows: false,
+    bandColor: DEFAULT_BAND_COLOR,
     /*
      * A new table looks like a table, and the look is its own data.
      *
@@ -439,18 +495,23 @@ export function normalizeTable(input: unknown): PublicationTable {
         | undefined;
       if (!stored || typeof stored !== "object") return createTableCell();
 
-      const content = (Array.isArray(stored.content) ? stored.content : [])
-        .map((entry) => normalizePublicationBlock(entry))
-        .filter(
-          (block): block is PublicationBlock =>
-            // A cell holds content, not compositions, and never another table.
-            block !== null &&
-            (TABLE_CELL_BLOCK_TYPES as readonly string[]).includes(block.type)
-        );
+      /*
+       * A cell held a list of blocks before it held one. The first of them is
+       * what the cell is, and the rest are dropped — read here rather than by
+       * a migration, so a table saved by the older shape opens correctly.
+       */
+      const legacy = Array.isArray(stored.content) ? stored.content : [];
+      const candidate = normalizePublicationBlock(stored.block ?? legacy[0]);
+      const kept =
+        candidate &&
+        // A cell holds content, not compositions, and never another table.
+        (TABLE_CELL_BLOCK_TYPES as readonly string[]).includes(candidate.type)
+          ? candidate
+          : createCellBlock("richText");
 
       const cell: PublicationTableCell = {
         id: str(stored.id) || makeId("pubcell"),
-        content,
+        block: kept,
       };
       if (stored.style) cell.style = normalizeStyleValues(stored.style);
       return cell;
@@ -464,6 +525,7 @@ export function normalizeTable(input: unknown): PublicationTable {
     headerRow: raw.headerRow === undefined ? true : Boolean(raw.headerRow),
     headerColumn: Boolean(raw.headerColumn),
     bandedRows: Boolean(raw.bandedRows),
+    bandColor: str(raw.bandColor) || DEFAULT_BAND_COLOR,
   };
 
   if (raw.tableStyle) table.tableStyle = normalizeStyleValues(raw.tableStyle);
@@ -548,9 +610,9 @@ export function withCellChanged(
   };
 }
 
-/** The content blocks of every cell, for anything that walks a page. */
+/** The block of every cell, for anything that walks a page. */
 export function tableContentBlocks(table: PublicationTable): PublicationBlock[] {
-  return table.cells.flatMap((row) => row.flatMap((cell) => cell.content));
+  return table.cells.flatMap((row) => row.map((cell) => cell.block));
 }
 
 export function createPublicationBlock(type: PublicationBlockType): PublicationBlock {

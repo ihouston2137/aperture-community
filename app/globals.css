@@ -6188,23 +6188,16 @@ ol.doc-list ol.doc-list ol.doc-list {
   background: color-mix(in srgb, currentColor 8%, transparent);
 }
 
-/* Cell content flows: the blocks in a cell stack down it in order, rather than
-   standing where a coordinate put them. */
-.pub-cell-stack {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  height: 100%;
-}
-
+/* A cell holds one block, and it fills the cell. */
 .pub-cell-item {
   position: relative;
-  flex: 0 0 auto;
   min-height: 0;
 }
 
-/* The editor's own cells: choosable, fillable, and marked when chosen. */
+/* The editor's own cells: choosable, and marked when chosen. */
 .pub-editor-cell {
+  position: relative;
+  height: 100%;
   min-height: 1.5rem;
   outline: 2px solid transparent;
   outline-offset: -2px;
@@ -6214,50 +6207,28 @@ ol.doc-list ol.doc-list ol.doc-list {
   outline-color: var(--admin-accent);
 }
 
-.pub-editor-cell-item {
-  position: relative;
-  outline: 1px solid transparent;
-  outline-offset: 1px;
+.pub-editor-cell.is-writing > :not(.pub-editor-cell-writing) {
+  visibility: hidden;
 }
 
-/* The block in a cell whose settings the inspector is showing. */
-.pub-editor-cell-item.is-chosen {
-  outline-color: var(--admin-accent);
-}
-
-/* What a cell holds, listed in the order it is stacked. */
-.cell-contents {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  margin-top: 0.4rem;
-}
-
-.cell-content-row {
+/* Where a table is picked up once its cells have taken over pressing. */
+.pub-table-grip {
+  position: absolute;
+  top: -1.15rem;
+  left: 0;
+  right: 0;
+  height: 1rem;
   display: flex;
   align-items: center;
-  gap: 0.25rem;
-}
-
-.cell-content-name {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  flex: 1;
-  min-width: 0;
-  padding: 0.25rem 0.4rem;
-  border: 1px solid var(--admin-border);
-  border-radius: 0.25rem;
-  background: var(--admin-bg);
-  color: var(--admin-text);
-  font-size: 0.75rem;
-  text-align: left;
-  cursor: pointer;
-}
-
-.cell-content-row.is-chosen .cell-content-name {
-  border-color: var(--admin-accent);
-  color: var(--admin-accent);
+  justify-content: center;
+  border-radius: 0.25rem 0.25rem 0 0;
+  background: var(--admin-accent);
+  color: #fff;
+  font-size: 0.6rem;
+  letter-spacing: 0.2em;
+  cursor: move;
+  touch-action: none;
+  z-index: 3;
 }
 
 .pub-editor-cell-empty {
@@ -6284,10 +6255,6 @@ ol.doc-list ol.doc-list ol.doc-list {
 
 .pub-editor-cell-item:hover .pub-editor-cell-remove {
   opacity: 1;
-}
-
-.pub-editor-cell-item.is-writing > :not(.pub-editor-cell-writing) {
-  visibility: hidden;
 }
 
 .pub-editor-cell-writing {
@@ -6442,6 +6409,30 @@ ol.doc-list ol.doc-list ol.doc-list {
   font-size: 0.75rem;
   color: var(--admin-muted);
   white-space: nowrap;
+}
+
+.pub-format-swatch {
+  width: 1.75rem;
+  height: 1.5rem;
+  padding: 0;
+  border: 1px solid var(--admin-border);
+  border-radius: 0.25rem;
+  background: none;
+}
+
+.pub-format-select,
+.pub-format-number {
+  height: 1.5rem;
+  padding: 0 0.35rem;
+  border: 1px solid var(--admin-border);
+  border-radius: 0.25rem;
+  background: var(--admin-bg);
+  color: var(--admin-text);
+  font-size: 0.75rem;
+}
+
+.pub-format-number {
+  width: 4rem;
 }
 
 .pub-format-check {

@@ -21,6 +21,7 @@ import {
 } from "@/components/builder/settings-fields";
 import {
   blockHtml,
+  CellBlockView,
   PublicationBlockView,
   PublicationTableView,
   publicationBlockStyle,
@@ -36,6 +37,8 @@ import type { AdminExit } from "@/lib/admin-exit";
 import type { BuilderSources } from "@/lib/builder-sources";
 import { protectedMediaUrl } from "@/lib/protected-media-url";
 import { plainTextToRichText, richTextToPlainText } from "@/lib/rich-text";
+import { formatColor, parseColor } from "@/lib/color";
+import type { StyleValues } from "@/lib/style-values";
 import {
   createPublicationBlock,
   createPublicationPage,
@@ -55,8 +58,11 @@ import {
   withColumnRemoved,
   withRowAdded,
   withRowRemoved,
+  withCellKind,
   TABLE_CELL_BLOCK_TYPES,
+  TABLE_CELL_BLOCK_LABELS,
   type PublicationTable,
+  type PublicationTableCell,
   emptyBackground,
   withGroupMembers,
   withLayoutBackground,
@@ -280,17 +286,26 @@ function StyleButton({ label, onOpen }: { label: string; onOpen: () => void }) {
  */
 function TableFormatBar({
   block,
+  range,
   cell,
   onChange,
-  onAddContent,
+  onKind,
+  onDress,
 }: {
   block: PublicationBlock;
-  cell: { row: number; column: number } | null;
+  /** How many cells the buttons act on, for labelling. */
+  range: number;
+  /** The cell whose kind and dressing are shown, if one is chosen. */
+  cell: PublicationTableCell | null;
   onChange: (change: (table: PublicationTable) => PublicationTable) => void;
-  onAddContent: (type: PublicationBlockType) => void;
+  onKind: (type: (typeof TABLE_CELL_BLOCK_TYPES)[number]) => void;
+  onDress: (patch: StyleValues) => void;
 }) {
   const table = block.table;
   if (!table) return null;
+
+  const style = cell?.style ?? {};
+  const padding = style.paddingTop ?? 0;
 
   return (
     <div className="pub-table-bar">
@@ -299,39 +314,36 @@ function TableFormatBar({
         <button
           type="button"
           className="btn btn-sm"
-          title="Add a row below the one selected"
-          onClick={() => onChange((current) => withRowAdded(current, cell?.row))}
+          title="Add a row below"
+          onClick={() => onChange((current) => withRowAdded(current))}
         >
           +
         </button>
         <button
           type="button"
           className="btn btn-sm"
-          disabled={!cell || table.rows.length <= 1}
-          title="Remove the selected row"
-          onClick={() => cell && onChange((current) => withRowRemoved(current, cell.row))}
+          disabled={table.rows.length <= 1}
+          title="Remove the chosen row"
+          onClick={() => onChange((current) => withRowRemoved(current, current.rows.length - 1))}
         >
           −
         </button>
-      </span>
-
-      <span className="pub-format-group">
         <span className="pub-format-label">Columns</span>
         <button
           type="button"
           className="btn btn-sm"
-          title="Add a column beside the one selected"
-          onClick={() => onChange((current) => withColumnAdded(current, cell?.column))}
+          title="Add a column"
+          onClick={() => onChange((current) => withColumnAdded(current))}
         >
           +
         </button>
         <button
           type="button"
           className="btn btn-sm"
-          disabled={!cell || table.columns.length <= 1}
-          title="Remove the selected column"
+          disabled={table.columns.length <= 1}
+          title="Remove the last column"
           onClick={() =>
-            cell && onChange((current) => withColumnRemoved(current, cell.column))
+            onChange((current) => withColumnRemoved(current, current.columns.length - 1))
           }
         >
           −
@@ -359,6 +371,8 @@ function TableFormatBar({
           />
           Header column
         </label>
+        {/* Banding is a colour, not a fixed grey: the tint that reads on a
+            white page disappears on a dark one. */}
         <label className="pub-format-check">
           <input
             type="checkbox"
@@ -369,26 +383,122 @@ function TableFormatBar({
           />
           Banded
         </label>
+        {table.bandedRows ? (
+          <input
+            type="color"
+            className="pub-format-swatch"
+            aria-label="Band colour"
+            title="Band colour"
+            value={parseColor(table.bandColor, "#94a3b8").hex}
+            onChange={(event) =>
+              onChange((current) => ({
+                ...current,
+                // Banding tints a row; an opaque band would hide the page.
+                bandColor: formatColor(event.target.value, 0.18),
+              }))
+            }
+          />
+        ) : null}
       </span>
 
-      {/* A cell holds anything a page can, so the bar offers all of it — this
-          is the difference between a table of words and a table. */}
+      {/* Everything from here acts on the cells that are chosen. */}
       <span className="pub-format-group">
         <span className="pub-format-label">
-          {cell ? `Add to R${cell.row + 1}C${cell.column + 1}` : "Choose a cell to fill it"}
+          {range > 1 ? `${range} cells` : "Cell"}
         </span>
-        {TABLE_CELL_BLOCK_TYPES.map((type) => (
-          <button
-            key={type}
-            type="button"
-            className="btn btn-sm"
-            disabled={!cell}
-            title={BLOCK_LABELS[type] ?? type}
-            onClick={() => onAddContent(type)}
-          >
-            <IconView name={BLOCK_ICONS[type] ?? "Square"} size={14} />
-          </button>
-        ))}
+
+        <select
+          className="pub-format-select"
+          aria-label="What the cell holds"
+          title="What the cell holds"
+          value={cell?.block.type ?? "richText"}
+          disabled={!cell}
+          onChange={(event) =>
+            onKind(event.target.value as (typeof TABLE_CELL_BLOCK_TYPES)[number])
+          }
+        >
+          {TABLE_CELL_BLOCK_TYPES.map((type) => (
+            <option key={type} value={type}>
+              {TABLE_CELL_BLOCK_LABELS[type]}
+            </option>
+          ))}
+        </select>
+
+        <input
+          type="color"
+          className="pub-format-swatch"
+          aria-label="Cell background"
+          title="Cell background"
+          disabled={!cell}
+          value={parseColor(style.backgroundColor, "#ffffff").hex}
+          onChange={(event) => onDress({ backgroundColor: event.target.value })}
+        />
+        <button
+          type="button"
+          className="btn btn-sm"
+          title="No background"
+          disabled={!cell}
+          onClick={() => onDress({ backgroundColor: undefined })}
+        >
+          <IconView name="Ban" size={14} />
+        </button>
+
+        <input
+          type="color"
+          className="pub-format-swatch"
+          aria-label="Cell border colour"
+          title="Cell border colour"
+          disabled={!cell}
+          value={parseColor(style.borderColor, "#94a3b8").hex}
+          onChange={(event) =>
+            onDress({
+              borderColor: event.target.value,
+              // Choosing a colour means wanting a line, so one is drawn.
+              borderStyle: style.borderStyle === "none" ? "solid" : style.borderStyle ?? "solid",
+              borderWidth: style.borderWidth || 0.0625,
+            })
+          }
+        />
+        <select
+          className="pub-format-select"
+          aria-label="Cell border"
+          title="Cell border"
+          disabled={!cell}
+          value={style.borderStyle ?? "none"}
+          onChange={(event) =>
+            onDress({
+              borderStyle: event.target.value as StyleValues["borderStyle"],
+              borderWidth: style.borderWidth || 0.0625,
+            })
+          }
+        >
+          <option value="none">No border</option>
+          <option value="solid">Solid</option>
+          <option value="dashed">Dashed</option>
+          <option value="dotted">Dotted</option>
+        </select>
+
+        <span className="pub-format-label">Padding</span>
+        <input
+          type="number"
+          className="pub-format-number"
+          aria-label="Cell padding in rem"
+          title="Cell padding, in rem"
+          min={0}
+          step={0.125}
+          disabled={!cell}
+          value={padding}
+          onChange={(event) => {
+            const next = Number(event.target.value);
+            if (!Number.isFinite(next)) return;
+            onDress({
+              paddingTop: next,
+              paddingRight: next,
+              paddingBottom: next,
+              paddingLeft: next,
+            });
+          }}
+        />
       </span>
     </div>
   );
@@ -1162,7 +1272,10 @@ export function PublicationEditor({
    * controls a block on the canvas gets — otherwise a picture in a table is a
    * picture nobody can change.
    */
-  const [cellItemId, setCellItemId] = useState<string | null>(null);
+  /** The far corner of a cell range; the near one is `cellAt`. */
+  const [cellFocus, setCellFocus] = useState<{ row: number; column: number } | null>(
+    null
+  );
   /*
    * Writing and cell choice both end when the selection leaves the block.
    *
@@ -1842,54 +1955,85 @@ export function PublicationEditor({
     return { block: selected, cell };
   })();
 
-  /** The cell the inspector is showing, and the block chosen inside it. */
-  const cellContext = (() => {
-    if (!tableSelection?.cell || !tableSelection.block.table) return null;
-    const at = tableSelection.cell;
-    const cell = tableSelection.block.table.cells[at.row]?.[at.column];
-    if (!cell) return null;
-    const item = cell.content.find((entry) => entry.id === cellItemId) ?? null;
-    return { blockId: tableSelection.block.id, at, cell, item };
+  /**
+   * The cells being worked on, as a rectangle.
+   *
+   * A rectangle rather than one cell, because dressing a table is almost never
+   * a one-cell job: a heading row, a column of figures, the whole grid. Two
+   * corners are held and every cell between them is chosen, which is how a
+   * spreadsheet has always done it.
+   */
+  const cellRange = (() => {
+    // `activeCell` is the guarded one: it is null unless the chosen cell
+    // belongs to the table that is selected now. Reading `cellAt` straight
+    // would let a cell chosen in one table address the grid of another.
+    if (!tableSelection?.block.table || !activeCell) return null;
+    const table = tableSelection.block.table;
+    // A focus left over from a taller table is clamped by the loops below.
+    const focus = cellFocus ?? activeCell;
+
+    const top = Math.min(activeCell.row, focus.row);
+    const bottom = Math.max(activeCell.row, focus.row);
+    const left = Math.min(activeCell.column, focus.column);
+    const right = Math.max(activeCell.column, focus.column);
+
+    const addresses: { row: number; column: number }[] = [];
+    for (let row = top; row <= bottom && row < table.rows.length; row++) {
+      for (let column = left; column <= right && column < table.columns.length; column++) {
+        addresses.push({ row, column });
+      }
+    }
+    if (addresses.length === 0) return null;
+
+    return { blockId: tableSelection.block.id, addresses, anchor: addresses[0] };
   })();
 
-  /** Rewrites one block inside a cell. */
-  function updateCellItem(patch: Partial<PublicationBlock>) {
-    if (!cellContext?.item) return;
-    const itemId = cellContext.item.id;
-    updateTable(cellContext.blockId, (table) =>
-      withCellChanged(table, cellContext.at, (cell) => ({
-        ...cell,
-        content: cell.content.map((entry) =>
-          entry.id === itemId ? { ...entry, ...patch } : entry
-        ),
-      }))
-    );
-  }
+  /** The one cell whose own content the inspector edits. */
+  const cellContext = (() => {
+    if (!cellRange || !tableSelection?.block.table) return null;
+    const at = cellRange.anchor;
+    const cell = tableSelection.block.table.cells[at.row]?.[at.column];
+    return cell ? { blockId: cellRange.blockId, at, cell } : null;
+  })();
 
-  /** Moves a block within its cell; the order it sits in is the layout. */
-  function moveCellItem(index: number, direction: -1 | 1) {
-    if (!cellContext) return;
-    const target = index + direction;
-
-    updateTable(cellContext.blockId, (table) =>
-      withCellChanged(table, cellContext.at, (cell) => {
-        if (target < 0 || target >= cell.content.length) return cell;
-        const content = [...cell.content];
-        [content[index], content[target]] = [content[target], content[index]];
-        return { ...cell, content };
-      })
-    );
-  }
-
-  function removeCellItem(itemId: string) {
+  /** Rewrites the block held by the cell the inspector is showing. */
+  function updateCellBlock(patch: Partial<PublicationBlock>) {
     if (!cellContext) return;
     updateTable(cellContext.blockId, (table) =>
       withCellChanged(table, cellContext.at, (cell) => ({
         ...cell,
-        content: cell.content.filter((entry) => entry.id !== itemId),
+        block: { ...cell.block, ...patch },
       }))
     );
-    if (cellItemId === itemId) setCellItemId(null);
+  }
+
+  /** Applies one change to every chosen cell. */
+  function updateChosenCells(
+    change: (cell: PublicationTableCell) => PublicationTableCell
+  ) {
+    if (!cellRange) return;
+    updateTable(cellRange.blockId, (table) =>
+      cellRange.addresses.reduce(
+        (current, at) => withCellChanged(current, at, change),
+        table
+      )
+    );
+  }
+
+  /** Changes what the chosen cells hold. Each cell holds exactly one thing. */
+  function setCellKind(type: (typeof TABLE_CELL_BLOCK_TYPES)[number]) {
+    updateChosenCells((cell) => withCellKind(cell, type));
+  }
+
+  /**
+   * Dresses the chosen cells.
+   *
+   * Merged into whatever each already wears rather than replacing it, so
+   * setting a background across a selection does not wipe the borders the
+   * cells were given separately.
+   */
+  function dressChosenCells(patch: StyleValues) {
+    updateChosenCells((cell) => ({ ...cell, style: { ...cell.style, ...patch } }));
   }
 
   /** Rewrites a table block's grid, keeping its box the size of the grid. */
@@ -1902,31 +2046,6 @@ export function PublicationEditor({
 
     const table = change(block.table);
     updateBlock(blockId, { table, ...tableSize(table) });
-  }
-
-  /** Puts a new block into a cell, at the end of whatever is already there. */
-  function addToCell(
-    blockId: string,
-    at: { row: number; column: number },
-    type: PublicationBlockType
-  ) {
-    const item = createPublicationBlock(type);
-    // Inside a cell a block is sized by the cell, not placed on the canvas, so
-    // it starts modest and fills the width it is given.
-    item.width = 240;
-    item.height = type === "richText" || type === "button" ? 40 : 120;
-    item.x = 0;
-    item.y = 0;
-    item.zIndex = 1;
-
-    updateTable(blockId, (table) =>
-      withCellChanged(table, at, (cell) => ({
-        ...cell,
-        content: [...cell.content, item],
-      }))
-    );
-    setSelectedIds([blockId]);
-    setCellAt({ blockId, ...at });
   }
 
   /**
@@ -2879,12 +2998,11 @@ export function PublicationEditor({
             {tableSelection ? (
               <TableFormatBar
                 block={tableSelection.block}
-                cell={tableSelection.cell}
+                range={cellRange?.addresses.length ?? 0}
+                cell={cellContext?.cell ?? null}
                 onChange={(change) => updateTable(tableSelection.block.id, change)}
-                onAddContent={(type) =>
-                  tableSelection.cell &&
-                  addToCell(tableSelection.block.id, tableSelection.cell, type)
-                }
+                onKind={setCellKind}
+                onDress={dressChosenCells}
               />
             ) : null}
             {!editingTextId && !tableSelection ? (
@@ -3103,113 +3221,72 @@ export function PublicationEditor({
                     sources={canvasSources}
                     renderCell={(cell, at) => {
                       const chosen =
-                        activeCell?.blockId === block.id &&
-                        activeCell.row === at.row &&
-                        activeCell.column === at.column;
+                        cellRange?.blockId === block.id &&
+                        cellRange.addresses.some(
+                          (entry) => entry.row === at.row && entry.column === at.column
+                        );
+                      const writingHere = editingTextId === cell.block.id;
 
                       return (
                         <div
-                          className={`pub-cell-stack pub-editor-cell${
-                            chosen ? " is-chosen" : ""
+                          className={`pub-editor-cell${chosen ? " is-chosen" : ""}${
+                            writingHere ? " is-writing" : ""
                           }`}
                           onPointerDown={(event) => {
-                            // The cell takes the press so the table does not
-                            // start dragging out from under the choice.
+                            /*
+                             * A press inside the table is a cell being chosen,
+                             * but only once the table itself is. The first
+                             * press selects the table and is left to reach the
+                             * block behind, so a table can be picked up and
+                             * moved in one gesture the way every other block
+                             * can; presses after that work on its cells.
+                             */
+                            if (!selectedIds.includes(block.id)) return;
                             event.stopPropagation();
-                            // A press in the words being written is the caret
-                            // being placed or a selection being dragged out.
-                            // Re-choosing the cell it is already in would
-                            // rebuild this subtree mid-gesture.
-                            if (chosen && editingTextId) return;
-                            setSelectedIds([block.id]);
+                            if (writingHere) return;
+
                             setStyleSlot(null);
+                            // Shift reaches from the cell already chosen to
+                            // this one, which is how a range is drawn.
+                            if (event.shiftKey && cellAt?.blockId === block.id) {
+                              setCellFocus(at);
+                              return;
+                            }
                             setCellAt({ blockId: block.id, ...at });
-                            // The press landed on the cell rather than on
-                            // anything in it, so nothing in it is chosen.
-                            setCellItemId(null);
+                            setCellFocus(null);
+                          }}
+                          onDoubleClick={(event) => {
+                            if (cell.block.type !== "richText" && cell.block.type !== "button") {
+                              return;
+                            }
+                            event.stopPropagation();
+                            if (writingHere) return;
+                            setSelectedIds([block.id]);
+                            setCellAt({ blockId: block.id, ...at });
+                            setCellFocus(null);
+                            setWriting({ ownerId: block.id, textId: cell.block.id });
                           }}
                         >
-                          {cell.content.map((item) => (
-                            <div
-                              key={item.id}
-                              className={`pub-editor-cell-item${
-                                editingTextId === item.id ? " is-writing" : ""
-                              }${cellItemId === item.id ? " is-chosen" : ""}`}
-                              /* One toolbar, so only one thing may be open in
-                                 it: writing in a cell is asked for the same way
-                                 writing in a block is. */
-                              /* Choosing it on the canvas is what puts its
-                                 controls in the inspector — a picture in a
-                                 cell is picked the way one on the page is. */
-                              onPointerDown={(event) => {
-                                event.stopPropagation();
-                                if (editingTextId === item.id) return;
-                                setSelectedIds([block.id]);
-                                setStyleSlot(null);
-                                setCellAt({ blockId: block.id, ...at });
-                                setCellItemId(item.id);
-                              }}
-                              onDoubleClick={(event) => {
-                                if (!WRITEABLE_BLOCKS.has(item.type)) return;
-                                event.stopPropagation();
-                                // Already writing: this is a word being
-                                // double-clicked to select it.
-                                if (editingTextId === item.id) return;
-                                setSelectedIds([block.id]);
-                                setCellAt({ blockId: block.id, ...at });
-                                setWriting({ ownerId: block.id, textId: item.id });
-                              }}
-                            >
-                              <PublicationBlockView
-                                block={item}
-                                sources={canvasSources}
-                                interactive={false}
-                              />
-                              <button
-                                type="button"
-                                className="pub-editor-cell-remove"
-                                title="Remove from this cell"
-                                onPointerDown={(event) => event.stopPropagation()}
-                                onClick={() =>
+                          <CellBlockView block={cell.block} sources={canvasSources} />
+
+                          {writingHere ? (
+                            <div className="pub-editor-cell-writing">
+                              <RichTextEditor
+                                value={blockHtml(cell.block)}
+                                autoFocus
+                                onChange={(html) =>
                                   updateTable(block.id, (table) =>
                                     withCellChanged(table, at, (entry) => ({
                                       ...entry,
-                                      content: entry.content.filter(
-                                        (other) => other.id !== item.id
-                                      ),
+                                      block: { ...entry.block, html },
                                     }))
                                   )
                                 }
-                              >
-                                ×
-                              </button>
-                              {editingTextId === item.id ? (
-                                <div className="pub-editor-cell-writing">
-                                  <RichTextEditor
-                                    value={blockHtml(item)}
-                                    autoFocus
-                                    onChange={(html) =>
-                                      updateTable(block.id, (table) =>
-                                        withCellChanged(table, at, (entry) => ({
-                                          ...entry,
-                                          content: entry.content.map((other) =>
-                                            other.id === item.id
-                                              ? { ...other, html }
-                                              : other
-                                          ),
-                                        }))
-                                      )
-                                    }
-                                    fonts={sources.fonts}
-                                    toolbarHost={formatBar}
-                                    bare
-                                  />
-                                </div>
-                              ) : null}
+                                fonts={sources.fonts}
+                                toolbarHost={formatBar}
+                                bare
+                              />
                             </div>
-                          ))}
-                          {cell.content.length === 0 ? (
-                            <span className="pub-editor-cell-empty">Empty</span>
                           ) : null}
                         </div>
                       );
@@ -3244,6 +3321,22 @@ export function PublicationEditor({
                     />
                   </div>
                 ) : null}
+                {/*
+                  A table selected for its cells still has to be movable.
+                  Once it is selected, presses inside it choose cells, so the
+                  grip is where the whole thing is picked up — a strip along
+                  its top edge, the way a table is dragged anywhere else.
+                */}
+                {!repeated && block.type === "table" && selectedIds.includes(block.id) ? (
+                  <span
+                    className="pub-table-grip"
+                    title="Drag to move the table"
+                    onPointerDown={(event) => startDrag(event, block, "move")}
+                  >
+                    ⠿
+                  </span>
+                ) : null}
+
                 {!repeated && selectedId === block.id ? (
                   <>
                     <span
@@ -3711,117 +3804,53 @@ export function PublicationEditor({
                   </div>
 
                   {cellContext ? (
-                    <div className="inspector-section">
-                      <h4 className="inspector-title">
-                        Cell R{cellContext.at.row + 1}C{cellContext.at.column + 1}
-                      </h4>
-                      <StyleButton
-                        label="This cell"
-                        onOpen={() => setStyleSlot("cell")}
-                      />
-
-                      {/* What is in the cell, in the order it is stacked. */}
-                      {cellContext.cell.content.length === 0 ? (
-                        <p className="help-text">
-                          Empty. Add something from the bar above the canvas.
-                        </p>
-                      ) : (
-                        <div className="cell-contents">
-                          {cellContext.cell.content.map((item, index) => (
-                            <div
-                              key={item.id}
-                              className={`cell-content-row${
-                                item.id === cellItemId ? " is-chosen" : ""
-                              }`}
-                            >
-                              <button
-                                type="button"
-                                className="cell-content-name"
-                                onClick={() =>
-                                  setCellItemId(item.id === cellItemId ? null : item.id)
-                                }
-                              >
-                                <IconView
-                                  name={BLOCK_ICONS[item.type] ?? "Square"}
-                                  size={14}
-                                />
-                                {BLOCK_LABELS[item.type] ?? item.type}
-                              </button>
-                              {/* Order is the layout here: a cell stacks what
-                                  it holds, so moving one up moves it up. */}
-                              <button
-                                type="button"
-                                className="btn btn-sm"
-                                title="Move up"
-                                disabled={index === 0}
-                                onClick={() => moveCellItem(index, -1)}
-                              >
-                                ↑
-                              </button>
-                              <button
-                                type="button"
-                                className="btn btn-sm"
-                                title="Move down"
-                                disabled={index === cellContext.cell.content.length - 1}
-                                onClick={() => moveCellItem(index, 1)}
-                              >
-                                ↓
-                              </button>
-                              <button
-                                type="button"
-                                className="btn btn-sm btn-danger"
-                                title="Remove from the cell"
-                                onClick={() => removeCellItem(item.id)}
-                              >
-                                ×
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="inspector-section">
-                      <p className="help-text" style={{ marginTop: 0 }}>
-                        Choose a cell on the canvas to fill or dress it.
-                      </p>
-                    </div>
-                  )}
-
-                  {/* The chosen block inside the cell, with the very controls
-                      it would get standing on the canvas. */}
-                  {cellContext?.item ? (
                     <>
                       <div className="inspector-section">
                         <h4 className="inspector-title">
-                          {BLOCK_LABELS[cellContext.item.type] ?? "Content"}
+                          Cell R{cellContext.at.row + 1}C{cellContext.at.column + 1}
+                          {cellRange && cellRange.addresses.length > 1
+                            ? ` — ${cellRange.addresses.length} chosen`
+                            : ""}
                         </h4>
-                        <div className="field-grid">
-                          <NumField
-                            label="Width"
-                            value={cellContext.item.width}
-                            onChange={(width) => updateCellItem({ width })}
-                          />
-                          <NumField
-                            label="Height"
-                            value={cellContext.item.height}
-                            onChange={(height) => updateCellItem({ height })}
-                          />
-                        </div>
-                        <p className="help-text" style={{ marginTop: 0 }}>
-                          A cell lays its contents out in order. Width is a
-                          maximum; words take the height they need.
-                        </p>
+                        <SelectField
+                          label="Holds"
+                          value={cellContext.cell.block.type}
+                          options={TABLE_CELL_BLOCK_TYPES.map((type) => ({
+                            value: type,
+                            label: TABLE_CELL_BLOCK_LABELS[type],
+                          }))}
+                          onChange={(type) =>
+                            setCellKind(type as (typeof TABLE_CELL_BLOCK_TYPES)[number])
+                          }
+                        />
+                        <StyleButton
+                          label={
+                            cellRange && cellRange.addresses.length > 1
+                              ? "These cells"
+                              : "This cell"
+                          }
+                          onOpen={() => setStyleSlot("cell")}
+                        />
                       </div>
+
+                      {/* The block the cell holds, with the very controls it
+                          would get standing on the canvas. */}
                       <BlockContentFields
-                        block={cellContext.item}
-                        update={updateCellItem}
+                        block={cellContext.cell.block}
+                        update={updateCellBlock}
                         sources={sources}
                         pages={pages}
                         setStyleSlot={setStyleSlot}
                       />
                     </>
-                  ) : null}
+                  ) : (
+                    <div className="inspector-section">
+                      <p className="help-text" style={{ marginTop: 0 }}>
+                        Choose a cell on the canvas to fill or dress it. Shift-click
+                        another to reach across a range.
+                      </p>
+                    </div>
+                  )}
                 </>
               ) : (
                 <BlockContentFields

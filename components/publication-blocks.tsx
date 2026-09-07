@@ -72,15 +72,15 @@ export function publicationBlockStyle(block: PublicationBlock): CSSProperties {
 }
 
 /**
- * One block inside a table cell.
+ * The one block a table cell holds.
  *
- * A cell is a box, so its content flows: the block's `x`, `y` and `zIndex` say
- * nothing here, and its `width` and `height` become a maximum rather than a
- * placement. Words take the height they need; a picture, an icon or a shape
- * takes the height it was given, so a row of logos stays a row of logos when
- * the column beside it grows.
+ * A cell is a box, so the block fills it rather than standing in it: its `x`,
+ * `y` and `zIndex` say nothing, and its stored height is a starting point that
+ * words are free to exceed. A picture or a shape keeps the height it was
+ * given, so a row of logos stays a row of logos when the column beside it
+ * grows.
  */
-function CellContentView({
+export function CellBlockView({
   block,
   sources,
 }: {
@@ -92,11 +92,7 @@ function CellContentView({
   return (
     <div
       className="pub-cell-item"
-      style={{
-        width: "100%",
-        maxWidth: `${block.width}px`,
-        height: flows ? "auto" : `${block.height}px`,
-      }}
+      style={{ width: "100%", height: flows ? "100%" : `${block.height}px` }}
     >
       <PublicationBlockView block={block} sources={sources} interactive={false} />
     </div>
@@ -152,8 +148,7 @@ export function PublicationTableView({
                   (table.headerRow && rowIndex === 0) ||
                   (table.headerColumn && columnIndex === 0);
                 const Cell = heading ? "th" : "td";
-                const banded =
-                  table.bandedRows && !heading && rowIndex % 2 === 1;
+                const banded = table.bandedRows && !heading && rowIndex % 2 === 1;
 
                 return (
                   <Cell
@@ -162,21 +157,18 @@ export function PublicationTableView({
                     style={{
                       ...cellCss,
                       ...(heading ? headerCss : undefined),
+                      // The band sits under the cell's own dressing, so a cell
+                      // given a colour of its own keeps it on a banded row.
+                      ...(banded && table.bandColor
+                        ? { backgroundColor: table.bandColor }
+                        : undefined),
                       ...(styleValuesToCss(cell.style) as CSSProperties),
                     }}
                   >
                     {renderCell ? (
                       renderCell(cell, { row: rowIndex, column: columnIndex })
                     ) : (
-                      <div className="pub-cell-stack">
-                        {cell.content.map((item) => (
-                          <CellContentView
-                            key={item.id}
-                            block={item}
-                            sources={sources}
-                          />
-                        ))}
-                      </div>
+                      <CellBlockView block={cell.block} sources={sources} />
                     )}
                   </Cell>
                 );
