@@ -413,6 +413,22 @@ export type PublicationRecord = {
  */
 const BLOCK_CLIPBOARD_KEY = "aperturePublicationBlocks";
 
+/** What an undo puts back. */
+type DocumentSnapshot = {
+  pages: PublicationPage[];
+  pageTemplates: PublicationPageTemplate[];
+};
+
+/**
+ * Changes closer together than this are one step.
+ *
+ * Long enough that a drag, a resize or a run of typing comes back in one
+ * press; short enough that two deliberate actions stay two.
+ */
+const HISTORY_COALESCE_MS = 500;
+/** Snapshots are whole pages, so the stack is bounded rather than endless. */
+const HISTORY_LIMIT = 60;
+
 export function PublicationEditor({
   publication,
   sources,
@@ -473,7 +489,7 @@ export function PublicationEditor({
   const [saveError, setSaveError] = useState("");
   const [slideshow, setSlideshow] = useState(publication.slideshow);
   const [audio, setAudio] = useState(publication.audio);
-  const [pages, setPages] = useState<PublicationPage[]>(
+  const [pages, setPagesState] = useState<PublicationPage[]>(
     publication.pages.length > 0 ? publication.pages : [createPublicationPage(0)]
   );
   /*
@@ -483,9 +499,135 @@ export function PublicationEditor({
    * changes underfoot.
    */
   const [repeatedBlocks] = [publication.repeatedBlocks];
-  const [pageTemplates, setPageTemplates] = useState<PublicationPageTemplate[]>(
+  const [pageTemplates, setPageTemplatesState] = useState<PublicationPageTemplate[]>(
     publication.pageTemplates
   );
+
+  /* ------------------------------------------------------------- History */
+
+  /**
+   * What an undo restores: the pages and the layouts, which between them are
+   * everything anybody draws.
+   *
+   * Deliberately not the publication's own settings — its title, its slug, its
+   * status. Those are typed into fields that undo themselves, and rolling one
+   * back because a block moved would be a surprise.
+   */
+  const undoStack = useRef<DocumentSnapshot[]>([]);
+  const redoStack = useRef<DocumentSnapshot[]>([]);
+  /** Only so the buttons can grey out; the stacks themselves live in refs. */
+  const [historyDepth, setHistoryDepth] = useState({ undo: 0, redo: 0 });
+
+  /**
+   * The document as it stands, for the history to take a copy of.
+   *
+   * Kept in a ref because `record` runs from event handlers that outlive the
+   * render which made them, and a stale copy would undo to the wrong place.
+   */
+  const documentRef = useRef<DocumentSnapshot>({ pages, pageTemplates });
+  useEffect(() => {
+    documentRef.current = { pages, pageTemplates };
+  }, [pages, pageTemplates]);
+
+  /**
+   * Whether a run of changes is still going.
+   *
+   * Set when one is recorded and cleared a moment after the last of them, so
+   * the window stretches for as long as changes keep arriving — a drag lasting
+   * five seconds is still one step. A timer rather than a clock reading:
+   * nothing here may depend on when it happened to be called.
+   */
+  const coalescing = useRef(false);
+  const coalesceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (coalesceTimer.current) clearTimeout(coalesceTimer.current);
+  }, []);
+
+  function syncHistoryDepth() {
+    setHistoryDepth((current) =>
+      current.undo === undoStack.current.length && current.redo === redoStack.current.length
+        ? current
+        : { undo: undoStack.current.length, redo: redoStack.current.length }
+    );
+  }
+
+  /**
+   * Remembers where the document stood, before it is changed.
+   *
+   * Changes arriving in quick succession are one step, not many. A block
+   * dragged across the page writes a new position every frame, and a hundred
+   * undos to cross it back is not an undo anybody wants — so a run of changes
+   * keeps the snapshot taken before the run started, and the whole gesture
+   * comes back in one press.
+   */
+  function record() {
+    // Anything done after an undo is a new branch: what was undone is gone.
+    redoStack.current = [];
+
+    // Only the first change of a run is remembered; the rest join it.
+    if (!coalescing.current) {
+      undoStack.current = [
+        ...undoStack.current.slice(-(HISTORY_LIMIT - 1)),
+        documentRef.current,
+      ];
+    }
+
+    coalescing.current = true;
+    if (coalesceTimer.current) clearTimeout(coalesceTimer.current);
+    coalesceTimer.current = setTimeout(() => {
+      coalescing.current = false;
+    }, HISTORY_COALESCE_MS);
+
+    syncHistoryDepth();
+  }
+
+  function applySnapshot(snapshot: DocumentSnapshot) {
+    documentRef.current = snapshot;
+    setPagesState(snapshot.pages);
+    setPageTemplatesState(snapshot.pageTemplates);
+    // Undoing the page something was added to can leave the open page beyond
+    // the end of the list, and `pages[pageIndex]` has to stay a page.
+    setPageIndex((current) => Math.min(current, Math.max(0, snapshot.pages.length - 1)));
+    // A restored document is a fresh starting point: the next edit records
+    // rather than being folded into the run that led here.
+    coalescing.current = false;
+    if (coalesceTimer.current) clearTimeout(coalesceTimer.current);
+  }
+
+  function undo() {
+    const previous = undoStack.current.pop();
+    if (!previous) return;
+    redoStack.current = [...redoStack.current, documentRef.current];
+    applySnapshot(previous);
+    syncHistoryDepth();
+  }
+
+  function redo() {
+    const next = redoStack.current.pop();
+    if (!next) return;
+    undoStack.current = [...undoStack.current, documentRef.current];
+    applySnapshot(next);
+    syncHistoryDepth();
+  }
+
+  /**
+   * The pages and the layouts, changed through the history.
+   *
+   * Every route that edits the document goes through these two, so recording
+   * here is recording everywhere — no command has to remember to.
+   */
+  function setPages(update: (current: PublicationPage[]) => PublicationPage[]) {
+    record();
+    setPagesState(update);
+  }
+
+  function setPageTemplates(
+    update: (current: PublicationPageTemplate[]) => PublicationPageTemplate[]
+  ) {
+    record();
+    setPageTemplatesState(update);
+  }
   /**
    * Which layout the left column is editing, or null for the pages list. An
    * empty string means the Layouts tab is open with nothing chosen yet.
@@ -724,17 +866,20 @@ export function PublicationEditor({
   const editingTextId =
     writing && writing.ownerId === selectedId ? writing.textId : null;
   const activeCell = cellAt && cellAt.blockId === selectedId ? cellAt : null;
-  /*
-   * Writing ends when the selection leaves the block.
-   *
-   * Every route out — clicking the canvas, choosing another block, deleting
-   * this one, changing page — moves the selection, so this is the one place
-   * that has to let go rather than each of them remembering to.
-   */
 
   const spaceDown = useRef(false);
   useEffect(() => {
     const down = (event: KeyboardEvent) => {
+      // Space in a field or in the words being written is a space, not a
+      // request to pan the canvas.
+      const target = event.target as HTMLElement | null;
+      if (
+        target?.closest(
+          "input, textarea, select, [contenteditable=''], [contenteditable='true']"
+        )
+      ) {
+        return;
+      }
       if (event.code === "Space") spaceDown.current = true;
     };
     const up = (event: KeyboardEvent) => {
@@ -842,14 +987,16 @@ export function PublicationEditor({
     window.addEventListener("pointerup", onUp);
   }
 
-  const updatePage = useCallback(
-    (index: number, patch: Partial<PublicationPage>) => {
-      setPages((current) =>
-        current.map((item, itemIndex) => (itemIndex === index ? { ...item, ...patch } : item))
-      );
-    },
-    []
-  );
+  /*
+   * Not memoized: it now records to the history before it writes, and the
+   * history is rebuilt with the component. It is only ever called from event
+   * handlers, so its identity changing between renders costs nothing.
+   */
+  function updatePage(index: number, patch: Partial<PublicationPage>) {
+    setPages((current) =>
+      current.map((item, itemIndex) => (itemIndex === index ? { ...item, ...patch } : item))
+    );
+  }
 
   function setActiveBlocks(blocks: PublicationBlock[]) {
     if (editingTemplate) {
@@ -1248,6 +1395,29 @@ export function PublicationEditor({
       }
 
       const command = event.ctrlKey || event.metaKey;
+
+      /*
+       * Undo and redo, for the canvas.
+       *
+       * Only reached when the caret is not in a text editor — the guard above
+       * returns early for those — so Quill keeps its own undo for the words
+       * being written, and this one puts back blocks, pages and layouts.
+       */
+      if (command && !event.shiftKey && event.key.toLowerCase() === "z") {
+        event.preventDefault();
+        undo();
+        return;
+      }
+
+      if (
+        command &&
+        ((event.shiftKey && event.key.toLowerCase() === "z") ||
+          (!event.shiftKey && event.key.toLowerCase() === "y"))
+      ) {
+        event.preventDefault();
+        redo();
+        return;
+      }
 
       // Shift makes it the look rather than the block: the same two letters,
       // one modifier apart, because they are the same two intentions.
@@ -1737,6 +1907,27 @@ export function PublicationEditor({
         ) : null}
 
         <div className="spacer" />
+
+        <div className="pub-history">
+          <button
+            type="button"
+            className="btn btn-sm"
+            title="Undo (Ctrl+Z)"
+            disabled={historyDepth.undo === 0}
+            onClick={undo}
+          >
+            <IconView name="Undo2" size={15} />
+          </button>
+          <button
+            type="button"
+            className="btn btn-sm"
+            title="Redo (Ctrl+Shift+Z)"
+            disabled={historyDepth.redo === 0}
+            onClick={redo}
+          >
+            <IconView name="Redo2" size={15} />
+          </button>
+        </div>
 
         {/* Zoom. The canvas is one scaled surface, so every block on it grows
             and shrinks together. */}
@@ -2471,11 +2662,26 @@ export function PublicationEditor({
                   pointerEvents: repeated ? "none" : "auto",
                 }}
                 onPointerDown={
-                  // A block being written in belongs to the caret, not to the
-                  // drag: pressing inside the words has to place the cursor.
-                  repeated || editingTextId === block.id
+                  repeated
                     ? undefined
-                    : (event) => startDrag(event, block, "move")
+                    : (event) => {
+                        /*
+                         * A block being written in belongs to the caret.
+                         *
+                         * The press is stopped here rather than left alone:
+                         * the workspace behind treats a press as "nothing is
+                         * selected any more, start panning", which would drop
+                         * the selection the editor is derived from and drag
+                         * the canvas out from under a selection gesture. The
+                         * event still reaches Quill, which is below this and
+                         * sees it on the way down.
+                         */
+                        if (editingTextId === block.id) {
+                          event.stopPropagation();
+                          return;
+                        }
+                        startDrag(event, block, "move");
+                      }
                 }
                 onContextMenu={
                   repeated
@@ -2511,6 +2717,9 @@ export function PublicationEditor({
                     ? undefined
                     : (event) => {
                         event.stopPropagation();
+                        // Double-clicking inside words already being written
+                        // is how a word is selected, not a fresh instruction.
+                        if (editingTextId === block.id) return;
                         if (block.groupId && block.groupId !== openGroupId) {
                           setOpenGroupId(block.groupId);
                           setSelectedIds([block.id]);
@@ -2547,6 +2756,11 @@ export function PublicationEditor({
                             // The cell takes the press so the table does not
                             // start dragging out from under the choice.
                             event.stopPropagation();
+                            // A press in the words being written is the caret
+                            // being placed or a selection being dragged out.
+                            // Re-choosing the cell it is already in would
+                            // rebuild this subtree mid-gesture.
+                            if (chosen && editingTextId) return;
                             setSelectedIds([block.id]);
                             setStyleSlot(null);
                             setCellAt({ blockId: block.id, ...at });
@@ -2564,6 +2778,9 @@ export function PublicationEditor({
                               onDoubleClick={(event) => {
                                 if (!WRITEABLE_BLOCKS.has(item.type)) return;
                                 event.stopPropagation();
+                                // Already writing: this is a word being
+                                // double-clicked to select it.
+                                if (editingTextId === item.id) return;
                                 setSelectedIds([block.id]);
                                 setCellAt({ blockId: block.id, ...at });
                                 setWriting({ ownerId: block.id, textId: item.id });

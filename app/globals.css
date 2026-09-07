@@ -6230,6 +6230,11 @@ ol.doc-list ol.doc-list ol.doc-list {
   z-index: 2;
 }
 
+.pub-history {
+  display: flex;
+  gap: 0.25rem;
+}
+
 .pub-table-bar {
   display: flex;
   align-items: center;
@@ -6281,7 +6286,8 @@ ol.doc-list ol.doc-list ol.doc-list {
   background: none;
 }
 
-.pub-editor-writing .ql-editor {
+.pub-editor-writing .ql-editor,
+.pub-editor-cell-writing .ql-editor {
   min-height: 0;
   height: 100%;
   padding: 0;
@@ -6289,6 +6295,24 @@ ol.doc-list ol.doc-list ol.doc-list {
      in; a focus ring would sit over the design being judged. */
   outline: 1px dashed var(--admin-accent);
   outline-offset: 2px;
+}
+
+/*
+ * The writing area is text, and behaves like text.
+ *
+ * The workspace around it turns both of these off so that dragging pans the
+ * canvas rather than selecting the page furniture. Inside the words that is
+ * exactly backwards: dragging across them is how a sentence is selected, so
+ * the writing area asks for them back.
+ */
+.pub-editor-writing,
+.pub-editor-writing .ql-editor,
+.pub-editor-cell-writing,
+.pub-editor-cell-writing .ql-editor {
+  user-select: text;
+  -webkit-user-select: text;
+  touch-action: auto;
+  cursor: text;
 }
 
 /* The box around a selection of several. Transparent to the pointer so a press
