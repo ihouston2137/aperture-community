@@ -970,6 +970,44 @@ input, select, textarea {
   z-index: 5;
 }
 
+/*
+ * And their icons keep dark ink.
+ *
+ * The toolbar's own icons are drawn in the admin's light text colour so they
+ * read on a dark bar. The panel that opens out of it is white, and the same
+ * light ink on it is invisible — which is what made the alignment choices
+ * impossible to see. Inside the panel, the ink goes back to dark.
+ */
+.rte-toolbar .ql-snow .ql-picker-options .ql-stroke,
+.rte-toolbar .ql-snow .ql-picker-options .ql-stroke-miter {
+  stroke: var(--content-text);
+}
+
+.rte-toolbar .ql-snow .ql-picker-options .ql-fill,
+.rte-toolbar .ql-snow .ql-picker-options .ql-stroke.ql-fill {
+  fill: var(--content-text);
+}
+
+.rte-toolbar .ql-snow .ql-picker-options .ql-picker-item {
+  padding: 0.2rem 0.35rem;
+  border-radius: 0.2rem;
+}
+
+.rte-toolbar .ql-snow .ql-picker-options .ql-picker-item:hover,
+.rte-toolbar .ql-snow .ql-picker-options .ql-picker-item.ql-selected {
+  background: color-mix(in srgb, var(--admin-accent) 18%, transparent);
+}
+
+.rte-toolbar .ql-snow .ql-picker-options .ql-picker-item:hover .ql-stroke,
+.rte-toolbar .ql-snow .ql-picker-options .ql-picker-item.ql-selected .ql-stroke {
+  stroke: var(--admin-accent);
+}
+
+.rte-toolbar .ql-snow .ql-picker-options .ql-picker-item:hover .ql-fill,
+.rte-toolbar .ql-snow .ql-picker-options .ql-picker-item.ql-selected .ql-fill {
+  fill: var(--admin-accent);
+}
+
 .rich-text-editor .ql-container.ql-snow {
   border-color: var(--admin-border);
   border-radius: 0 0 var(--radius) var(--radius);
@@ -6558,6 +6596,56 @@ ol.doc-list ol.doc-list ol.doc-list {
      in; a focus ring would sit over the design being judged. */
   outline: 1px dashed var(--admin-accent);
   outline-offset: 2px;
+}
+
+/*
+ * The writing surface is dressed exactly as the words it stands in for.
+ *
+ * Quill brings its own paragraph spacing and a line-height of 1.42, and the
+ * block brings `.rich-text`. With only Quill's, the text sat higher the moment
+ * it was clicked into and dropped back when it was let go, so what was being
+ * judged while typing was not what would be published. The class is put on the
+ * writing surface itself and these win over Quill by being more specific.
+ */
+.ql-editor.rich-text {
+  line-height: inherit;
+  white-space: normal;
+}
+
+.ql-editor.rich-text p {
+  margin: 0 0 var(--rich-text-paragraph-space, 1em);
+  padding: 0;
+}
+
+.ql-editor.rich-text > :first-child {
+  margin-top: 0;
+}
+
+.ql-editor.rich-text > :last-child {
+  margin-bottom: 0;
+}
+
+.ql-editor.rich-text h1 { font-size: 2rem; }
+.ql-editor.rich-text h2 { font-size: 1.625rem; }
+.ql-editor.rich-text h3 { font-size: 1.375rem; }
+.ql-editor.rich-text h4 { font-size: 1.125rem; }
+
+.ql-editor.rich-text ul,
+.ql-editor.rich-text ol {
+  margin: 0 0 1em;
+  padding-left: 1.5rem;
+  list-style: revert;
+}
+
+.ql-editor.rich-text li {
+  margin-bottom: 0.35em;
+  padding-left: 0;
+  list-style-type: revert;
+}
+
+/* Quill hangs its own bullet off a pseudo-element; the list marker is back. */
+.ql-editor.rich-text li > .ql-ui {
+  display: none;
 }
 
 /*

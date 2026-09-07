@@ -73,6 +73,61 @@ const TOOLBAR_HTML = `
   </span>
 `;
 
+/**
+ * Font family and size ship as inline styles with the whitelist removed, so any
+ * design-library font and any rem value can be applied. Quill's defaults are
+ * class attributors with fixed whitelists, which silently drop anything else.
+ *
+ * Registration is on the Quill class, so doing it once is doing it everywhere —
+ * but it is cheap and idempotent, and the headless helper below may run before
+ * any editor has been built.
+ */
+function registerStyleAttributors(QuillCtor: unknown) {
+  const registry = QuillCtor as {
+    import: (path: string) => { whitelist: string[] | null };
+    register: (target: unknown, overwrite: boolean) => void;
+  };
+  const fontStyle = registry.import("attributors/style/font");
+  fontStyle.whitelist = null;
+  registry.register(fontStyle, true);
+  const sizeStyle = registry.import("attributors/style/size");
+  sizeStyle.whitelist = null;
+  registry.register(sizeStyle, true);
+}
+
+/**
+ * The same formatting, applied to a whole piece of html that is not on screen.
+ *
+ * For the other cells of a selection. The toolbar drives one editor — the cell
+ * the choice was started at — and pressing bold with six cells chosen has to
+ * bold all six. Rather than reimplementing what each format means as a string
+ * transform, the html is put through a Quill of its own, formatted end to end,
+ * and read back: whatever the toolbar means, this means the same.
+ */
+export async function applyAttributesToHtml(
+  html: string,
+  attributes: Record<string, unknown>
+): Promise<string> {
+  const { default: QuillCtor } = await import("quill");
+  registerStyleAttributors(QuillCtor);
+
+  // Detached: it is never seen, and nothing may reach it.
+  const host = document.createElement("div");
+  const quill = new QuillCtor(host);
+
+  quill.setContents(quill.clipboard.convert({ html: html || "" }), "silent");
+  quill.formatText(
+    0,
+    quill.getLength(),
+    attributes as Record<string, unknown>,
+    "silent"
+  );
+
+  const out = normalizeRichTextSpaces(quill.getSemanticHTML());
+  host.remove();
+  return out;
+}
+
 /** Reads a Quill `size` format back to a rem number, tolerating legacy px. */
 function parseSize(value: unknown): number | null {
   if (typeof value !== "string") return null;
@@ -234,6 +289,8 @@ export function RichTextEditor({
   bare = false,
   autoFocus = false,
   formatWholeWhenBlurred = false,
+  contentClass,
+  onFormat,
   onBlur,
 }: {
   value: string;
@@ -267,6 +324,22 @@ export function RichTextEditor({
    * Once there is a caret, the selection wins as it always does.
    */
   formatWholeWhenBlurred?: boolean;
+  /**
+   * Put on the writing surface itself.
+   *
+   * So that the words being typed are dressed exactly as the words being
+   * replaced: the same paragraph spacing, the same headings, the same lists.
+   * Without it Quill's own defaults apply and the text shifts the moment it is
+   * clicked into.
+   */
+  contentClass?: string;
+  /**
+   * A format was applied to these words, and to what.
+   *
+   * So a caller holding several pieces of text — the cells of a table — can
+   * apply the same thing to the rest of them.
+   */
+  onFormat?: (attributes: Record<string, unknown>) => void;
   onBlur?: () => void;
 }) {
   const toolbarHost = useRef<HTMLDivElement>(null);
@@ -284,7 +357,8 @@ export function RichTextEditor({
     placeholderRef.current = placeholder;
     onBlurRef.current = onBlur;
     wholeRef.current = formatWholeWhenBlurred;
-  }, [onChange, placeholder, onBlur, formatWholeWhenBlurred]);
+    onFormatRef.current = onFormat;
+  }, [onChange, placeholder, onBlur, formatWholeWhenBlurred, onFormat]);
   /** The last HTML this editor produced, so its own value coming back is a no-op. */
   const emittedRef = useRef(value);
   const initialValueRef = useRef(value);
@@ -312,6 +386,8 @@ export function RichTextEditor({
    */
   const savedRange = useRef<{ index: number; length: number } | null>(null);
   const wholeRef = useRef(formatWholeWhenBlurred);
+  const contentClassRef = useRef(contentClass);
+  const onFormatRef = useRef(onFormat);
 
   /*
    * Whether the toolbar has somewhere to be.
@@ -335,20 +411,7 @@ export function RichTextEditor({
       const { default: QuillCtor } = await import("quill");
       if (cancelled || !toolbarHost.current || !editorHost.current) return;
 
-      // Font family and size ship as inline styles with the whitelist removed,
-      // so the toolbar can apply any design-library font and any rem value.
-      // Quill's defaults are class attributors with fixed whitelists, which
-      // silently drop anything else.
-      const registry = QuillCtor as unknown as {
-        import: (path: string) => { whitelist: string[] | null };
-        register: (target: unknown, overwrite: boolean) => void;
-      };
-      const fontStyle = registry.import("attributors/style/font");
-      fontStyle.whitelist = null;
-      registry.register(fontStyle, true);
-      const sizeStyle = registry.import("attributors/style/size");
-      sizeStyle.whitelist = null;
-      registry.register(sizeStyle, true);
+      registerStyleAttributors(QuillCtor);
 
       /*
        * One toolbar in the host, always.
@@ -377,10 +440,32 @@ export function RichTextEditor({
         modules: { toolbar: { container: toolbarEl } },
       });
 
+      if (contentClassRef.current) {
+        quill.root.classList.add(...contentClassRef.current.split(/\s+/).filter(Boolean));
+      }
+
       quill.setContents(
         quill.clipboard.convert({ html: initialValueRef.current || "" }),
         "silent"
       );
+
+      quill.on("text-change", (delta, _old, source) => {
+        /*
+         * A change that only formats, and the formats it applied.
+         *
+         * A delta of nothing but `retain` ops has inserted and deleted
+         * nothing — it is the toolbar acting on what is already there. The
+         * attributes on those ops are exactly what was pressed, which is what
+         * the other chosen cells need to be told.
+         */
+        if (source === "user" && onFormatRef.current) {
+          const ops = delta.ops ?? [];
+          const formatting =
+            ops.length > 0 && ops.every((op) => typeof op.retain === "number");
+          const attributes = ops.find((op) => op.attributes)?.attributes;
+          if (formatting && attributes) onFormatRef.current({ ...attributes });
+        }
+      });
 
       quill.on("text-change", () => {
         // Quill turns every space into `&nbsp;` on the way out, which stops the

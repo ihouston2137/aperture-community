@@ -21,6 +21,7 @@ import {
 } from "@/components/builder/settings-fields";
 import {
   blockHtml,
+  blockTextProps,
   CellBlockView,
   PublicationBlockView,
   PublicationTableView,
@@ -29,7 +30,10 @@ import {
 } from "@/components/publication-blocks";
 import { PublicationExport } from "@/components/publication-export";
 import { PublicationViewer } from "@/components/publication-viewer";
-import { RichTextEditor } from "@/components/rich-text-editor";
+import {
+  applyAttributesToHtml,
+  RichTextEditor,
+} from "@/components/rich-text-editor";
 import { InlineStyleEditor } from "@/components/style-editor";
 import { IconView } from "@/components/icons";
 import { IconSearchField } from "@/components/icon-search";
@@ -1214,13 +1218,33 @@ export function PublicationEditor({
   }
 
   function setActiveBlocks(blocks: PublicationBlock[]) {
+    updateBlocks(() => blocks);
+  }
+
+  /**
+   * Changes the blocks from whatever they are *now*.
+   *
+   * The value form above reads the blocks as they were when this render ran,
+   * which is right for anything that happens in one go. It is wrong for
+   * anything that pauses: a change applied after an `await` would be built on
+   * blocks from before it and would quietly undo whatever landed in between.
+   */
+  function updateBlocks(
+    change: (blocks: PublicationBlock[]) => PublicationBlock[]
+  ) {
     if (editingTemplate) {
       setPageTemplates((current) =>
-        current.map((item) => (item.id === editingTemplate.id ? { ...item, blocks } : item))
+        current.map((item) =>
+          item.id === editingTemplate.id ? { ...item, blocks: change(item.blocks) } : item
+        )
       );
       return;
     }
-    updatePage(pageIndex, { blocks });
+    setPages((current) =>
+      current.map((item, index) =>
+        index === pageIndex ? { ...item, blocks: change(item.blocks) } : item
+      )
+    );
   }
 
   /**
@@ -1811,9 +1835,17 @@ export function PublicationEditor({
   const cellText =
     cellContext && isWriteable(cellContext.cell.block.type) ? cellContext.cell : null;
   const insideCellText = insideCell && Boolean(cellText);
-  /** The block inside a cell whose own settings the right column shows. */
+  /**
+   * The block inside a cell whose own settings the right column shows.
+   *
+   * Having words and having nothing else are different things. A shape, an
+   * uploaded outline and a button all carry words *and* a drawing to set up,
+   * and treating "can be written in" as "is only words" left all three with a
+   * caret and no way to reach the shape at all. Only plain text has nothing
+   * beyond its words.
+   */
   const cellContent =
-    insideCell && cellContext && !isWriteable(cellContext.cell.block.type)
+    insideCell && cellContext && cellContext.cell.block.type !== "richText"
       ? cellContext.cell.block
       : null;
   /** Rewrites the block held by the cell the inspector is showing. */
@@ -1890,6 +1922,49 @@ export function PublicationEditor({
     );
   }
 
+  /**
+   * Spreads a formatting change across the rest of the chosen cells.
+   *
+   * The toolbar drives one editor — the cell the choice was started at — so
+   * pressing bold with six cells chosen would otherwise bold one. The other
+   * five are formatted end to end with the same attributes, through a Quill of
+   * their own, so whatever the toolbar meant they mean the same.
+   */
+  async function spreadCellFormat(attributes: Record<string, unknown>) {
+    if (!cellRange || !cellContext || cellRange.addresses.length < 2) return;
+
+    const blockId = cellRange.blockId;
+    const table = activeBlocks.find((entry) => entry.id === blockId)?.table;
+    if (!table) return;
+
+    const others = cellRange.addresses.filter(
+      (at) => at.row !== cellContext.at.row || at.column !== cellContext.at.column
+    );
+
+    // Read the words first, then format them: the blocks are replaced on every
+    // edit, and a cell read after the await would be a cell from before it.
+    const formatted = await Promise.all(
+      others.map(async (at) => ({
+        at,
+        html: await applyAttributesToHtml(
+          blockHtml(table.cells[at.row][at.column].block),
+          attributes
+        ),
+      }))
+    );
+
+    updateTable(blockId, (current) =>
+      formatted.reduce(
+        (next, { at, html }) =>
+          withCellChanged(next, at, (cell) => ({
+            ...cell,
+            block: { ...cell.block, html },
+          })),
+        current
+      )
+    );
+  }
+
   /** Changes what the chosen cells hold. Each cell holds exactly one thing. */
   function setCellKind(type: (typeof TABLE_CELL_BLOCK_TYPES)[number]) {
     updateChosenCells((cell) => withCellKind(cell, type));
@@ -1914,18 +1989,25 @@ export function PublicationEditor({
     blockId: string,
     change: (table: PublicationTable) => PublicationTable
   ) {
-    const block = activeBlocks.find((entry) => entry.id === blockId);
-    if (!block?.table) return;
+    // Read at the moment it is applied, not at the moment it was asked for:
+    // formatting several cells at once resumes after an await, and the words
+    // typed into the first of them must still be there.
+    updateBlocks((blocks) =>
+      blocks.map((block) => {
+        if (block.id !== blockId || !block.table) return block;
 
-    const table = change(block.table);
-    const size = tableSize(table);
-    // The height is a floor here too: a table already grown to fit its words
-    // must not shrink back just because a colour was changed.
-    updateBlock(blockId, {
-      table,
-      width: size.width,
-      height: Math.max(size.height, block.height),
-    });
+        const table = change(block.table);
+        const size = tableSize(table);
+        return {
+          ...block,
+          table,
+          width: size.width,
+          // The height is a floor here too: a table already grown to fit its
+          // words must not shrink back because a colour was changed.
+          height: Math.max(size.height, block.height),
+        };
+      })
+    );
   }
 
   /**
@@ -3202,7 +3284,9 @@ export function PublicationEditor({
                                 key={cell.block.id}
                                 value={blockHtml(cell.block)}
                                 autoFocus={insideCellText}
+                                contentClass="rich-text"
                                 formatWholeWhenBlurred
+                                onFormat={(attributes) => void spreadCellFormat(attributes)}
                                 onChange={(html) =>
                                   updateTable(block.id, (table) =>
                                     withCellChanged(table, at, (entry) => ({
@@ -3245,13 +3329,19 @@ export function PublicationEditor({
                   hidden for as long as the editor is standing in for it.
                 */}
                 {!repeated && editingTextId === block.id ? (
-                  <div className="pub-editor-writing">
+                  <div
+                    className={`pub-editor-writing ${
+                      blockTextProps(block).className
+                    }`.trim()}
+                    style={blockTextProps(block).style}
+                  >
                     <RichTextEditor
                       key={block.id}
                       value={blockHtml(block)}
                       onChange={(html) => updateBlock(block.id, { html })}
                       fonts={sources.fonts}
                       toolbarHost={formatBar}
+                      contentClass="rich-text"
                       bare
                       autoFocus
                     />

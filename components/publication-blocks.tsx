@@ -60,6 +60,31 @@ export function blockHtml(block: PublicationBlock): string {
   return plain ? plainTextToRichText(plain) : "";
 }
 
+/**
+ * How a block's words are dressed: its named style, or its own.
+ *
+ * Shared because the in-place editor has to wear exactly the same thing. It
+ * stands over the block while somebody types, and if it does not carry the
+ * block's size, colour and spacing then the words move the moment they are
+ * clicked and move back when they are let go — so what is being judged while
+ * editing is not what will be published.
+ *
+ * A shadow here follows what is drawn, not the block's box: a publication block
+ * is a rectangle on a canvas holding a word, an icon or a picture, and the
+ * rectangle is a place rather than a thing. `drop` follows the letters of a
+ * heading and the outline of a cut-out image, and still follows the box where
+ * the block carries a background or a border, which is the only case where the
+ * box is a thing.
+ */
+export function blockTextProps(block: PublicationBlock): {
+  className: string;
+  style: CSSProperties | undefined;
+} {
+  return block.styleSlug
+    ? { className: customStyleClassName(block.styleSlug), style: undefined }
+    : { className: "", style: styleValuesToCss(block.textStyle, "drop") };
+}
+
 /** Absolute placement in canvas units — the stage handles scaling. */
 export function publicationBlockStyle(block: PublicationBlock): CSSProperties {
   return {
@@ -286,19 +311,7 @@ export function PublicationBlockView({
   interactive?: boolean;
   onNavigate?: (pageId: string) => void;
 }) {
-  /*
-   * A shadow here follows what is drawn, not the block's box.
-   *
-   * A publication block is a rectangle on a canvas holding a word, an icon or
-   * a picture, and the rectangle is a place rather than a thing — a shadow of
-   * it is a shadow of nothing anybody put there. `drop` follows the letters of
-   * a heading and the outline of a cut-out image, and still follows the box
-   * where the block carries a background or a border, which is the only case
-   * where the box is a thing.
-   */
-  const textProps = block.styleSlug
-    ? { className: customStyleClassName(block.styleSlug), style: undefined }
-    : { className: "", style: styleValuesToCss(block.textStyle, "drop") };
+  const textProps = blockTextProps(block);
 
   // Blocks may carry only a media id (older documents) or an explicit url.
   const mediaUrl =
