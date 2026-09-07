@@ -59,6 +59,9 @@ import {
   withRowAdded,
   withRowRemoved,
   withCellKind,
+  withColumnWidth,
+  withRowHeight,
+  MIN_TABLE_CELL,
   TABLE_CELL_BLOCK_TYPES,
   TABLE_CELL_BLOCK_LABELS,
   type PublicationTable,
@@ -287,19 +290,31 @@ function StyleButton({ label, onOpen }: { label: string; onOpen: () => void }) {
 function TableFormatBar({
   block,
   range,
+  rows,
+  columns,
   cell,
   onChange,
   onKind,
   onDress,
+  onSize,
 }: {
   block: PublicationBlock;
   /** How many cells the buttons act on, for labelling. */
   range: number;
+  /** The rows and columns those cells sit in, which sizing acts on. */
+  rows: number[];
+  columns: number[];
   /** The cell whose kind and dressing are shown, if one is chosen. */
   cell: PublicationTableCell | null;
   onChange: (change: (table: PublicationTable) => PublicationTable) => void;
   onKind: (type: (typeof TABLE_CELL_BLOCK_TYPES)[number]) => void;
   onDress: (patch: StyleValues) => void;
+  onSize: (change: {
+    rows?: number[];
+    columns?: number[];
+    height?: number;
+    width?: number;
+  }) => void;
 }) {
   const table = block.table;
   if (!table) return null;
@@ -477,6 +492,44 @@ function TableFormatBar({
           <option value="dashed">Dashed</option>
           <option value="dotted">Dotted</option>
         </select>
+
+        {/* Size follows the selection too: choose a row of cells and the
+            height applies to that row, a column and the width to that one. */}
+        <span className="pub-format-label">
+          {rows.length > 1 ? `H×${rows.length}` : "Height"}
+        </span>
+        <input
+          type="number"
+          className="pub-format-number"
+          aria-label="Row height in canvas units"
+          title="Height of the rows the chosen cells are in"
+          min={MIN_TABLE_CELL}
+          step={10}
+          disabled={rows.length === 0}
+          value={table.rows[rows[0]] ?? ""}
+          onChange={(event) => {
+            const next = Number(event.target.value);
+            if (Number.isFinite(next)) onSize({ rows, height: next });
+          }}
+        />
+
+        <span className="pub-format-label">
+          {columns.length > 1 ? `W×${columns.length}` : "Width"}
+        </span>
+        <input
+          type="number"
+          className="pub-format-number"
+          aria-label="Column width in canvas units"
+          title="Width of the columns the chosen cells are in"
+          min={MIN_TABLE_CELL}
+          step={10}
+          disabled={columns.length === 0}
+          value={table.columns[columns[0]] ?? ""}
+          onChange={(event) => {
+            const next = Number(event.target.value);
+            if (Number.isFinite(next)) onSize({ columns, width: next });
+          }}
+        />
 
         <span className="pub-format-label">Padding</span>
         <input
@@ -2020,6 +2073,46 @@ export function PublicationEditor({
     );
   }
 
+  /**
+   * Choosing cells by dragging over them.
+   *
+   * A ref rather than state: it is read by a handler on every cell the pointer
+   * crosses, and re-rendering the whole table on the way past each one would
+   * make the sweep stutter.
+   */
+  const sweepingCells = useRef(false);
+  function startCellSweep() {
+    sweepingCells.current = true;
+    const stop = () => {
+      sweepingCells.current = false;
+      window.removeEventListener("pointerup", stop);
+    };
+    window.addEventListener("pointerup", stop);
+  }
+
+  /** The rows and columns the chosen cells sit in. */
+  const chosenRows = [...new Set(cellRange?.addresses.map((at) => at.row) ?? [])];
+  const chosenColumns = [...new Set(cellRange?.addresses.map((at) => at.column) ?? [])];
+
+  /** Sets the height of the chosen rows, or the width of the chosen columns. */
+  function resizeChosen(change: {
+    rows?: number[];
+    columns?: number[];
+    height?: number;
+    width?: number;
+  }) {
+    if (!cellRange) return;
+    updateTable(cellRange.blockId, (table) => {
+      if (change.rows && change.height !== undefined) {
+        return withRowHeight(table, change.rows, change.height);
+      }
+      if (change.columns && change.width !== undefined) {
+        return withColumnWidth(table, change.columns, change.width);
+      }
+      return table;
+    });
+  }
+
   /** Changes what the chosen cells hold. Each cell holds exactly one thing. */
   function setCellKind(type: (typeof TABLE_CELL_BLOCK_TYPES)[number]) {
     updateChosenCells((cell) => withCellKind(cell, type));
@@ -2999,10 +3092,13 @@ export function PublicationEditor({
               <TableFormatBar
                 block={tableSelection.block}
                 range={cellRange?.addresses.length ?? 0}
+                rows={chosenRows}
+                columns={chosenColumns}
                 cell={cellContext?.cell ?? null}
                 onChange={(change) => updateTable(tableSelection.block.id, change)}
                 onKind={setCellKind}
                 onDress={dressChosenCells}
+                onSize={resizeChosen}
               />
             ) : null}
             {!editingTextId && !tableSelection ? (
@@ -3254,6 +3350,12 @@ export function PublicationEditor({
                             }
                             setCellAt({ blockId: block.id, ...at });
                             setCellFocus(null);
+                            // And dragging across them draws the same range,
+                            // which is the gesture a grid asks for first.
+                            startCellSweep();
+                          }}
+                          onPointerEnter={() => {
+                            if (sweepingCells.current) setCellFocus(at);
                           }}
                           onDoubleClick={(event) => {
                             if (cell.block.type !== "richText" && cell.block.type !== "button") {
@@ -3658,18 +3760,16 @@ export function PublicationEditor({
 
               {styleSlot === "cell" && cellContext ? (
                 <InlineStyleEditor
+                  // Seeded from the cell the range was started at; written to
+                  // every cell in it, because dressing a selection means making
+                  // those cells look alike.
                   values={cellContext.cell.style}
                   styleSlug=""
                   fonts={sources.fonts}
                   savedStyles={sources.styles}
                   showSavedStyles={false}
                   onChange={({ values }) =>
-                    updateTable(cellContext.blockId, (table) =>
-                      withCellChanged(table, cellContext.at, (cell) => ({
-                        ...cell,
-                        style: values,
-                      }))
-                    )
+                    updateChosenCells((cell) => ({ ...cell, style: values }))
                   }
                 />
               ) : null}

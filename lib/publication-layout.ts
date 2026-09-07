@@ -382,6 +382,8 @@ function pick<T extends string>(value: unknown, allowed: readonly T[], fallback:
 /** Default column width and row height, in canvas units. */
 const TABLE_COLUMN_WIDTH = 240;
 const TABLE_ROW_HEIGHT = 90;
+/** No column or row may be squeezed past this, in canvas units. */
+export const MIN_TABLE_CELL = 24;
 /** A tint faint enough to read as banding rather than as a coloured row. */
 const DEFAULT_BAND_COLOR = "rgba(148, 163, 184, 0.18)";
 
@@ -478,7 +480,7 @@ export function normalizeTable(input: unknown): PublicationTable {
     const list = Array.isArray(value) ? value : [];
     const kept = list
       .slice(0, cap)
-      .map((entry) => Math.max(24, Math.round(num(entry, fallback))));
+      .map((entry) => Math.max(MIN_TABLE_CELL, Math.round(num(entry, fallback))));
     return kept.length > 0 ? kept : [fallback];
   };
 
@@ -586,6 +588,40 @@ export function withRowRemoved(table: PublicationTable, at: number): Publication
     ...table,
     rows: table.rows.filter((_height, index) => index !== at),
     cells: table.cells.filter((_row, index) => index !== at),
+  };
+}
+
+/**
+ * Sets the height of the named rows, or the width of the named columns.
+ *
+ * Taken from a selection rather than typed against a row number: somebody
+ * evening up a table has the cells in front of them, not a list of indices.
+ */
+export function withRowHeight(
+  table: PublicationTable,
+  rows: number[],
+  height: number
+): PublicationTable {
+  const wanted = new Set(rows);
+  const next = Math.max(MIN_TABLE_CELL, Math.round(height));
+  return {
+    ...table,
+    rows: table.rows.map((current, index) => (wanted.has(index) ? next : current)),
+  };
+}
+
+export function withColumnWidth(
+  table: PublicationTable,
+  columns: number[],
+  width: number
+): PublicationTable {
+  const wanted = new Set(columns);
+  const next = Math.max(MIN_TABLE_CELL, Math.round(width));
+  return {
+    ...table,
+    columns: table.columns.map((current, index) =>
+      wanted.has(index) ? next : current
+    ),
   };
 }
 

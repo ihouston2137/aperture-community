@@ -32,19 +32,14 @@ const MAX_SIZE = 6;
 const BASE_SIZE = 1;
 
 /**
- * The colour swatches, which are Quill's own palette.
+ * The colour swatches. Quill's palette, kept because it is a good one.
  *
- * They are written out here rather than left to Quill because of how it fills
- * an empty colour `<select>`: one swatch is nominated as the default and gets
- * `selected` and *no* `value`, and the toolbar reads a selected-attribute
- * option as "remove this format". That swatch is black for the text colour and
- * white for the highlight — so choosing black stripped the colour instead of
- * setting it, and the text fell back to whatever it inherited. Quill can assume
- * the two are the same thing because its editor is always black on white; text
- * here sits on a publication canvas in whatever colour the block's style says.
- *
- * Filling the select ourselves means every swatch carries a real value, and
- * "no colour" is one deliberate entry at the end of the palette instead.
+ * Quill's own colour controls are not used at all now — its picker is built
+ * from a `<select>` whose first swatch it marks `selected` with no value,
+ * which the toolbar reads as "remove this format". Black in the text palette
+ * and white in the highlight one therefore cleared the colour instead of
+ * setting it, and there was no way to reach a colour outside the grid or to
+ * make any of them see-through. The control below does all three.
  */
 const COLOR_SWATCHES = [
   "#000000", "#e60000", "#ff9900", "#ffff00", "#008a00", "#0066cc", "#9933ff",
@@ -54,18 +49,6 @@ const COLOR_SWATCHES = [
   "#444444", "#5c0000", "#663d00", "#666600", "#003700", "#002966", "#3d1466",
 ];
 
-/**
- * The palette for one colour select. The last entry carries `selected` and no
- * value, which is how Quill's toolbar spells "clear this format" — the reset
- * every other swatch used to be mistaken for.
- */
-function colorOptions(resetLabel: string): string {
-  return (
-    COLOR_SWATCHES.map((color) => `<option value="${color}"></option>`).join("") +
-    `<option selected>${resetLabel}</option>`
-  );
-}
-
 /** Built into an element this component owns, so Quill never touches React's DOM. */
 const TOOLBAR_HTML = `
   <span class="ql-formats">
@@ -73,10 +56,6 @@ const TOOLBAR_HTML = `
     <button type="button" class="ql-italic"></button>
     <button type="button" class="ql-underline"></button>
     <button type="button" class="ql-strike"></button>
-  </span>
-  <span class="ql-formats">
-    <select class="ql-color">${colorOptions("Default colour")}</select>
-    <select class="ql-background">${colorOptions("No highlight")}</select>
   </span>
   <span class="ql-formats">
     <select class="ql-align"></select>
@@ -109,97 +88,137 @@ function roundSize(value: number): number {
 }
 
 /**
- * One custom colour, with its transparency.
+ * One colour control: the swatches and any other colour, under one button.
  *
- * A swatch grid can only offer the colours somebody chose in advance, and none
- * of them can be see-through. This is the other half: any colour at all, and
- * an opacity to go with it — a highlight that tints the words rather than
- * hiding what is behind them, or a caption laid over a photograph.
+ * Two controls for one decision was one too many — a grid of swatches beside a
+ * custom picker asks somebody to choose how to choose. The palette is the quick
+ * answer and the rest of the panel is the exact one, and they set the same
+ * thing, so they belong behind the same button.
  *
  * The value is written the way the rest of the admin writes colours: a plain
- * hex string while it is opaque, `rgba()` as soon as it is not.
+ * hex string while it is opaque, `rgba()` as soon as it is not — so a custom
+ * colour that lands on a swatch still lights that swatch up.
  */
-function CustomColorButton({
+function ColorControl({
   label,
   glyph,
+  swatches,
   value,
   open,
   disabled,
-  onToggle,
+  onOpen,
+  onClose,
   onChange,
 }: {
   label: string;
   glyph: string;
+  swatches: string[];
   value: string;
   open: boolean;
   disabled: boolean;
-  onToggle: () => void;
+  onOpen: () => void;
+  onClose: () => void;
   onChange: (value: string) => void;
 }) {
   const { hex, alpha } = parseColor(value, "#000000");
+  const percent = Math.round(alpha * 100);
 
   return (
-    <span className="rte-custom-color">
+    <span className="rte-color">
       <button
         type="button"
-        className={`rte-custom-trigger${open ? " is-open" : ""}`}
-        title={`${label} — any colour, any opacity`}
+        className={`rte-color-trigger${open ? " is-open" : ""}`}
+        title={label}
         aria-label={label}
         aria-expanded={open}
         disabled={disabled}
-        // The toolbar must not steal the selection the colour will apply to.
+        /*
+         * The press is stopped from moving the focus, which is what keeps the
+         * editor's selection alive — the colour has to land on the words that
+         * were selected when the button was reached for.
+         */
         onMouseDown={(event) => event.preventDefault()}
-        onClick={onToggle}
+        onClick={() => (open ? onClose() : onOpen())}
       >
-        <span className="rte-custom-glyph">{glyph}</span>
-        {/* Checkerboard behind the bar, so a transparent colour looks it. */}
-        <span className="rte-custom-bar">
+        <span className="rte-color-glyph">{glyph}</span>
+        {/* Checkerboard behind the bar, so a see-through colour looks it. */}
+        <span className="rte-color-bar">
           <span style={{ background: value || "transparent" }} />
         </span>
       </button>
 
       {open ? (
-        <span className="rte-custom-panel" onMouseDown={(event) => event.preventDefault()}>
-          <label className="rte-custom-row">
-            <span>Colour</span>
-            <input
-              type="color"
-              value={hex}
-              onChange={(event) => onChange(formatColor(event.target.value, alpha))}
-            />
-          </label>
+        <>
+          {/* The next press anywhere else closes the panel. */}
+          <span className="rte-color-sheet" onPointerDown={onClose} />
 
-          <label className="rte-custom-row">
-            <span>Opacity</span>
-            <input
-              type="range"
-              min={0}
-              max={100}
-              value={Math.round(alpha * 100)}
-              onChange={(event) => onChange(formatColor(hex, Number(event.target.value) / 100))}
-            />
-            <output>{Math.round(alpha * 100)}%</output>
-          </label>
+          <span className="rte-color-panel">
+            <span className="rte-color-swatches">
+              {swatches.map((swatch) => (
+                <button
+                  key={swatch}
+                  type="button"
+                  className={`rte-color-swatch${
+                    swatch === value ? " is-current" : ""
+                  }`}
+                  style={{ background: swatch }}
+                  title={swatch}
+                  aria-label={swatch}
+                  onMouseDown={(event) => event.preventDefault()}
+                  // Swatches keep whatever opacity is set, so the palette and
+                  // the slider are one control rather than two that undo each
+                  // other.
+                  onClick={() => onChange(formatColor(swatch, alpha))}
+                />
+              ))}
+            </span>
 
-          <label className="rte-custom-row">
-            <span>Value</span>
-            <input
-              type="text"
-              className="rte-custom-value"
-              value={value}
-              placeholder="#000000"
-              onChange={(event) => onChange(event.target.value.trim())}
-            />
-          </label>
+            {/*
+              No `preventDefault` from here down. It would keep the selection,
+              but it also cancels the gestures these inputs are made of — a
+              range slider that cannot be dragged is a transparency control
+              that does nothing. The selection is held and restored by the
+              caller instead.
+            */}
+            <label className="rte-color-row">
+              <span>Any colour</span>
+              <input
+                type="color"
+                value={hex}
+                onChange={(event) => onChange(formatColor(event.target.value, alpha))}
+              />
+              <input
+                type="text"
+                className="rte-color-value"
+                value={value}
+                placeholder="#000000"
+                aria-label={`${label} value`}
+                onChange={(event) => onChange(event.target.value.trim())}
+              />
+            </label>
 
-          <button
-            type="button"
-            className="btn btn-sm"
-            onClick={() => onChange("")}
-          >
-            No colour
-          </button>
-        </span>
+            <label className="rte-color-row">
+              <span>Opacity</span>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={percent}
+                onChange={(event) => onChange(formatColor(hex, Number(event.target.value) / 100))}
+              />
+              <output>{percent}%</output>
+            </label>
+
+            <button
+              type="button"
+              className="btn btn-sm"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => onChange("")}
+            >
+              No colour
+            </button>
+          </span>
+        </>
       ) : null}
     </span>
   );
@@ -271,8 +290,16 @@ export function RichTextEditor({
    * which a swatch cannot express at all. Held per target because text and
    * highlight are set independently.
    */
-  const [custom, setCustom] = useState({ color: "", background: "" });
-  const [customOpen, setCustomOpen] = useState<"color" | "background" | null>(null);
+  const [colors, setColors] = useState({ color: "", background: "" });
+  const [colorOpen, setColorOpen] = useState<"color" | "background" | null>(null);
+  /**
+   * Where the caret was when the colour panel was opened.
+   *
+   * The panel's own inputs take the focus — they have to, or a slider cannot
+   * be dragged — so the range they will colour is remembered on the way in and
+   * put back before each change.
+   */
+  const colorRange = useRef<{ index: number; length: number } | null>(null);
 
   /*
    * Whether the toolbar has somewhere to be.
@@ -352,7 +379,7 @@ export function RichTextEditor({
         const format = quill.getFormat(range);
         setFont(typeof format.font === "string" ? format.font : "");
         setSize(parseSize(format.size));
-        setCustom({
+        setColors({
           color: typeof format.color === "string" ? format.color : "",
           background: typeof format.background === "string" ? format.background : "",
         });
@@ -422,15 +449,28 @@ export function RichTextEditor({
     setFont(next);
   };
 
+  /** Remembers the words being coloured, before the panel takes the focus. */
+  const openColors = (target: "color" | "background") => {
+    colorRange.current = quillRef.current?.getSelection() ?? colorRange.current;
+    setColorOpen(target);
+  };
+
   /**
-   * Sets a colour the palette does not hold.
+   * Sets a colour, or clears it when the value is empty.
    *
-   * An empty value clears the format, which is what the palette's own reset
-   * entry does — the two ways of saying "no colour of its own" agree.
+   * The remembered range is put back first: by the time this runs the focus is
+   * in a slider or a colour input, and Quill would otherwise have nothing to
+   * apply the colour to.
    */
   const applyColor = (target: "color" | "background", next: string) => {
-    applyFormat(target, next || false);
-    setCustom((current) => ({ ...current, [target]: next }));
+    const quill = quillRef.current;
+    if (!quill) return;
+
+    const range = colorRange.current;
+    if (range) quill.setSelection(range.index, range.length, "silent");
+    quill.format(target, next || false, "user");
+
+    setColors((current) => ({ ...current, [target]: next }));
   };
 
   const toolbar = (
@@ -492,25 +532,27 @@ export function RichTextEditor({
 
       {/* Beside the swatches rather than instead of them: the palette is the
           quick answer and this is the exact one. */}
-      <span className="rte-group rte-custom-colors">
-        <CustomColorButton
+      <span className="rte-group">
+        <ColorControl
           label="Text colour"
           glyph="A"
-          value={custom.color}
-          open={customOpen === "color"}
+          swatches={COLOR_SWATCHES}
+          value={colors.color}
+          open={colorOpen === "color"}
           disabled={!ready}
-          onToggle={() => setCustomOpen((current) => (current === "color" ? null : "color"))}
+          onOpen={() => openColors("color")}
+          onClose={() => setColorOpen(null)}
           onChange={(next) => applyColor("color", next)}
         />
-        <CustomColorButton
+        <ColorControl
           label="Highlight"
           glyph="▮"
-          value={custom.background}
-          open={customOpen === "background"}
+          swatches={COLOR_SWATCHES}
+          value={colors.background}
+          open={colorOpen === "background"}
           disabled={!ready}
-          onToggle={() =>
-            setCustomOpen((current) => (current === "background" ? null : "background"))
-          }
+          onOpen={() => openColors("background")}
+          onClose={() => setColorOpen(null)}
           onChange={(next) => applyColor("background", next)}
         />
       </span>
