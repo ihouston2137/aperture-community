@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import type Quill from "quill";
 import "quill/dist/quill.snow.css";
 
+import { formatColor, parseColor } from "@/lib/color";
 import { REM_BASE, normalizeRichTextSpaces } from "@/lib/rich-text";
 
 /**
@@ -107,6 +108,103 @@ function roundSize(value: number): number {
   return Math.round(value * 1000) / 1000;
 }
 
+/**
+ * One custom colour, with its transparency.
+ *
+ * A swatch grid can only offer the colours somebody chose in advance, and none
+ * of them can be see-through. This is the other half: any colour at all, and
+ * an opacity to go with it — a highlight that tints the words rather than
+ * hiding what is behind them, or a caption laid over a photograph.
+ *
+ * The value is written the way the rest of the admin writes colours: a plain
+ * hex string while it is opaque, `rgba()` as soon as it is not.
+ */
+function CustomColorButton({
+  label,
+  glyph,
+  value,
+  open,
+  disabled,
+  onToggle,
+  onChange,
+}: {
+  label: string;
+  glyph: string;
+  value: string;
+  open: boolean;
+  disabled: boolean;
+  onToggle: () => void;
+  onChange: (value: string) => void;
+}) {
+  const { hex, alpha } = parseColor(value, "#000000");
+
+  return (
+    <span className="rte-custom-color">
+      <button
+        type="button"
+        className={`rte-custom-trigger${open ? " is-open" : ""}`}
+        title={`${label} — any colour, any opacity`}
+        aria-label={label}
+        aria-expanded={open}
+        disabled={disabled}
+        // The toolbar must not steal the selection the colour will apply to.
+        onMouseDown={(event) => event.preventDefault()}
+        onClick={onToggle}
+      >
+        <span className="rte-custom-glyph">{glyph}</span>
+        {/* Checkerboard behind the bar, so a transparent colour looks it. */}
+        <span className="rte-custom-bar">
+          <span style={{ background: value || "transparent" }} />
+        </span>
+      </button>
+
+      {open ? (
+        <span className="rte-custom-panel" onMouseDown={(event) => event.preventDefault()}>
+          <label className="rte-custom-row">
+            <span>Colour</span>
+            <input
+              type="color"
+              value={hex}
+              onChange={(event) => onChange(formatColor(event.target.value, alpha))}
+            />
+          </label>
+
+          <label className="rte-custom-row">
+            <span>Opacity</span>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={Math.round(alpha * 100)}
+              onChange={(event) => onChange(formatColor(hex, Number(event.target.value) / 100))}
+            />
+            <output>{Math.round(alpha * 100)}%</output>
+          </label>
+
+          <label className="rte-custom-row">
+            <span>Value</span>
+            <input
+              type="text"
+              className="rte-custom-value"
+              value={value}
+              placeholder="#000000"
+              onChange={(event) => onChange(event.target.value.trim())}
+            />
+          </label>
+
+          <button
+            type="button"
+            className="btn btn-sm"
+            onClick={() => onChange("")}
+          >
+            No colour
+          </button>
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
 export function RichTextEditor({
   value,
   onChange,
@@ -165,6 +263,16 @@ export function RichTextEditor({
   const [font, setFont] = useState("");
   /** `null` means the selection inherits its size rather than setting one. */
   const [size, setSize] = useState<number | null>(null);
+  /**
+   * The colour at the caret, for the custom control.
+   *
+   * Quill's swatches cover the palette; this covers everything else — a brand
+   * colour that is not one of thirty-five, and any degree of transparency,
+   * which a swatch cannot express at all. Held per target because text and
+   * highlight are set independently.
+   */
+  const [custom, setCustom] = useState({ color: "", background: "" });
+  const [customOpen, setCustomOpen] = useState<"color" | "background" | null>(null);
 
   /*
    * Whether the toolbar has somewhere to be.
@@ -244,6 +352,10 @@ export function RichTextEditor({
         const format = quill.getFormat(range);
         setFont(typeof format.font === "string" ? format.font : "");
         setSize(parseSize(format.size));
+        setCustom({
+          color: typeof format.color === "string" ? format.color : "",
+          background: typeof format.background === "string" ? format.background : "",
+        });
       });
 
       if (onBlurRef.current) {
@@ -310,6 +422,17 @@ export function RichTextEditor({
     setFont(next);
   };
 
+  /**
+   * Sets a colour the palette does not hold.
+   *
+   * An empty value clears the format, which is what the palette's own reset
+   * entry does — the two ways of saying "no colour of its own" agree.
+   */
+  const applyColor = (target: "color" | "background", next: string) => {
+    applyFormat(target, next || false);
+    setCustom((current) => ({ ...current, [target]: next }));
+  };
+
   const toolbar = (
     <div className={`rte-toolbar${bare ? " is-detached" : ""}`}>
         <span className="rte-group">
@@ -366,6 +489,31 @@ export function RichTextEditor({
       {/* Quill's own controls are built into a child of this host, which this
           component creates and removes. */}
       <div className="rte-toolbar-host" ref={toolbarHost} />
+
+      {/* Beside the swatches rather than instead of them: the palette is the
+          quick answer and this is the exact one. */}
+      <span className="rte-group rte-custom-colors">
+        <CustomColorButton
+          label="Text colour"
+          glyph="A"
+          value={custom.color}
+          open={customOpen === "color"}
+          disabled={!ready}
+          onToggle={() => setCustomOpen((current) => (current === "color" ? null : "color"))}
+          onChange={(next) => applyColor("color", next)}
+        />
+        <CustomColorButton
+          label="Highlight"
+          glyph="▮"
+          value={custom.background}
+          open={customOpen === "background"}
+          disabled={!ready}
+          onToggle={() =>
+            setCustomOpen((current) => (current === "background" ? null : "background"))
+          }
+          onChange={(next) => applyColor("background", next)}
+        />
+      </span>
     </div>
   );
 

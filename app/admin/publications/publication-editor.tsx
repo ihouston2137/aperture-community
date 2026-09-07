@@ -143,7 +143,17 @@ const STYLE_PANEL_TITLES: Record<string, string> = {
   button: "Button style",
 };
 /** The two dressable parts of a block: its text, and — for shapes — the shape. */
-type StyleSlot = "text" | "shape";
+type StyleSlot = "text" | "shape" | "table" | "tableHeader" | "tableCell" | "cell";
+
+/** What each style slot is called in the panel, and where it writes. */
+const STYLE_SLOT_TITLES: Record<StyleSlot, string> = {
+  text: "Text style",
+  shape: "Shape style",
+  table: "Table style",
+  tableHeader: "Header cells",
+  tableCell: "All cells",
+  cell: "This cell",
+};
 
 /** Ids for layouts created in the browser; the same shape the server makes. */
 function makeTemplateId() {
@@ -428,6 +438,298 @@ type DocumentSnapshot = {
 const HISTORY_COALESCE_MS = 500;
 /** Snapshots are whole pages, so the stack is bounded rather than endless. */
 const HISTORY_LIMIT = 60;
+
+/**
+ * The controls that say what a block *is* — its words, its picture, its icon,
+ * the shape it draws — as opposed to where it sits or how it is dressed.
+ *
+ * Lifted out of the inspector so that a block inside a table cell is edited
+ * with exactly the same controls as one standing on the canvas. A cell holds
+ * ordinary blocks, so anything else would be a second, poorer editor for the
+ * same things.
+ */
+function BlockContentFields({
+  block,
+  update,
+  sources,
+  pages,
+  setStyleSlot,
+}: {
+  block: PublicationBlock;
+  update: (patch: Partial<PublicationBlock>) => void;
+  sources: BuilderSources;
+  pages: PublicationPage[];
+  setStyleSlot: (slot: StyleSlot | null) => void;
+}) {
+  return (
+    <>
+      <div className="inspector-section">
+        <h4 className="inspector-title">Content</h4>
+
+        {block.type === "richText" ? (
+          <>
+            <p className="help-text">
+              Double-click the block to write in it. The bar above the
+              canvas formats whatever the caret is in; sizes are stored
+              in rem and scale with the viewer.
+            </p>
+            <StyleButton label="Text style" onOpen={() => setStyleSlot("text")} />
+          </>
+        ) : null}
+
+        {block.type === "image" || block.type === "video" ? (
+          <>
+            <MediaField
+              label={block.type === "image" ? "Image" : "Video"}
+              value={block.mediaUrl ?? ""}
+              mediaType={block.type}
+              onChange={(url, asset) =>
+                update({ mediaUrl: url, mediaId: asset?._id ?? "" })
+              }
+            />
+            <SelectField
+              label="Fit"
+              value={block.objectFit ?? "cover"}
+              options={[
+                { value: "cover", label: "Cover" },
+                { value: "contain", label: "Contain" },
+              ]}
+              onChange={(objectFit) => update({ objectFit })}
+            />
+            {/* Corners, border, shadow and the rest come from the
+                style now, rather than a lone radius field. */}
+            <StyleButton
+              label={block.type === "image" ? "Image style" : "Video style"}
+              onOpen={() => setStyleSlot("text")}
+            />
+            {block.type === "video" ? (
+              <>
+                <CheckField
+                  label="Autoplay"
+                  value={Boolean(block.autoplay)}
+                  onChange={(autoplay) => update({ autoplay })}
+                />
+                <CheckField
+                  label="Loop"
+                  value={block.loop !== false}
+                  onChange={(loop) => update({ loop })}
+                />
+                <CheckField
+                  label="Muted"
+                  value={block.muted !== false}
+                  onChange={(muted) => update({ muted })}
+                />
+                <CheckField
+                  label="Show controls"
+                  value={Boolean(block.controls)}
+                  onChange={(controls) => update({ controls })}
+                />
+              </>
+            ) : null}
+          </>
+        ) : null}
+
+        {block.type === "button" ? (
+          <>
+            <p className="help-text">
+              Double-click the button to write its face.
+            </p>
+            {/* What it does when pressed is the click action below,
+                which every block carries — a second link field on the
+                button alone was a second answer to one question, and
+                the one nothing rendered. */}
+            <StyleButton
+              label="Button style"
+              onOpen={() => setStyleSlot("text")}
+            />
+          </>
+        ) : null}
+
+        {block.type === "qrCode" ? (
+          <>
+            <TextField
+              label="Value or URL"
+              value={block.qrValue ?? ""}
+              onChange={(qrValue) => update({ qrValue })}
+            />
+            <ColorField
+              label="Colour"
+              value={block.color ?? "#000000"}
+              onChange={(color) => update({ color })}
+            />
+          </>
+        ) : null}
+
+        {block.type === "icon" ? (
+          <>
+            <IconSearchField
+              value={block.iconName ?? "star"}
+              onChange={(iconName) => update({ iconName })}
+            />
+            <StyleButton label="Icon style" onOpen={() => setStyleSlot("text")} />
+          </>
+        ) : null}
+
+        {/* Both shape blocks carry the same controls — they differ only
+            in where the outline comes from, a preset or an uploaded
+            file. */}
+        {block.type === "shape" || block.type === "customShape" ? (
+          <>
+            {block.type === "shape" ? (
+              <SelectField
+                label="Shape"
+                value={block.shapeKind ?? "rectangle"}
+                options={SHAPE_KINDS.map((value) => ({
+                  value,
+                  label: SHAPE_KIND_LABELS[value],
+                }))}
+                onChange={(shapeKind) => update({ shapeKind })}
+              />
+            ) : (
+              <SelectField
+                label="Shape"
+                value={block.shapeSlug ?? ""}
+                options={[
+                  { value: "", label: "Select a shape…" },
+                  ...sources.shapes.map((shape) => ({
+                    value: shape.slug,
+                    label: shape.name,
+                  })),
+                ]}
+                onChange={(shapeSlug) => update({ shapeSlug })}
+              />
+            )}
+
+            {/* Fill, outline and corners all live in the shape's style
+                now, so there is no separate colour field. */}
+            <StyleButton label="Shape style" onOpen={() => setStyleSlot("shape")} />
+
+            <p className="help-text">
+              Double-click the shape to write on it.
+            </p>
+            {richTextToPlainText(blockHtml(block)).trim() ? (
+              <>
+                <SelectField
+                  label="Text placement"
+                  value={block.textPlacement ?? "inside"}
+                  options={SHAPE_TEXT_PLACEMENTS.map((placement) => ({
+                    value: placement,
+                    label: SHAPE_TEXT_PLACEMENT_LABELS[placement],
+                  }))}
+                  onChange={(textPlacement) =>
+                    update({ textPlacement })
+                  }
+                />
+                <p className="help-text" style={{ marginTop: 0 }}>
+                  {(block.textPlacement ?? "inside") === "inside"
+                    ? block.shapeKind === "line"
+                      ? "A line has no inside — text placed in it sits across the line."
+                      : "Text inside is held to the shape’s outline and cut off at it."
+                    : "Text above takes its own height from the block, and the shape fills what is left."}
+                </p>
+                <StyleButton label="Text style" onOpen={() => setStyleSlot("text")} />
+              </>
+            ) : null}
+          </>
+        ) : null}
+
+        {block.type === "story" ? (
+          <SelectField
+            label="Story"
+            value={block.storyId ?? ""}
+            options={[
+              { value: "", label: "Select a story…" },
+              ...sources.stories.map((story) => ({ value: story._id, label: story.label })),
+            ]}
+            onChange={(storyId) => update({ storyId })}
+          />
+        ) : null}
+
+        {block.type === "collection" ? (
+          <SelectField
+            label="Collection"
+            value={block.collectionId ?? ""}
+            options={[
+              { value: "", label: "Select a collection…" },
+              ...sources.collections.map((collection) => ({
+                value: collection._id,
+                label: collection.label,
+              })),
+            ]}
+            onChange={(collectionId) => update({ collectionId })}
+          />
+        ) : null}
+
+        {block.type === "form" ? (
+          <SelectField
+            label="Form"
+            value={block.formId ?? ""}
+            options={[
+              { value: "", label: "Select a form…" },
+              ...sources.forms.map((form) => ({ value: form._id, label: form.label })),
+            ]}
+            onChange={(formId) => update({ formId })}
+          />
+        ) : null}
+
+        {block.type === "sponsorScroll" ? (
+          <SponsorScrollFields
+            settings={normalizeSponsorScroll(block.sponsorScroll)}
+            levels={sources.recognitionLevels}
+            onChange={(sponsorScroll) =>
+              update({ sponsorScroll })
+            }
+          />
+        ) : null}
+      </div>
+
+      <div className="inspector-section">
+        <h4 className="inspector-title">Click action</h4>
+        <SelectField
+          label="On click"
+          value={block.clickAction ?? "none"}
+          options={[
+            { value: "none", label: "Nothing" },
+            { value: "link", label: "Open a link" },
+            { value: "page", label: "Go to a page" },
+          ]}
+          onChange={(clickAction) => update({ clickAction })}
+        />
+        {block.clickAction === "link" ? (
+          <>
+            <TextField
+              label="URL"
+              value={block.clickTarget ?? ""}
+              onChange={(clickTarget) => update({ clickTarget })}
+            />
+            <CheckField
+              label="Open in a new tab"
+              value={Boolean(block.newTab)}
+              onChange={(newTab) => update({ newTab })}
+            />
+          </>
+        ) : null}
+        {block.clickAction === "page" ? (
+          <SelectField
+            label="Page"
+            value={block.clickTarget ?? ""}
+            options={[
+              { value: "", label: "Select a page…" },
+              // Pages kept out of the order are named as such: they
+              // are exactly what this control is most often for, and a
+              // list that did not say so would look like a duplicate.
+              ...pages.map((item) => ({
+                value: item.id,
+                label: item.hidden ? `${item.name} (linked only)` : item.name,
+              })),
+            ]}
+            onChange={(clickTarget) => update({ clickTarget })}
+          />
+        ) : null}
+      </div>
+    </>
+  );
+}
 
 export function PublicationEditor({
   publication,
@@ -853,6 +1155,14 @@ export function PublicationEditor({
   const [cellAt, setCellAt] = useState<
     { blockId: string; row: number; column: number } | null
   >(null);
+  /**
+   * The block inside a cell that the inspector is editing.
+   *
+   * A cell holds ordinary blocks, so choosing one has to reach the same
+   * controls a block on the canvas gets — otherwise a picture in a table is a
+   * picture nobody can change.
+   */
+  const [cellItemId, setCellItemId] = useState<string | null>(null);
   /*
    * Writing and cell choice both end when the selection leaves the block.
    *
@@ -1531,6 +1841,56 @@ export function PublicationEditor({
       : null;
     return { block: selected, cell };
   })();
+
+  /** The cell the inspector is showing, and the block chosen inside it. */
+  const cellContext = (() => {
+    if (!tableSelection?.cell || !tableSelection.block.table) return null;
+    const at = tableSelection.cell;
+    const cell = tableSelection.block.table.cells[at.row]?.[at.column];
+    if (!cell) return null;
+    const item = cell.content.find((entry) => entry.id === cellItemId) ?? null;
+    return { blockId: tableSelection.block.id, at, cell, item };
+  })();
+
+  /** Rewrites one block inside a cell. */
+  function updateCellItem(patch: Partial<PublicationBlock>) {
+    if (!cellContext?.item) return;
+    const itemId = cellContext.item.id;
+    updateTable(cellContext.blockId, (table) =>
+      withCellChanged(table, cellContext.at, (cell) => ({
+        ...cell,
+        content: cell.content.map((entry) =>
+          entry.id === itemId ? { ...entry, ...patch } : entry
+        ),
+      }))
+    );
+  }
+
+  /** Moves a block within its cell; the order it sits in is the layout. */
+  function moveCellItem(index: number, direction: -1 | 1) {
+    if (!cellContext) return;
+    const target = index + direction;
+
+    updateTable(cellContext.blockId, (table) =>
+      withCellChanged(table, cellContext.at, (cell) => {
+        if (target < 0 || target >= cell.content.length) return cell;
+        const content = [...cell.content];
+        [content[index], content[target]] = [content[target], content[index]];
+        return { ...cell, content };
+      })
+    );
+  }
+
+  function removeCellItem(itemId: string) {
+    if (!cellContext) return;
+    updateTable(cellContext.blockId, (table) =>
+      withCellChanged(table, cellContext.at, (cell) => ({
+        ...cell,
+        content: cell.content.filter((entry) => entry.id !== itemId),
+      }))
+    );
+    if (cellItemId === itemId) setCellItemId(null);
+  }
 
   /** Rewrites a table block's grid, keeping its box the size of the grid. */
   function updateTable(
@@ -2764,6 +3124,9 @@ export function PublicationEditor({
                             setSelectedIds([block.id]);
                             setStyleSlot(null);
                             setCellAt({ blockId: block.id, ...at });
+                            // The press landed on the cell rather than on
+                            // anything in it, so nothing in it is chosen.
+                            setCellItemId(null);
                           }}
                         >
                           {cell.content.map((item) => (
@@ -2771,10 +3134,21 @@ export function PublicationEditor({
                               key={item.id}
                               className={`pub-editor-cell-item${
                                 editingTextId === item.id ? " is-writing" : ""
-                              }`}
+                              }${cellItemId === item.id ? " is-chosen" : ""}`}
                               /* One toolbar, so only one thing may be open in
                                  it: writing in a cell is asked for the same way
                                  writing in a block is. */
+                              /* Choosing it on the canvas is what puts its
+                                 controls in the inspector — a picture in a
+                                 cell is picked the way one on the page is. */
+                              onPointerDown={(event) => {
+                                event.stopPropagation();
+                                if (editingTextId === item.id) return;
+                                setSelectedIds([block.id]);
+                                setStyleSlot(null);
+                                setCellAt({ blockId: block.id, ...at });
+                                setCellItemId(item.id);
+                              }}
                               onDoubleClick={(event) => {
                                 if (!WRITEABLE_BLOCKS.has(item.type)) return;
                                 event.stopPropagation();
@@ -3143,11 +3517,69 @@ export function PublicationEditor({
                   ← {BLOCK_LABELS[selected.type]}
                 </button>
                 <h4 className="inspector-title" style={{ marginTop: "0.6rem" }}>
-                  {styleSlot === "shape"
-                    ? "Shape style"
-                    : STYLE_PANEL_TITLES[selected.type] ?? "Text style"}
+                  {styleSlot === "text"
+                    ? STYLE_PANEL_TITLES[selected.type] ?? "Text style"
+                    : STYLE_SLOT_TITLES[styleSlot]}
                 </h4>
               </div>
+
+              {/*
+                A table is dressed in three places, plus one cell at a time: the
+                grid itself carries the outline and the background behind
+                everything, the cell style is the default every cell wears, the
+                header style is what the heading row and column wear over it,
+                and a single cell can overrule all of it. Four panels rather
+                than one because those are four different questions — "what does
+                this table look like" is not "what does this one cell look
+                like".
+              */}
+              {styleSlot === "table" ||
+              styleSlot === "tableCell" ||
+              styleSlot === "tableHeader" ? (
+                <InlineStyleEditor
+                  values={
+                    styleSlot === "table"
+                      ? selected.table?.tableStyle
+                      : styleSlot === "tableHeader"
+                        ? selected.table?.headerStyle
+                        : selected.table?.cellStyle
+                  }
+                  styleSlug=""
+                  fonts={sources.fonts}
+                  savedStyles={sources.styles}
+                  // The grid draws no words of its own; its cells do.
+                  showTypography={styleSlot !== "table"}
+                  showSavedStyles={false}
+                  onChange={({ values }) =>
+                    updateTable(selected.id, (table) => ({
+                      ...table,
+                      ...(styleSlot === "table"
+                        ? { tableStyle: values }
+                        : styleSlot === "tableHeader"
+                          ? { headerStyle: values }
+                          : { cellStyle: values }),
+                    }))
+                  }
+                />
+              ) : null}
+
+              {styleSlot === "cell" && cellContext ? (
+                <InlineStyleEditor
+                  values={cellContext.cell.style}
+                  styleSlug=""
+                  fonts={sources.fonts}
+                  savedStyles={sources.styles}
+                  showSavedStyles={false}
+                  onChange={({ values }) =>
+                    updateTable(cellContext.blockId, (table) =>
+                      withCellChanged(table, cellContext.at, (cell) => ({
+                        ...cell,
+                        style: values,
+                      }))
+                    )
+                  }
+                />
+              ) : null}
 
               {styleSlot === "shape" ? (
                 <InlineStyleEditor
@@ -3256,270 +3688,150 @@ export function PublicationEditor({
                 </div>
               </div>
 
-              <div className="inspector-section">
-                <h4 className="inspector-title">Content</h4>
-
-                {selected.type === "richText" ? (
-                  <>
-                    <p className="help-text">
-                      Double-click the block to write in it. The bar above the
-                      canvas formats whatever the caret is in; sizes are stored
-                      in rem and scale with the viewer.
+              {selected.type === "table" ? (
+                <>
+                  <div className="inspector-section">
+                    <h4 className="inspector-title">Table</h4>
+                    <p className="help-text" style={{ marginTop: 0 }}>
+                      Click a cell on the canvas to fill it; the bar above the
+                      canvas adds rows, columns and content.
                     </p>
-                    <StyleButton label="Text style" onOpen={() => setStyleSlot("text")} />
-                  </>
-                ) : null}
-
-                {selected.type === "image" || selected.type === "video" ? (
-                  <>
-                    <MediaField
-                      label={selected.type === "image" ? "Image" : "Video"}
-                      value={selected.mediaUrl ?? ""}
-                      mediaType={selected.type}
-                      onChange={(url, asset) =>
-                        updateBlock(selected.id, { mediaUrl: url, mediaId: asset?._id ?? "" })
-                      }
-                    />
-                    <SelectField
-                      label="Fit"
-                      value={selected.objectFit ?? "cover"}
-                      options={[
-                        { value: "cover", label: "Cover" },
-                        { value: "contain", label: "Contain" },
-                      ]}
-                      onChange={(objectFit) => updateBlock(selected.id, { objectFit })}
-                    />
-                    {/* Corners, border, shadow and the rest come from the
-                        style now, rather than a lone radius field. */}
                     <StyleButton
-                      label={selected.type === "image" ? "Image style" : "Video style"}
-                      onOpen={() => setStyleSlot("text")}
+                      label="Table style"
+                      onOpen={() => setStyleSlot("table")}
                     />
-                    {selected.type === "video" ? (
-                      <>
-                        <CheckField
-                          label="Autoplay"
-                          value={Boolean(selected.autoplay)}
-                          onChange={(autoplay) => updateBlock(selected.id, { autoplay })}
-                        />
-                        <CheckField
-                          label="Loop"
-                          value={selected.loop !== false}
-                          onChange={(loop) => updateBlock(selected.id, { loop })}
-                        />
-                        <CheckField
-                          label="Muted"
-                          value={selected.muted !== false}
-                          onChange={(muted) => updateBlock(selected.id, { muted })}
-                        />
-                        <CheckField
-                          label="Show controls"
-                          value={Boolean(selected.controls)}
-                          onChange={(controls) => updateBlock(selected.id, { controls })}
-                        />
-                      </>
-                    ) : null}
-                  </>
-                ) : null}
-
-                {selected.type === "button" ? (
-                  <>
-                    <p className="help-text">
-                      Double-click the button to write its face.
-                    </p>
-                    {/* What it does when pressed is the click action below,
-                        which every block carries — a second link field on the
-                        button alone was a second answer to one question, and
-                        the one nothing rendered. */}
                     <StyleButton
-                      label="Button style"
-                      onOpen={() => setStyleSlot("text")}
+                      label="All cells"
+                      onOpen={() => setStyleSlot("tableCell")}
                     />
-                  </>
-                ) : null}
+                    <StyleButton
+                      label="Header cells"
+                      onOpen={() => setStyleSlot("tableHeader")}
+                    />
+                  </div>
 
-                {selected.type === "qrCode" ? (
-                  <>
-                    <TextField
-                      label="Value or URL"
-                      value={selected.qrValue ?? ""}
-                      onChange={(qrValue) => updateBlock(selected.id, { qrValue })}
-                    />
-                    <ColorField
-                      label="Colour"
-                      value={selected.color ?? "#000000"}
-                      onChange={(color) => updateBlock(selected.id, { color })}
-                    />
-                  </>
-                ) : null}
-
-                {selected.type === "icon" ? (
-                  <>
-                    <IconSearchField
-                      value={selected.iconName ?? "star"}
-                      onChange={(iconName) => updateBlock(selected.id, { iconName })}
-                    />
-                    <StyleButton label="Icon style" onOpen={() => setStyleSlot("text")} />
-                  </>
-                ) : null}
-
-                {/* Both shape blocks carry the same controls — they differ only
-                    in where the outline comes from, a preset or an uploaded
-                    file. */}
-                {selected.type === "shape" || selected.type === "customShape" ? (
-                  <>
-                    {selected.type === "shape" ? (
-                      <SelectField
-                        label="Shape"
-                        value={selected.shapeKind ?? "rectangle"}
-                        options={SHAPE_KINDS.map((value) => ({
-                          value,
-                          label: SHAPE_KIND_LABELS[value],
-                        }))}
-                        onChange={(shapeKind) => updateBlock(selected.id, { shapeKind })}
+                  {cellContext ? (
+                    <div className="inspector-section">
+                      <h4 className="inspector-title">
+                        Cell R{cellContext.at.row + 1}C{cellContext.at.column + 1}
+                      </h4>
+                      <StyleButton
+                        label="This cell"
+                        onOpen={() => setStyleSlot("cell")}
                       />
-                    ) : (
-                      <SelectField
-                        label="Shape"
-                        value={selected.shapeSlug ?? ""}
-                        options={[
-                          { value: "", label: "Select a shape…" },
-                          ...sources.shapes.map((shape) => ({
-                            value: shape.slug,
-                            label: shape.name,
-                          })),
-                        ]}
-                        onChange={(shapeSlug) => updateBlock(selected.id, { shapeSlug })}
-                      />
-                    )}
 
-                    {/* Fill, outline and corners all live in the shape's style
-                        now, so there is no separate colour field. */}
-                    <StyleButton label="Shape style" onOpen={() => setStyleSlot("shape")} />
-
-                    <p className="help-text">
-                      Double-click the shape to write on it.
-                    </p>
-                    {richTextToPlainText(blockHtml(selected)).trim() ? (
-                      <>
-                        <SelectField
-                          label="Text placement"
-                          value={selected.textPlacement ?? "inside"}
-                          options={SHAPE_TEXT_PLACEMENTS.map((placement) => ({
-                            value: placement,
-                            label: SHAPE_TEXT_PLACEMENT_LABELS[placement],
-                          }))}
-                          onChange={(textPlacement) =>
-                            updateBlock(selected.id, { textPlacement })
-                          }
-                        />
-                        <p className="help-text" style={{ marginTop: 0 }}>
-                          {(selected.textPlacement ?? "inside") === "inside"
-                            ? selected.shapeKind === "line"
-                              ? "A line has no inside — text placed in it sits across the line."
-                              : "Text inside is held to the shape’s outline and cut off at it."
-                            : "Text above takes its own height from the block, and the shape fills what is left."}
+                      {/* What is in the cell, in the order it is stacked. */}
+                      {cellContext.cell.content.length === 0 ? (
+                        <p className="help-text">
+                          Empty. Add something from the bar above the canvas.
                         </p>
-                        <StyleButton label="Text style" onOpen={() => setStyleSlot("text")} />
-                      </>
-                    ) : null}
-                  </>
-                ) : null}
+                      ) : (
+                        <div className="cell-contents">
+                          {cellContext.cell.content.map((item, index) => (
+                            <div
+                              key={item.id}
+                              className={`cell-content-row${
+                                item.id === cellItemId ? " is-chosen" : ""
+                              }`}
+                            >
+                              <button
+                                type="button"
+                                className="cell-content-name"
+                                onClick={() =>
+                                  setCellItemId(item.id === cellItemId ? null : item.id)
+                                }
+                              >
+                                <IconView
+                                  name={BLOCK_ICONS[item.type] ?? "Square"}
+                                  size={14}
+                                />
+                                {BLOCK_LABELS[item.type] ?? item.type}
+                              </button>
+                              {/* Order is the layout here: a cell stacks what
+                                  it holds, so moving one up moves it up. */}
+                              <button
+                                type="button"
+                                className="btn btn-sm"
+                                title="Move up"
+                                disabled={index === 0}
+                                onClick={() => moveCellItem(index, -1)}
+                              >
+                                ↑
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-sm"
+                                title="Move down"
+                                disabled={index === cellContext.cell.content.length - 1}
+                                onClick={() => moveCellItem(index, 1)}
+                              >
+                                ↓
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-danger"
+                                title="Remove from the cell"
+                                onClick={() => removeCellItem(item.id)}
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="inspector-section">
+                      <p className="help-text" style={{ marginTop: 0 }}>
+                        Choose a cell on the canvas to fill or dress it.
+                      </p>
+                    </div>
+                  )}
 
-                {selected.type === "story" ? (
-                  <SelectField
-                    label="Story"
-                    value={selected.storyId ?? ""}
-                    options={[
-                      { value: "", label: "Select a story…" },
-                      ...sources.stories.map((story) => ({ value: story._id, label: story.label })),
-                    ]}
-                    onChange={(storyId) => updateBlock(selected.id, { storyId })}
-                  />
-                ) : null}
-
-                {selected.type === "collection" ? (
-                  <SelectField
-                    label="Collection"
-                    value={selected.collectionId ?? ""}
-                    options={[
-                      { value: "", label: "Select a collection…" },
-                      ...sources.collections.map((collection) => ({
-                        value: collection._id,
-                        label: collection.label,
-                      })),
-                    ]}
-                    onChange={(collectionId) => updateBlock(selected.id, { collectionId })}
-                  />
-                ) : null}
-
-                {selected.type === "form" ? (
-                  <SelectField
-                    label="Form"
-                    value={selected.formId ?? ""}
-                    options={[
-                      { value: "", label: "Select a form…" },
-                      ...sources.forms.map((form) => ({ value: form._id, label: form.label })),
-                    ]}
-                    onChange={(formId) => updateBlock(selected.id, { formId })}
-                  />
-                ) : null}
-
-                {selected.type === "sponsorScroll" ? (
-                  <SponsorScrollFields
-                    settings={normalizeSponsorScroll(selected.sponsorScroll)}
-                    levels={sources.recognitionLevels}
-                    onChange={(sponsorScroll) =>
-                      updateBlock(selected.id, { sponsorScroll })
-                    }
-                  />
-                ) : null}
-              </div>
-
-              <div className="inspector-section">
-                <h4 className="inspector-title">Click action</h4>
-                <SelectField
-                  label="On click"
-                  value={selected.clickAction ?? "none"}
-                  options={[
-                    { value: "none", label: "Nothing" },
-                    { value: "link", label: "Open a link" },
-                    { value: "page", label: "Go to a page" },
-                  ]}
-                  onChange={(clickAction) => updateBlock(selected.id, { clickAction })}
+                  {/* The chosen block inside the cell, with the very controls
+                      it would get standing on the canvas. */}
+                  {cellContext?.item ? (
+                    <>
+                      <div className="inspector-section">
+                        <h4 className="inspector-title">
+                          {BLOCK_LABELS[cellContext.item.type] ?? "Content"}
+                        </h4>
+                        <div className="field-grid">
+                          <NumField
+                            label="Width"
+                            value={cellContext.item.width}
+                            onChange={(width) => updateCellItem({ width })}
+                          />
+                          <NumField
+                            label="Height"
+                            value={cellContext.item.height}
+                            onChange={(height) => updateCellItem({ height })}
+                          />
+                        </div>
+                        <p className="help-text" style={{ marginTop: 0 }}>
+                          A cell lays its contents out in order. Width is a
+                          maximum; words take the height they need.
+                        </p>
+                      </div>
+                      <BlockContentFields
+                        block={cellContext.item}
+                        update={updateCellItem}
+                        sources={sources}
+                        pages={pages}
+                        setStyleSlot={setStyleSlot}
+                      />
+                    </>
+                  ) : null}
+                </>
+              ) : (
+                <BlockContentFields
+                  block={selected}
+                  update={(patch) => updateBlock(selected.id, patch)}
+                  sources={sources}
+                  pages={pages}
+                  setStyleSlot={setStyleSlot}
                 />
-                {selected.clickAction === "link" ? (
-                  <>
-                    <TextField
-                      label="URL"
-                      value={selected.clickTarget ?? ""}
-                      onChange={(clickTarget) => updateBlock(selected.id, { clickTarget })}
-                    />
-                    <CheckField
-                      label="Open in a new tab"
-                      value={Boolean(selected.newTab)}
-                      onChange={(newTab) => updateBlock(selected.id, { newTab })}
-                    />
-                  </>
-                ) : null}
-                {selected.clickAction === "page" ? (
-                  <SelectField
-                    label="Page"
-                    value={selected.clickTarget ?? ""}
-                    options={[
-                      { value: "", label: "Select a page…" },
-                      // Pages kept out of the order are named as such: they
-                      // are exactly what this control is most often for, and a
-                      // list that did not say so would look like a duplicate.
-                      ...pages.map((item) => ({
-                        value: item.id,
-                        label: item.hidden ? `${item.name} (linked only)` : item.name,
-                      })),
-                    ]}
-                    onChange={(clickTarget) => updateBlock(selected.id, { clickTarget })}
-                  />
-                ) : null}
-              </div>
+              )}
             </>
           ) : (
             <>

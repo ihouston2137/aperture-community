@@ -379,6 +379,23 @@ export function createTable(columns = 3, rows = 3): PublicationTable {
     headerRow: true,
     headerColumn: false,
     bandedRows: false,
+    /*
+     * A new table looks like a table, and the look is its own data.
+     *
+     * Kept here rather than in a stylesheet because a rule in the stylesheet
+     * could not be turned off: "no border" is the absence of a border style,
+     * which is indistinguishable from never having set one, so a default
+     * painted in CSS would be a table that can never lose its lines.
+     */
+    cellStyle: {
+      borderStyle: "solid",
+      borderWidth: 0.0625,
+      borderColor: "#94a3b8",
+      paddingTop: 0.5,
+      paddingRight: 0.5,
+      paddingBottom: 0.5,
+      paddingLeft: 0.5,
+    },
   };
 }
 

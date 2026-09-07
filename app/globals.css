@@ -6176,11 +6176,9 @@ ol.doc-list ol.doc-list ol.doc-list {
   table-layout: fixed;
 }
 
-/* A visible grid by default, so a table dropped on a canvas reads as one
-   before anybody has styled it. The table's own style overrides this. */
+/* Only what a cell always is. Its lines and its padding are the table's own
+   data — see `createTable` — so that they can be changed and removed. */
 .pub-table-cell {
-  border: 1px solid currentColor;
-  padding: 0.5rem;
   vertical-align: top;
   text-align: left;
   overflow: hidden;
@@ -6218,6 +6216,48 @@ ol.doc-list ol.doc-list ol.doc-list {
 
 .pub-editor-cell-item {
   position: relative;
+  outline: 1px solid transparent;
+  outline-offset: 1px;
+}
+
+/* The block in a cell whose settings the inspector is showing. */
+.pub-editor-cell-item.is-chosen {
+  outline-color: var(--admin-accent);
+}
+
+/* What a cell holds, listed in the order it is stacked. */
+.cell-contents {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-top: 0.4rem;
+}
+
+.cell-content-row {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.cell-content-name {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex: 1;
+  min-width: 0;
+  padding: 0.25rem 0.4rem;
+  border: 1px solid var(--admin-border);
+  border-radius: 0.25rem;
+  background: var(--admin-bg);
+  color: var(--admin-text);
+  font-size: 0.75rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cell-content-row.is-chosen .cell-content-name {
+  border-color: var(--admin-accent);
+  color: var(--admin-accent);
 }
 
 .pub-editor-cell-empty {
@@ -6259,6 +6299,130 @@ ol.doc-list ol.doc-list ol.doc-list {
 .pub-history {
   display: flex;
   gap: 0.25rem;
+}
+
+/* --------------------------------------- Custom colour, in the rich toolbar */
+
+.rte-custom-colors {
+  gap: 0.25rem;
+}
+
+.rte-custom-color {
+  position: relative;
+}
+
+.rte-custom-trigger {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  width: 1.5rem;
+  padding: 0.15rem 0;
+  border: 1px solid transparent;
+  border-radius: 0.25rem;
+  background: none;
+  color: var(--admin-text);
+  cursor: pointer;
+  line-height: 1;
+}
+
+.rte-custom-trigger:hover:not(:disabled),
+.rte-custom-trigger.is-open {
+  border-color: var(--admin-border);
+  color: var(--admin-accent);
+}
+
+.rte-custom-trigger:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.rte-custom-glyph {
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* The checkerboard is what makes a half-transparent colour read as one rather
+   than as a lighter shade of itself. */
+.rte-custom-bar {
+  display: block;
+  width: 1rem;
+  height: 0.25rem;
+  border-radius: 1px;
+  background-color: #fff;
+  background-image:
+    linear-gradient(45deg, #c9c9c9 25%, transparent 25%, transparent 75%, #c9c9c9 75%),
+    linear-gradient(45deg, #c9c9c9 25%, transparent 25%, transparent 75%, #c9c9c9 75%);
+  background-size: 6px 6px;
+  background-position: 0 0, 3px 3px;
+}
+
+.rte-custom-bar > span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 1px;
+}
+
+.rte-custom-panel {
+  position: absolute;
+  top: calc(100% + 0.25rem);
+  left: 0;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  width: 13rem;
+  padding: 0.5rem;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--radius);
+  background: var(--admin-panel);
+  box-shadow: 0 0.5rem 1.5rem rgb(0 0 0 / 0.35);
+}
+
+.rte-custom-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  color: var(--admin-muted);
+}
+
+.rte-custom-row > span:first-child {
+  width: 3.5rem;
+  flex: none;
+}
+
+.rte-custom-row input[type="color"] {
+  width: 2rem;
+  height: 1.5rem;
+  padding: 0;
+  border: 1px solid var(--admin-border);
+  border-radius: 0.25rem;
+  background: none;
+}
+
+.rte-custom-row input[type="range"] {
+  flex: 1;
+  min-width: 0;
+}
+
+.rte-custom-row output {
+  width: 2.5rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.rte-custom-value {
+  flex: 1;
+  min-width: 0;
+  height: 1.5rem;
+  padding: 0 0.35rem;
+  border: 1px solid var(--admin-border);
+  border-radius: 0.25rem;
+  background: var(--admin-bg);
+  color: var(--admin-text);
+  font-size: 0.75rem;
 }
 
 .pub-table-bar {
