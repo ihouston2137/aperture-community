@@ -7,6 +7,7 @@ import { requirePermission } from "@/lib/access";
 import { normalizeColorOverrides } from "@/lib/color-overrides";
 import { connectDB } from "@/lib/db";
 import { normalizeDocTemplateLayout } from "@/lib/doc-template-layout";
+import { clearMediaUsage, syncMediaUsage } from "@/lib/media-usage-sync";
 import { DocTemplate } from "@/lib/models";
 import { slugify, uniqueSlug } from "@/lib/slug";
 
@@ -55,6 +56,12 @@ export async function saveDocTemplateAction(formData: FormData) {
     templateId = String(created._id);
   }
 
+  // A template is shared by every document in its set, so media placed in one
+  // is in use even though no single document names it.
+  await syncMediaUsage(templateId, `Doc template: ${name}`, [
+    { kind: "doc-template", source: payload.layout },
+  ]);
+
   // Only one template can be the default one.
   if (isDefault) {
     await DocTemplate.updateMany(
@@ -75,6 +82,7 @@ export async function deleteDocTemplateAction(formData: FormData) {
   if (!id) return;
 
   await DocTemplate.findByIdAndDelete(id);
+  await clearMediaUsage(id);
 
   revalidatePath("/admin/docs/templates");
   revalidatePath("/docs", "layout");

@@ -7,7 +7,9 @@ import { requirePermission } from "@/lib/access";
 import { connectDB } from "@/lib/db";
 import { normalizeDocBlocks, stripInlineMarkdown } from "@/lib/doc-layout";
 import { parseMarkdown } from "@/lib/doc-markdown";
-import { DocPage, Documentation } from "@/lib/models";
+import { docUsageLabel } from "@/lib/doc-tree";
+import { clearMediaUsage, syncMediaUsage } from "@/lib/media-usage-sync";
+import { DocPage, Documentation, MediaAsset } from "@/lib/models";
 import { slugify, uniqueSlug } from "@/lib/slug";
 
 async function guard() {
@@ -35,6 +37,47 @@ function tagList(value: FormDataEntryValue | null): string[] {
         .filter(Boolean)
     ),
   ];
+}
+
+/**
+ * Record the media a document holds, so the library can say where a picture is
+ * used and refuse to delete one that is still on a page.
+ *
+ * The set's title travels with the entry: "Overview" alone says nothing to
+ * whoever is looking at the picture from the other end.
+ */
+async function recordDocMedia(
+  docId: string,
+  documentationId: string,
+  title: string,
+  content: unknown
+) {
+  const set = await Documentation.findById(documentationId).select("title").lean<any>();
+  await syncMediaUsage(docId, docUsageLabel(set?.title, title), [
+    { kind: "doc-page", source: content },
+  ]);
+}
+
+/**
+ * Rewrite the usage labels of a set's documents after it is renamed.
+ *
+ * One update per document rather than a re-scan of each: the media a document
+ * holds has not changed, only what that reference is called.
+ */
+async function relabelDocSetMedia(documentationId: string, setTitle: string) {
+  const pages = await DocPage.find({ documentationId }).select("title").lean<any[]>();
+
+  for (const page of pages) {
+    await MediaAsset.updateMany(
+      { usage: { $elemMatch: { kind: "doc-page", refId: String(page._id) } } },
+      { $set: { "usage.$[entry].label": docUsageLabel(setTitle, page.title ?? "") } },
+      {
+        arrayFilters: [
+          { "entry.kind": "doc-page", "entry.refId": String(page._id) },
+        ],
+      }
+    );
+  }
 }
 
 export async function saveDocAction(formData: FormData) {
@@ -82,6 +125,8 @@ export async function saveDocAction(formData: FormData) {
     docId = String(created._id);
   }
 
+  await recordDocMedia(docId, documentationId, title, payload.content);
+
   revalidatePath(`/admin/docs/${documentationId}`);
   revalidatePath("/docs", "layout");
   redirect(`/admin/docs/${documentationId}/pages/${docId}/edit?saved=1`);
@@ -98,6 +143,8 @@ export async function deleteDocAction(formData: FormData) {
   // parent: losing a section heading should not silently take its pages too.
   await DocPage.updateMany({ parentId: id }, { $set: { parentId: "" } });
   await DocPage.findByIdAndDelete(id);
+  // Its pictures are no longer shown anywhere, so they stop counting as used.
+  await clearMediaUsage(id);
 
   revalidatePath(`/admin/docs/${documentationId}`);
   revalidatePath("/docs", "layout");
@@ -218,6 +265,11 @@ export async function importDocsAction(formData: FormData) {
       sourceFilename: name,
     });
 
+    // Imported markdown often points at library media already — an image
+    // exported from here, or one pasted in and uploaded — so the references it
+    // arrives with are recorded the same as any other.
+    await recordDocMedia(String(doc._id), documentationId, title, blocks);
+
     created += 1;
     if (!firstId) firstId = String(doc._id);
   }
@@ -304,7 +356,7 @@ export async function splitDocIntoPagesAction(formData: FormData) {
 
   for (const [index, section] of sections.entries()) {
     const title = section.title || `Section ${index + 1}`;
-    await DocPage.create({
+    const created = await DocPage.create({
       documentationId,
       title,
       slug: await uniqueDocSlug(documentationId, slugify(title), title),
@@ -313,10 +365,13 @@ export async function splitDocIntoPagesAction(formData: FormData) {
       order: existing + index,
       content: section.blocks,
     });
+    await recordDocMedia(String(created._id), documentationId, title, section.blocks);
   }
 
   // The original becomes the section's landing page, holding its introduction.
   await DocPage.findByIdAndUpdate(id, { $set: { content: lead } });
+  // Its pictures moved into the sections, so it keeps only what the lead holds.
+  await recordDocMedia(id, documentationId, doc.title ?? "", lead);
 
   revalidatePath(`/admin/docs/${documentationId}`);
   revalidatePath("/docs", "layout");
@@ -407,7 +462,11 @@ export async function saveDocSetAction(formData: FormData) {
 
   let setId = id;
   if (id) {
+    const before = await Documentation.findById(id).select("title").lean<any>();
     await Documentation.findByIdAndUpdate(id, payload);
+    // Usage entries name the set, so renaming one has to reach them; otherwise
+    // the media library goes on citing a set title that no longer exists.
+    if (before && before.title !== title) await relabelDocSetMedia(id, title);
   } else {
     const created = await Documentation.create(payload);
     setId = String(created._id);
@@ -426,8 +485,12 @@ export async function deleteDocSetAction(formData: FormData) {
 
   // A page outside a set is unreachable, so the set's pages go with it. This is
   // the one delete here that is not recoverable by re-parenting.
+  const doomed = await DocPage.find({ documentationId: id }).select("_id").lean<any[]>();
   await DocPage.deleteMany({ documentationId: id });
   await Documentation.findByIdAndDelete(id);
+
+  // Nothing shows those pictures now, so the library stops holding them back.
+  for (const page of doomed) await clearMediaUsage(String(page._id));
 
   revalidatePath("/admin/docs");
   revalidatePath("/docs", "layout");

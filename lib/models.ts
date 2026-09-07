@@ -1100,6 +1100,8 @@ export const MEDIA_USAGE_KINDS = [
   "form-content",
   "form-upload",
   "site-logo",
+  "doc-page",
+  "doc-template",
 ] as const;
 
 export type MediaUsageKind = (typeof MEDIA_USAGE_KINDS)[number];

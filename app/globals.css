@@ -960,6 +960,37 @@ input, select, textarea {
   border-color: var(--admin-border);
 }
 
+/* The one entry in a colour palette that is not a colour: it clears the format
+   and lets the text inherit again. Quill would paint it as another swatch —
+   black in the text palette, white in the highlight one — which is precisely
+   the confusion between "black" and "no colour" this palette exists to undo, so
+   it is drawn as a labelled row under the swatches instead. */
+.rich-text-editor .ql-snow .ql-color-picker .ql-picker-item:not([data-value]) {
+  background-color: transparent;
+  float: none;
+  clear: both;
+  width: 100%;
+  height: auto;
+  margin: 0.25rem 0 0;
+  padding-top: 0.25rem;
+  border: 0;
+  border-top: 1px solid var(--admin-border);
+  border-radius: 0;
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+.rich-text-editor .ql-snow .ql-color-picker .ql-picker-item:not([data-value])::before {
+  content: attr(data-label);
+}
+
+/* Hovering or selecting a swatch outlines it; on a text row that outline would
+   land as a stray line across the panel. */
+.rich-text-editor .ql-snow .ql-color-picker .ql-picker-item:not([data-value]):hover {
+  border-color: var(--admin-border);
+  text-decoration: underline;
+}
+
 .rich-text-editor .ql-container.ql-snow {
   border-color: var(--admin-border);
   border-radius: 0 0 var(--radius) var(--radius);

@@ -29,6 +29,41 @@ const MAX_SIZE = 6;
 /** What an unstyled run renders at, and where stepping starts from. */
 const BASE_SIZE = 1;
 
+/**
+ * The colour swatches, which are Quill's own palette.
+ *
+ * They are written out here rather than left to Quill because of how it fills
+ * an empty colour `<select>`: one swatch is nominated as the default and gets
+ * `selected` and *no* `value`, and the toolbar reads a selected-attribute
+ * option as "remove this format". That swatch is black for the text colour and
+ * white for the highlight — so choosing black stripped the colour instead of
+ * setting it, and the text fell back to whatever it inherited. Quill can assume
+ * the two are the same thing because its editor is always black on white; text
+ * here sits on a publication canvas in whatever colour the block's style says.
+ *
+ * Filling the select ourselves means every swatch carries a real value, and
+ * "no colour" is one deliberate entry at the end of the palette instead.
+ */
+const COLOR_SWATCHES = [
+  "#000000", "#e60000", "#ff9900", "#ffff00", "#008a00", "#0066cc", "#9933ff",
+  "#ffffff", "#facccc", "#ffebcc", "#ffffcc", "#cce8cc", "#cce0f5", "#ebd6ff",
+  "#bbbbbb", "#f06666", "#ffc266", "#ffff66", "#66b966", "#66a3e0", "#c285ff",
+  "#888888", "#a10000", "#b26b00", "#b2b200", "#006100", "#0047b2", "#6b24b2",
+  "#444444", "#5c0000", "#663d00", "#666600", "#003700", "#002966", "#3d1466",
+];
+
+/**
+ * The palette for one colour select. The last entry carries `selected` and no
+ * value, which is how Quill's toolbar spells "clear this format" — the reset
+ * every other swatch used to be mistaken for.
+ */
+function colorOptions(resetLabel: string): string {
+  return (
+    COLOR_SWATCHES.map((color) => `<option value="${color}"></option>`).join("") +
+    `<option selected>${resetLabel}</option>`
+  );
+}
+
 /** Built into an element this component owns, so Quill never touches React's DOM. */
 const TOOLBAR_HTML = `
   <span class="ql-formats">
@@ -38,8 +73,8 @@ const TOOLBAR_HTML = `
     <button type="button" class="ql-strike"></button>
   </span>
   <span class="ql-formats">
-    <select class="ql-color"></select>
-    <select class="ql-background"></select>
+    <select class="ql-color">${colorOptions("Default colour")}</select>
+    <select class="ql-background">${colorOptions("No highlight")}</select>
   </span>
   <span class="ql-formats">
     <select class="ql-align"></select>

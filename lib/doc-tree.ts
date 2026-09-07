@@ -66,6 +66,19 @@ export function docHref(setSlug: string, docSlug: string): string {
 }
 
 /**
+ * How a document names itself outside documentation — in the media library's
+ * "used in" list, say.
+ *
+ * The set leads, because a title alone is ambiguous once two sets each have an
+ * "Overview", and because the set is what a reader would be sent to.
+ */
+export function docUsageLabel(setTitle: string | undefined, title: string): string {
+  const name = title?.trim() || "Untitled document";
+  const set = setTitle?.trim();
+  return set ? `${set}: ${name}` : `Doc: ${name}`;
+}
+
+/**
  * The tree, from a flat list of one set's pages.
  *
  * A page whose parent is missing — deleted, or unpublished — is lifted to the

@@ -1,7 +1,11 @@
 import { connectDB } from "./db";
+import { docUsageLabel } from "./doc-tree";
 import {
   Bio,
   Collection,
+  DocPage,
+  DocTemplate,
+  Documentation,
   FormDefinition,
   MediaAsset,
   SiteContent,
@@ -32,6 +36,16 @@ const MEDIA_ID_KEYS = /(^|[a-z])mediaId$|^sourceId$/i;
 const MEDIA_PATH = /^\/(uploads|images)\//;
 
 /**
+ * Media addressed from inside a longer string rather than by a field of its
+ * own: `![alt](/uploads/x.png)` in a document's markdown, `<img src="…">` in a
+ * raw HTML block. Without this a picture written into prose reads as unused,
+ * and the delete guard lets it be thrown away while a page still shows it.
+ */
+const EMBEDDED_MEDIA = /\/(?:uploads|images)\/[\w.~%+-]+(?:\/[\w.~%+-]+)*/g;
+/** The same, once a url has been rewritten through the protected media route. */
+const EMBEDDED_TOKEN = /\/api\/media\?i=[A-Za-z0-9_-]+/g;
+
+/**
  * Walk an arbitrary document collecting anything that could address a media
  * asset: local media paths, `*MediaId` / `sourceId` fields, and `imageIds`
  * arrays. Being shape-agnostic is what lets one scanner cover every builder,
@@ -47,7 +61,19 @@ export function collectMediaRefs(
 
   if (typeof value === "string") {
     const path = sanitizeMediaPath(value);
-    if (path && MEDIA_PATH.test(path)) urls.add(path);
+    if (path && MEDIA_PATH.test(path)) {
+      urls.add(path);
+      return;
+    }
+
+    // Not a url in its own right, so read it as text that may quote some.
+    for (const pattern of [EMBEDDED_MEDIA, EMBEDDED_TOKEN]) {
+      pattern.lastIndex = 0;
+      for (const match of value.matchAll(pattern)) {
+        const embedded = sanitizeMediaPath(match[0]);
+        if (embedded && MEDIA_PATH.test(embedded)) urls.add(embedded);
+      }
+    }
     return;
   }
 
@@ -84,6 +110,9 @@ export async function buildMediaUsageIndex(): Promise<MediaUsageIndex> {
     stories,
     collections,
     publications,
+    docSets,
+    docPages,
+    docTemplates,
     bios,
     sponsors,
     forms,
@@ -98,6 +127,9 @@ export async function buildMediaUsageIndex(): Promise<MediaUsageIndex> {
       Zine.find()
         .select("title pages repeatedBlocks coverMediaId coverUrl audio")
         .lean<any[]>(),
+      Documentation.find().select("title").lean<any[]>(),
+      DocPage.find().select("title documentationId content").lean<any[]>(),
+      DocTemplate.find().select("name layout").lean<any[]>(),
       Bio.find().select("name headshotMediaId headshotUrl").lean<any[]>(),
       Sponsor.find().select("name logos").lean<any[]>(),
       FormDefinition.find().select("title layout").lean<any[]>(),
@@ -158,6 +190,34 @@ export async function buildMediaUsageIndex(): Promise<MediaUsageIndex> {
       "publication",
       String(publication._id),
       publication.title || "Untitled publication"
+    );
+  }
+
+  // A document's pictures belong to the set a reader finds them in, so the
+  // label carries it: two sets can each hold an "Overview", and "Overview" on
+  // its own tells whoever is about to delete an image nothing about where it
+  // still appears.
+  const setTitles = new Map<string, string>();
+  for (const set of docSets) setTitles.set(String(set._id), set.title || "");
+
+  for (const doc of docPages) {
+    record(
+      doc,
+      "documentation",
+      "doc-page",
+      String(doc._id),
+      docUsageLabel(setTitles.get(String(doc.documentationId ?? "")), doc.title)
+    );
+  }
+  // A template is shared by every document in its set, so an image placed in
+  // one is in use even while no single document names it.
+  for (const template of docTemplates) {
+    record(
+      template,
+      "documentation",
+      "doc-template",
+      String(template._id),
+      `Doc template: ${template.name || "Untitled"}`
     );
   }
 
