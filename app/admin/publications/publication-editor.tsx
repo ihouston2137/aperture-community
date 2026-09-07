@@ -2498,7 +2498,7 @@ export function PublicationEditor({
         </aside>
 
         {/* -------------------------------------------------------- Canvas */}
-        <div className="pub-stage">
+        <div className="pub-canvas-column">
           {/*
             The formatting bar, above the canvas and across it.
 

@@ -847,7 +847,7 @@ input, select, textarea {
   display: contents;
 }
 
-.rich-text-editor .rte-quill-toolbar.ql-toolbar {
+.rte-toolbar .rte-quill-toolbar.ql-toolbar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -855,7 +855,7 @@ input, select, textarea {
   border: 0;
 }
 
-.rich-text-editor .rte-quill-toolbar.ql-toolbar .ql-formats {
+.rte-toolbar .rte-quill-toolbar.ql-toolbar .ql-formats {
   margin-right: 0.5rem;
 }
 
@@ -927,37 +927,47 @@ input, select, textarea {
   opacity: 0.7;
 }
 
-/* Snow is a light theme and the admin is dark, so the icons need recolouring. */
-.rich-text-editor .ql-snow .ql-stroke,
-.rich-text-editor .ql-snow .ql-stroke-miter {
+/*
+ * Snow is a light theme and the admin is dark, so the icons need recolouring.
+ *
+ * Anchored on the toolbar rather than on the editor around it: the toolbar is
+ * portalled away into the bar above the publication canvas, where the editor
+ * is no longer its ancestor. Scoped to the editor, every rule below silently
+ * stopped applying there — dark icons on a dark panel, and the palette's
+ * "Default colour" row back to looking like a plain black swatch.
+ */
+.rte-toolbar .ql-snow .ql-stroke,
+.rte-toolbar .ql-snow .ql-stroke-miter {
   stroke: var(--admin-text);
 }
 
-.rich-text-editor .ql-snow .ql-fill,
-.rich-text-editor .ql-snow .ql-stroke.ql-fill {
+.rte-toolbar .ql-snow .ql-fill,
+.rte-toolbar .ql-snow .ql-stroke.ql-fill {
   fill: var(--admin-text);
 }
 
-.rich-text-editor .ql-snow .ql-picker {
+.rte-toolbar .ql-snow .ql-picker {
   color: var(--admin-text);
 }
 
-.rich-text-editor .ql-snow button:hover .ql-stroke,
-.rich-text-editor .ql-snow button.ql-active .ql-stroke,
-.rich-text-editor .ql-snow .ql-picker-label:hover .ql-stroke,
-.rich-text-editor .ql-snow .ql-picker-label.ql-active .ql-stroke {
+.rte-toolbar .ql-snow button:hover .ql-stroke,
+.rte-toolbar .ql-snow button.ql-active .ql-stroke,
+.rte-toolbar .ql-snow .ql-picker-label:hover .ql-stroke,
+.rte-toolbar .ql-snow .ql-picker-label.ql-active .ql-stroke {
   stroke: var(--admin-accent);
 }
 
-.rich-text-editor .ql-snow button:hover .ql-fill,
-.rich-text-editor .ql-snow button.ql-active .ql-fill {
+.rte-toolbar .ql-snow button:hover .ql-fill,
+.rte-toolbar .ql-snow button.ql-active .ql-fill {
   fill: var(--admin-accent);
 }
 
 /* The dropdown panels stay light, so their contents keep dark text. */
-.rich-text-editor .ql-snow .ql-picker-options {
+.rte-toolbar .ql-snow .ql-picker-options {
   color: var(--content-text);
   border-color: var(--admin-border);
+  /* Above the rest of the bar it opens out of. */
+  z-index: 5;
 }
 
 /* The one entry in a colour palette that is not a colour: it clears the format
@@ -965,7 +975,7 @@ input, select, textarea {
    black in the text palette, white in the highlight one — which is precisely
    the confusion between "black" and "no colour" this palette exists to undo, so
    it is drawn as a labelled row under the swatches instead. */
-.rich-text-editor .ql-snow .ql-color-picker .ql-picker-item:not([data-value]) {
+.rte-toolbar .ql-snow .ql-color-picker .ql-picker-item:not([data-value]) {
   background-color: transparent;
   float: none;
   clear: both;
@@ -980,13 +990,13 @@ input, select, textarea {
   line-height: 1.4;
 }
 
-.rich-text-editor .ql-snow .ql-color-picker .ql-picker-item:not([data-value])::before {
+.rte-toolbar .ql-snow .ql-color-picker .ql-picker-item:not([data-value])::before {
   content: attr(data-label);
 }
 
 /* Hovering or selecting a swatch outlines it; on a text row that outline would
    land as a stray line across the panel. */
-.rich-text-editor .ql-snow .ql-color-picker .ql-picker-item:not([data-value]):hover {
+.rte-toolbar .ql-snow .ql-color-picker .ql-picker-item:not([data-value]):hover {
   border-color: var(--admin-border);
   text-decoration: underline;
 }
@@ -6028,25 +6038,41 @@ ol.doc-list ol.doc-list ol.doc-list {
 /* The canvas column: a formatting bar, then the workspace under it. The
    workspace keeps its own scrolling and panning, so the bar has to be a
    sibling rather than something floating inside it. */
-.pub-stage {
+/*
+ * The editor's canvas column: a formatting bar, then the workspace under it.
+ *
+ * Named for the column rather than the stage, because `.pub-stage` is the
+ * viewer's scaled page and this is not one of those — the editor mounts the
+ * viewer to export from, so a shared name would have dressed both.
+ */
+.pub-canvas-column {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   min-width: 0;
   min-height: 0;
 }
 
-/* Always present so a toolbar always has somewhere to arrive; quiet until
-   something puts controls in it. */
+/*
+ * Always present so a toolbar always has somewhere to arrive; quiet until
+ * something puts controls in it.
+ *
+ * Nothing here may clip or be painted over: the colour and alignment controls
+ * open downward, out of the bar and across the canvas below it. So the bar
+ * wraps rather than scrolling — a scroll container would cut the panels off at
+ * its own edge — and it is lifted above the workspace, which comes after it in
+ * the document and would otherwise paint over anything hanging out of it.
+ */
 .pub-format-bar {
+  position: relative;
+  z-index: 3;
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 0.5rem;
   min-height: 2.75rem;
-  padding: 0 0.5rem;
+  padding: 0.25rem 0.5rem;
   border-bottom: 1px solid var(--admin-border);
   background: var(--admin-panel, var(--admin-bg));
-  overflow-x: auto;
-  overflow-y: hidden;
 }
 
 .pub-format-bar-slot {
@@ -6239,7 +6265,7 @@ ol.doc-list ol.doc-list ol.doc-list {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
 }
 
 .pub-format-group {
