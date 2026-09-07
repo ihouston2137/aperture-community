@@ -338,6 +338,19 @@ export function RichTextEditor({
       sizeStyle.whitelist = null;
       registry.register(sizeStyle, true);
 
+      /*
+       * One toolbar in the host, always.
+       *
+       * This editor creates and removes its own, which is what keeps a
+       * discarded editor from being left listening on the buttons of a live
+       * one. Where the toolbar is portalled somewhere shared — the bar above a
+       * publication canvas — a torn-down editor that somehow failed to take
+       * its toolbar with it would show as a second row of controls beside the
+       * real one. Anything already here cannot belong to this editor, which
+       * has not built its toolbar yet, so it goes.
+       */
+      toolbarHost.current.replaceChildren();
+
       toolbarEl = document.createElement("div");
       toolbarEl.className = "rte-quill-toolbar";
       toolbarEl.innerHTML = TOOLBAR_HTML;

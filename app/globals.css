@@ -6434,6 +6434,38 @@ ol.doc-list ol.doc-list ol.doc-list {
   width: 4rem;
 }
 
+/* Nine little cells: where content sits in its cell, both ways at once. Faster
+   to hit than two dropdowns, and it shows the answer rather than naming it. */
+.pub-align-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 0.6rem);
+  grid-template-rows: repeat(3, 0.6rem);
+  gap: 1px;
+  padding: 2px;
+  border: 1px solid var(--admin-border);
+  border-radius: 0.25rem;
+}
+
+.pub-align-cell {
+  padding: 0;
+  border: 0;
+  border-radius: 1px;
+  background: color-mix(in srgb, var(--admin-text) 18%, transparent);
+  cursor: pointer;
+}
+
+.pub-align-cell:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--admin-accent) 55%, transparent);
+}
+
+.pub-align-cell.is-current {
+  background: var(--admin-accent);
+}
+
+.pub-align-grid:has(.pub-align-cell:disabled) {
+  opacity: 0.45;
+}
+
 /* Names the level a group of controls dresses: table, column, row, cell, text. */
 .pub-format-title {
   font-size: 0.6875rem;

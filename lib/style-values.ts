@@ -86,6 +86,12 @@ export type StyleValues = {
   uppercase?: boolean;
   color?: string;
   textAlign?: "left" | "center" | "right" | "justify";
+  /**
+   * Where content sits down the box, for the one place a box has spare height
+   * to put it in: a table cell. Ignored everywhere else, where a block is the
+   * height it was given.
+   */
+  verticalAlign?: "top" | "middle" | "bottom";
 
   // Container
   backgroundColor?: string;
@@ -240,12 +246,23 @@ const BOOLEAN_KEYS = ["italic", "underline", "uppercase", "shadowEnabled"] as co
 const STRING_KEYS = [
   "fontFamily",
   "color",
-  "textAlign",
   "backgroundColor",
-  "borderStyle",
   "borderColor",
   "shadowColor",
 ] as const;
+
+/**
+ * Keys whose values are one of a few named answers.
+ *
+ * Kept apart from the free strings because these end up as CSS keywords: a
+ * value that is not one of them is not a colour somebody typed, it is noise,
+ * and storing it would mean reading it back forever.
+ */
+const ENUM_KEYS = {
+  textAlign: ["left", "center", "right", "justify"],
+  verticalAlign: ["top", "middle", "bottom"],
+  borderStyle: ["none", "solid", "dashed", "dotted"],
+} as const;
 
 function hexWithAlpha(color: string, opacity: number): string {
   const match = /^#([0-9a-f]{6})$/i.exec(color.trim());
@@ -278,6 +295,13 @@ export function normalizeStyleValues(input: unknown): StyleValues {
   for (const key of STRING_KEYS) {
     const value = raw[key];
     if (typeof value === "string" && value.trim() !== "") {
+      (out as Record<string, unknown>)[key] = value.trim();
+    }
+  }
+
+  for (const [key, allowed] of Object.entries(ENUM_KEYS)) {
+    const value = raw[key];
+    if (typeof value === "string" && (allowed as readonly string[]).includes(value.trim())) {
       (out as Record<string, unknown>)[key] = value.trim();
     }
   }
@@ -330,6 +354,7 @@ export function styleValuesToCss(
   if (values.uppercase) style.textTransform = "uppercase";
   if (values.color) style.color = values.color;
   if (values.textAlign) style.textAlign = values.textAlign;
+  if (values.verticalAlign) style.verticalAlign = values.verticalAlign;
 
   if (values.backgroundColor) {
     style.backgroundColor =

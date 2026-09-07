@@ -10,7 +10,7 @@ import type {
 } from "@/lib/publication-layout";
 import { protectedMediaUrl } from "@/lib/protected-media-url";
 import { plainTextToRichText, richTextToPlainText } from "@/lib/rich-text";
-import { shapeSurfaceOf, styleValuesToCss } from "@/lib/style-values";
+import { shapeSurfaceOf, styleValuesToCss, type StyleValues } from "@/lib/style-values";
 import { resolveStyle, tableCellCss, tableScheme } from "@/lib/table-style";
 
 import { LucideIconView } from "./lucide-icon";
@@ -72,30 +72,60 @@ export function publicationBlockStyle(block: PublicationBlock): CSSProperties {
   };
 }
 
+/** Where content sits across a cell and down it, from the resolved style. */
+const ACROSS = { left: "flex-start", center: "center", right: "flex-end", justify: "stretch" };
+const DOWN = { top: "flex-start", middle: "center", bottom: "flex-end" };
+
 /**
  * The one block a table cell holds.
  *
- * A cell is a box, so the block fills it rather than standing in it: its `x`,
- * `y` and `zIndex` say nothing, and its stored height is a starting point that
- * words are free to exceed. A picture or a shape keeps the height it was
- * given, so a row of logos stays a row of logos when the column beside it
- * grows.
+ * A cell is a box with room to spare, so where the block sits in it is a real
+ * question — and for anything that is not words it is the *only* way to place
+ * it. Words answer it with `text-align` and the cell's `vertical-align`; a
+ * picture, an icon or a shape needs the box around it to do the placing, which
+ * is what the flex wrapper is for.
+ *
+ * Its `x`, `y` and `zIndex` say nothing here. Its width and height are its own,
+ * so a logo stays the size it was given while the column beside it grows —
+ * except for words, which take the cell.
  */
 export function CellBlockView({
   block,
   sources,
+  align,
 }: {
   block: PublicationBlock;
   sources: PublicationSources;
+  /** The cell's resolved alignment, which places anything that is not words. */
+  align?: { x?: StyleValues["textAlign"]; y?: StyleValues["verticalAlign"] };
 }) {
   const flows = block.type === "richText" || block.type === "button";
+
+  if (flows) {
+    // Words fill the cell and align themselves; the cell's own `text-align`
+    // and `vertical-align` are already doing the work.
+    return (
+      <div className="pub-cell-item" style={{ width: "100%" }}>
+        <PublicationBlockView block={block} sources={sources} interactive={false} />
+      </div>
+    );
+  }
 
   return (
     <div
       className="pub-cell-item"
-      style={{ width: "100%", minHeight: flows ? undefined : `${block.height}px` }}
+      style={{
+        display: "flex",
+        width: "100%",
+        height: "100%",
+        minHeight: `${block.height}px`,
+        justifyContent: ACROSS[align?.x ?? "left"],
+        alignItems: DOWN[align?.y ?? "top"],
+      }}
     >
-      <PublicationBlockView block={block} sources={sources} interactive={false} />
+      <div style={{ width: `${block.width}px`, height: `${block.height}px`, maxWidth: "100%" }}>
+        <PublicationBlockView block={block} sources={sources} interactive={false} />
+      </div>
     </div>
   );
 }
@@ -122,7 +152,9 @@ export function PublicationTableView({
   /** The editor draws its own cells, so it can put a caret in one. */
   renderCell?: (
     cell: PublicationTableCell,
-    at: { row: number; column: number }
+    at: { row: number; column: number },
+    /** What the cell ended up wearing, so the editor can place content too. */
+    resolved: StyleValues
   ) => React.ReactNode;
   /**
    * How tall the grid actually came out.
@@ -197,9 +229,13 @@ export function PublicationTableView({
                 return (
                   <Cell key={cell.id} className="pub-table-cell" style={tableCellCss(resolved)}>
                     {renderCell ? (
-                      renderCell(cell, { row: rowIndex, column: columnIndex })
+                      renderCell(cell, { row: rowIndex, column: columnIndex }, resolved)
                     ) : (
-                      <CellBlockView block={cell.block} sources={sources} />
+                      <CellBlockView
+                        block={cell.block}
+                        sources={sources}
+                        align={{ x: resolved.textAlign, y: resolved.verticalAlign }}
+                      />
                     )}
                   </Cell>
                 );

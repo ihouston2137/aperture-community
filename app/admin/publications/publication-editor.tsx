@@ -605,6 +605,32 @@ function TableFormatBar({
             });
           }}
         />
+
+        {/*
+          Alignment is the cell's, not the text's, and it works both ways.
+          For words it is where the line sits; for a picture, an icon or a
+          shape it is the only thing that says where in the cell it goes.
+        */}
+        <span className="pub-align-grid" role="group" aria-label="Alignment">
+          {(["top", "middle", "bottom"] as const).map((y) =>
+            (["left", "center", "right"] as const).map((x) => {
+              const current =
+                (style.verticalAlign ?? "top") === y && (style.textAlign ?? "left") === x;
+              return (
+                <button
+                  key={`${y}-${x}`}
+                  type="button"
+                  className={`pub-align-cell${current ? " is-current" : ""}`}
+                  disabled={!chosen}
+                  title={`${y} ${x}`}
+                  aria-label={`Align ${y} ${x}`}
+                  aria-pressed={current}
+                  onClick={() => onDressCells({ textAlign: x, verticalAlign: y })}
+                />
+              );
+            })
+          )}
+        </span>
       </span>
 
       {/* ------------------------------------------------------------- Text */}
@@ -650,24 +676,6 @@ function TableFormatBar({
           <option value="400">Regular</option>
           <option value="600">Semibold</option>
           <option value="700">Bold</option>
-        </select>
-        {/* Where the words sit in the cell: across it, and up and down it. */}
-        <select
-          className="pub-format-select"
-          aria-label="Text alignment"
-          title="Where the words sit across the cell"
-          disabled={!chosen}
-          value={style.textAlign ?? ""}
-          onChange={(event) =>
-            onDressCells({
-              textAlign: (event.target.value || undefined) as StyleValues["textAlign"],
-            })
-          }
-        >
-          <option value="">Align</option>
-          <option value="left">Left</option>
-          <option value="center">Centre</option>
-          <option value="right">Right</option>
         </select>
       </span>
     </div>
@@ -1456,8 +1464,6 @@ export function PublicationEditor({
    * words: text in a table cell belongs to the table, which is what stays
    * selected while it is being written in.
    */
-  const editingTextId =
-    writing && writing.ownerId === selectedId ? writing.textId : null;
   const activeCell = cellAt && cellAt.blockId === selectedId ? cellAt : null;
 
   const spaceDown = useRef(false);
@@ -2166,6 +2172,23 @@ export function PublicationEditor({
     return cell ? { blockId: cellRange.blockId, at, cell } : null;
   })();
 
+  /*
+   * At most one thing is ever being written in, and it is the thing that is
+   * selected now.
+   *
+   * The owner check alone was not enough. Text inside a table belongs to the
+   * table, so moving to another cell left the owner matching and the editor
+   * for the cell just left still mounted — and its toolbar still in the bar
+   * beside the new one. Writing therefore also has to be in the cell that is
+   * chosen; anywhere else, it has ended.
+   */
+  const editingTextId = (() => {
+    if (!writing || writing.ownerId !== selectedId) return null;
+    // A block's own words: the owner is the block, and it is selected.
+    if (writing.ownerId === writing.textId) return writing.textId;
+    // A cell's words: only while that cell is the one chosen.
+    return cellContext?.cell.block.id === writing.textId ? writing.textId : null;
+  })();
   /** Rewrites the block held by the cell the inspector is showing. */
   function updateCellBlock(patch: Partial<PublicationBlock>) {
     if (!cellContext) return;
@@ -3473,7 +3496,7 @@ export function PublicationEditor({
                     table={block.table}
                     sources={canvasSources}
                     onMeasured={(height) => measuredTable(block.id, height)}
-                    renderCell={(cell, at) => {
+                    renderCell={(cell, at, resolved) => {
                       const chosen =
                         cellRange?.blockId === block.id &&
                         cellRange.addresses.some(
@@ -3527,11 +3550,16 @@ export function PublicationEditor({
                             setWriting({ ownerId: block.id, textId: cell.block.id });
                           }}
                         >
-                          <CellBlockView block={cell.block} sources={canvasSources} />
+                          <CellBlockView
+                            block={cell.block}
+                            sources={canvasSources}
+                            align={{ x: resolved.textAlign, y: resolved.verticalAlign }}
+                          />
 
                           {writingHere ? (
                             <div className="pub-editor-cell-writing">
                               <RichTextEditor
+                                key={cell.block.id}
                                 value={blockHtml(cell.block)}
                                 autoFocus
                                 onChange={(html) =>
@@ -3572,6 +3600,7 @@ export function PublicationEditor({
                 {!repeated && editingTextId === block.id ? (
                   <div className="pub-editor-writing">
                     <RichTextEditor
+                      key={block.id}
                       value={blockHtml(block)}
                       onChange={(html) => updateBlock(block.id, { html })}
                       fonts={sources.fonts}
@@ -4089,6 +4118,33 @@ export function PublicationEditor({
                           }
                           onOpen={() => setStyleSlot("cell")}
                         />
+
+                        {/*
+                          Words take the cell, so their size is the cell's.
+                          Everything else is drawn at a size of its own and
+                          placed by the cell's alignment, so it needs one.
+                        */}
+                        {cellContext.cell.block.type === "richText" ||
+                        cellContext.cell.block.type === "button" ? null : (
+                          <>
+                            <div className="field-grid">
+                              <NumField
+                                label="Width"
+                                value={cellContext.cell.block.width}
+                                onChange={(width) => updateCellBlock({ width })}
+                              />
+                              <NumField
+                                label="Height"
+                                value={cellContext.cell.block.height}
+                                onChange={(height) => updateCellBlock({ height })}
+                              />
+                            </div>
+                            <p className="help-text" style={{ marginTop: 0 }}>
+                              Drawn at this size and placed by the cell&rsquo;s
+                              alignment. The row grows if it needs to.
+                            </p>
+                          </>
+                        )}
                       </div>
 
                       {/* The block the cell holds, with the very controls it
