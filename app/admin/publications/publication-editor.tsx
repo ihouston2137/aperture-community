@@ -3274,39 +3274,48 @@ export function PublicationEditor({
                             the text controls are in the bar and act on all of
                             the cell's words.
                           */}
-                          {anchored && cellText ? (
-                            <div
-                              className={`pub-editor-cell-writing${
-                                insideCellText ? " is-open" : ""
-                              }`}
-                            >
-                              <RichTextEditor
-                                key={cell.block.id}
-                                value={blockHtml(cell.block)}
-                                autoFocus={insideCellText}
-                                contentClass="rich-text"
-                                formatWholeWhenBlurred
-                                onFormat={(attributes) => void spreadCellFormat(attributes)}
-                                onChange={(html) =>
-                                  updateTable(block.id, (table) =>
-                                    withCellChanged(table, at, (entry) => ({
-                                      ...entry,
-                                      block: { ...entry.block, html },
-                                    }))
-                                  )
-                                }
-                                fonts={sources.fonts}
-                                toolbarHost={formatBar}
-                                bare
-                              />
-                            </div>
-                          ) : (
-                            <CellBlockView
-                              block={cell.block}
-                              sources={canvasSources}
-                              align={{ x: resolved.textAlign, y: resolved.verticalAlign }}
-                            />
-                          )}
+                          <CellBlockView
+                            block={cell.block}
+                            sources={canvasSources}
+                            align={{ x: resolved.textAlign, y: resolved.verticalAlign }}
+                            /*
+                             * The cell is drawn as it will publish, with the
+                             * editor standing in for its words. A shape in a
+                             * cell is therefore visible while it is written on,
+                             * exactly as one on the page is.
+                             */
+                            textOverride={
+                              anchored && cellText ? (
+                                <span
+                                  className={`pub-editor-cell-writing${
+                                    insideCellText ? " is-open" : ""
+                                  }`}
+                                >
+                                  <RichTextEditor
+                                    key={cell.block.id}
+                                    value={blockHtml(cell.block)}
+                                    autoFocus={insideCellText}
+                                    contentClass="rich-text"
+                                    formatWholeWhenBlurred
+                                    onFormat={(attributes) =>
+                                      void spreadCellFormat(attributes)
+                                    }
+                                    onChange={(html) =>
+                                      updateTable(block.id, (table) =>
+                                        withCellChanged(table, at, (entry) => ({
+                                          ...entry,
+                                          block: { ...entry.block, html },
+                                        }))
+                                      )
+                                    }
+                                    fonts={sources.fonts}
+                                    toolbarHost={formatBar}
+                                    bare
+                                  />
+                                </span>
+                              ) : undefined
+                            }
+                          />
                         </div>
                       );
                     }}
@@ -3316,37 +3325,32 @@ export function PublicationEditor({
                     block={block}
                     sources={canvasSources}
                     interactive={false}
+                    /*
+                     * Written in place, inside the block rather than over it.
+                     * A shape being written on stays drawn, its words stay
+                     * clipped to its outline, and a label above one still takes
+                     * its own height — so what is being typed is what will be
+                     * published, rather than a bare box where the shape was.
+                     */
+                    textOverride={
+                      editingTextId === block.id ? (
+                        <span className="pub-editor-writing">
+                          <RichTextEditor
+                            key={block.id}
+                            value={blockHtml(block)}
+                            onChange={(html) => updateBlock(block.id, { html })}
+                            fonts={sources.fonts}
+                            toolbarHost={formatBar}
+                            contentClass="rich-text"
+                            bare
+                            autoFocus
+                          />
+                        </span>
+                      ) : undefined
+                    }
                   />
                 )}
 
-                {/*
-                  The words, written where they will be read.
-
-                  Laid over the block rather than replacing it, so a shape
-                  stays drawn under its label and a button keeps its face while
-                  the words on it are changed. The block underneath still
-                  renders its own text, which would show through, so it is
-                  hidden for as long as the editor is standing in for it.
-                */}
-                {!repeated && editingTextId === block.id ? (
-                  <div
-                    className={`pub-editor-writing ${
-                      blockTextProps(block).className
-                    }`.trim()}
-                    style={blockTextProps(block).style}
-                  >
-                    <RichTextEditor
-                      key={block.id}
-                      value={blockHtml(block)}
-                      onChange={(html) => updateBlock(block.id, { html })}
-                      fonts={sources.fonts}
-                      toolbarHost={formatBar}
-                      contentClass="rich-text"
-                      bare
-                      autoFocus
-                    />
-                  </div>
-                ) : null}
                 {/*
                   A table selected for its cells still has to be movable.
                   Once it is selected, presses inside it choose cells, so the

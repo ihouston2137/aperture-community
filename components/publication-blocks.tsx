@@ -118,11 +118,14 @@ export function CellBlockView({
   block,
   sources,
   align,
+  textOverride,
 }: {
   block: PublicationBlock;
   sources: PublicationSources;
   /** The cell's resolved alignment, which places anything that is not words. */
   align?: { x?: StyleValues["textAlign"]; y?: StyleValues["verticalAlign"] };
+  /** Stands in for the words, so a shape in a cell is drawn while it is written on. */
+  textOverride?: React.ReactNode;
 }) {
   const flows = block.type === "richText" || block.type === "button";
 
@@ -131,7 +134,12 @@ export function CellBlockView({
     // and `vertical-align` are already doing the work.
     return (
       <div className="pub-cell-item" style={{ width: "100%" }}>
-        <PublicationBlockView block={block} sources={sources} interactive={false} />
+        <PublicationBlockView
+          block={block}
+          sources={sources}
+          interactive={false}
+          textOverride={textOverride}
+        />
       </div>
     );
   }
@@ -149,7 +157,12 @@ export function CellBlockView({
       }}
     >
       <div style={{ width: `${block.width}px`, height: `${block.height}px`, maxWidth: "100%" }}>
-        <PublicationBlockView block={block} sources={sources} interactive={false} />
+        <PublicationBlockView
+          block={block}
+          sources={sources}
+          interactive={false}
+          textOverride={textOverride}
+        />
       </div>
     </div>
   );
@@ -304,11 +317,21 @@ export function PublicationBlockView({
   block,
   sources,
   interactive = true,
+  textOverride,
   onNavigate,
 }: {
   block: PublicationBlock;
   sources: PublicationSources;
   interactive?: boolean;
+  /**
+   * Stands in for the block's words, wherever they would have gone.
+   *
+   * The editor is put *in* the block rather than over it, so a shape being
+   * written on is still drawn, the words are still clipped to its outline, and
+   * the label above one still takes its own height. Somebody changing the
+   * words on a star can see the star.
+   */
+  textOverride?: React.ReactNode;
   onNavigate?: (pageId: string) => void;
 }) {
   const textProps = blockTextProps(block);
@@ -321,7 +344,14 @@ export function PublicationBlockView({
 
   switch (block.type) {
     case "richText":
-      content = (
+      content = textOverride ? (
+        <div
+          className={`rich-text ${textProps.className}`.trim()}
+          style={{ width: "100%", height: "100%", ...textProps.style }}
+        >
+          {textOverride}
+        </div>
+      ) : (
         <div
           className={`rich-text ${textProps.className}`.trim()}
           style={{ width: "100%", height: "100%", overflow: "hidden", ...textProps.style }}
@@ -377,9 +407,16 @@ export function PublicationBlockView({
       break;
 
     case "button":
-      content = (
-        // A div rather than a span: a button's face is rich text now, and rich
-        // text is paragraphs, which cannot live inside an inline element.
+      // A div rather than a span: a button's face is rich text now, and rich
+      // text is paragraphs, which cannot live inside an inline element.
+      content = textOverride ? (
+        <div
+          className={`pb-button rich-text ${textProps.className}`.trim()}
+          style={{ width: "100%", height: "100%", ...textProps.style }}
+        >
+          {textOverride}
+        </div>
+      ) : (
         <div
           className={`pb-button rich-text ${textProps.className}`.trim()}
           style={{ width: "100%", height: "100%", ...textProps.style }}
@@ -442,11 +479,16 @@ export function PublicationBlockView({
        */
       const surface = shapeSurfaceOf(block.shapeStyle);
       const html = blockHtml(block);
-      // Rich text is markup even when it says nothing, so an empty paragraph
-      // must not count as words the shape has to make room for.
-      const hasWords = richTextToPlainText(html).trim() !== "";
+      /*
+       * Rich text is markup even when it says nothing, so an empty paragraph
+       * must not count as words the shape has to make room for — unless the
+       * words are being written, when the room has to be there to write in.
+       */
+      const hasWords = Boolean(textOverride) || richTextToPlainText(html).trim() !== "";
       const above = hasWords && (block.textPlacement ?? "inside") === "above";
-      const words = hasWords ? (
+      const words = textOverride ? (
+        <span className="rich-text">{textOverride}</span>
+      ) : hasWords ? (
         <span className="rich-text" dangerouslySetInnerHTML={{ __html: html }} />
       ) : null;
 

@@ -6273,17 +6273,10 @@ ol.doc-list ol.doc-list ol.doc-list {
 }
 
 /*
- * The cell's words.
- *
- * Always present for the chosen cell, so the text controls are in the bar
- * whether or not anybody has gone inside; only interactive once they have,
- * because a press on a closed cell belongs to the cell.
+ * The cell's words are always live for the chosen cell, so the text controls
+ * are in the bar whether or not anybody has gone inside; only interactive once
+ * they have, because a press on a closed cell belongs to the cell.
  */
-.pub-editor-cell-writing {
-  position: relative;
-  height: 100%;
-}
-
 .pub-editor-cell-writing:not(.is-open) {
   pointer-events: none;
 }
@@ -6563,23 +6556,46 @@ ol.doc-list ol.doc-list ol.doc-list {
   white-space: nowrap;
 }
 
-/* A block being written in. Its own words are hidden while the editor stands
-   in for them — both would otherwise show, one over the other. */
-.pub-editor-block.is-writing > :not(.pub-editor-writing):not(.pub-editor-handle) {
-  visibility: hidden;
+/* Being written in. The block now looks exactly as it will publish, so this
+   dashed edge is the only sign that the caret is in it. */
+.pub-editor-block.is-writing {
+  outline: 1px dashed var(--admin-accent);
+  outline-offset: 2px;
 }
 
-.pub-editor-writing {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
+/*
+ * A block being written in.
+ *
+ * The editor stands where the block's words stand, inside the block rather
+ * than over it — so a shape keeps being drawn while its label is typed, and
+ * the words stay clipped to its outline. Nothing is hidden any more; there is
+ * only ever one set of words, and it is the live one.
+ */
+.pub-editor-writing,
+.pub-editor-cell-writing {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
-/* The editor fills the block exactly, so the words sit where they will be read
-   rather than shifting into a panel of their own. */
+/*
+ * A shape's text layer is deaf to the pointer, so that pressing the shape
+ * selects it. The editor inside that layer has to hear, or there would be no
+ * way to put a caret in the words it is showing.
+ */
+.pb-shape-clip:has(.pub-editor-writing),
+.pb-shape-clip:has(.pub-editor-cell-writing.is-open) {
+  pointer-events: auto;
+}
+
+/* The editor fills the space its words had, rather than shifting into a panel
+   of its own. */
 .pub-editor-writing .rich-text-editor.is-bare,
 .pub-editor-writing .rte-editor-host,
-.pub-editor-writing .ql-container.ql-snow {
+.pub-editor-writing .ql-container.ql-snow,
+.pub-editor-cell-writing .rich-text-editor.is-bare,
+.pub-editor-cell-writing .rte-editor-host,
+.pub-editor-cell-writing .ql-container.ql-snow {
   width: 100%;
   height: 100%;
   border: 0;
