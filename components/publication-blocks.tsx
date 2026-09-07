@@ -143,6 +143,7 @@ export function PublicationTableView({
   className,
   style,
   renderCell,
+  cellProps,
   onMeasured,
 }: {
   table: PublicationTable | undefined;
@@ -156,6 +157,18 @@ export function PublicationTableView({
     /** What the cell ended up wearing, so the editor can place content too. */
     resolved: StyleValues
   ) => React.ReactNode;
+  /**
+   * Handlers put on the cell itself.
+   *
+   * The whole cell is the target, not the content standing in it: a cell with
+   * one short word in it is mostly empty, and pressing that emptiness is
+   * pressing the cell. The padding belongs to the cell too, so it can only be
+   * caught here.
+   */
+  cellProps?: (
+    cell: PublicationTableCell,
+    at: { row: number; column: number }
+  ) => React.HTMLAttributes<HTMLTableCellElement>;
   /**
    * How tall the grid actually came out.
    *
@@ -188,7 +201,16 @@ export function PublicationTableView({
       className={`pub-table-box${className ? ` ${className}` : ""}`}
       style={{ width: "100%", ...style }}
     >
-      <table className="pub-table" style={styleValuesToCss(table.tableStyle)}>
+      <table
+        className="pub-table"
+        style={{
+          ...styleValuesToCss(table.tableStyle),
+          /* Cells share their lines until a gap is asked for, at which point
+             they become tiles and each draws its own. */
+          borderCollapse: table.cellSpacing ? "separate" : "collapse",
+          borderSpacing: table.cellSpacing ? `${table.cellSpacing}px` : undefined,
+        }}
+      >
         <colgroup>
           {table.columns.map((column, index) => (
             <col key={index} style={{ width: `${column.size}px` }} />
@@ -227,7 +249,12 @@ export function PublicationTableView({
                 const Cell = heading ? "th" : "td";
 
                 return (
-                  <Cell key={cell.id} className="pub-table-cell" style={tableCellCss(resolved)}>
+                  <Cell
+                    key={cell.id}
+                    className="pub-table-cell"
+                    style={tableCellCss(resolved)}
+                    {...cellProps?.(cell, { row: rowIndex, column: columnIndex })}
+                  >
                     {renderCell ? (
                       renderCell(cell, { row: rowIndex, column: columnIndex }, resolved)
                     ) : (

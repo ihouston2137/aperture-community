@@ -233,6 +233,7 @@ export function RichTextEditor({
   toolbarHost: externalToolbarHost = undefined,
   bare = false,
   autoFocus = false,
+  formatWholeWhenBlurred = false,
   onBlur,
 }: {
   value: string;
@@ -257,6 +258,15 @@ export function RichTextEditor({
   /** No frame and no min-height: the editor is standing in for the block itself. */
   bare?: boolean;
   autoFocus?: boolean;
+  /**
+   * With no caret in the words, a format applies to all of them.
+   *
+   * For a table cell, which is chosen long before anybody double-clicks into
+   * it: the toolbar is there the whole time, and pressing bold with the cell
+   * merely chosen means "make this cell bold" rather than nothing at all.
+   * Once there is a caret, the selection wins as it always does.
+   */
+  formatWholeWhenBlurred?: boolean;
   onBlur?: () => void;
 }) {
   const toolbarHost = useRef<HTMLDivElement>(null);
@@ -273,7 +283,8 @@ export function RichTextEditor({
     onChangeRef.current = onChange;
     placeholderRef.current = placeholder;
     onBlurRef.current = onBlur;
-  }, [onChange, placeholder, onBlur]);
+    wholeRef.current = formatWholeWhenBlurred;
+  }, [onChange, placeholder, onBlur, formatWholeWhenBlurred]);
   /** The last HTML this editor produced, so its own value coming back is a no-op. */
   const emittedRef = useRef(value);
   const initialValueRef = useRef(value);
@@ -299,7 +310,8 @@ export function RichTextEditor({
    * be dragged — so the range they will colour is remembered on the way in and
    * put back before each change.
    */
-  const colorRange = useRef<{ index: number; length: number } | null>(null);
+  const savedRange = useRef<{ index: number; length: number } | null>(null);
+  const wholeRef = useRef(formatWholeWhenBlurred);
 
   /*
    * Whether the toolbar has somewhere to be.
@@ -389,6 +401,7 @@ export function RichTextEditor({
         // No selection means focus just left, so leave the toolbar showing the
         // formatting the user is about to change.
         if (!range) return;
+        savedRange.current = range;
         const format = quill.getFormat(range);
         setFont(typeof format.font === "string" ? format.font : "");
         setSize(parseSize(format.size));
@@ -440,13 +453,37 @@ export function RichTextEditor({
     if (quill) quill.root.dataset.placeholder = placeholder ?? "";
   }, [placeholder, ready]);
 
-  /** Quill drops its selection when the toolbar takes focus; `focus()` restores it. */
-  const applyFormat = useCallback((name: string, next: string | false) => {
+  /**
+   * Applies a format to the caret's selection, or to everything.
+   *
+   * Quill drops its selection when the toolbar takes focus, so it is restored
+   * first. Where there was never a caret — a table cell chosen but not opened —
+   * the whole of the words are selected instead, so the toolbar means what it
+   * looks like it means.
+   */
+  const selectTarget = useCallback(() => {
     const quill = quillRef.current;
-    if (!quill) return;
-    quill.focus();
-    quill.format(name, next, "user");
+    if (!quill) return null;
+
+    const range = quill.getSelection() ?? savedRange.current;
+    if (range) {
+      quill.setSelection(range.index, range.length, "silent");
+      return quill;
+    }
+    if (!wholeRef.current) return null;
+
+    quill.setSelection(0, quill.getLength(), "silent");
+    return quill;
   }, []);
+
+  const applyFormat = useCallback(
+    (name: string, next: string | false) => {
+      const quill = selectTarget();
+      if (!quill) return;
+      quill.format(name, next, "user");
+    },
+    [selectTarget]
+  );
 
   const stepSize = (direction: 1 | -1) => {
     const next = roundSize(
@@ -464,7 +501,7 @@ export function RichTextEditor({
 
   /** Remembers the words being coloured, before the panel takes the focus. */
   const openColors = (target: "color" | "background") => {
-    colorRange.current = quillRef.current?.getSelection() ?? colorRange.current;
+    savedRange.current = quillRef.current?.getSelection() ?? savedRange.current;
     setColorOpen(target);
   };
 
@@ -476,13 +513,9 @@ export function RichTextEditor({
    * apply the colour to.
    */
   const applyColor = (target: "color" | "background", next: string) => {
-    const quill = quillRef.current;
+    const quill = selectTarget();
     if (!quill) return;
-
-    const range = colorRange.current;
-    if (range) quill.setSelection(range.index, range.length, "silent");
     quill.format(target, next || false, "user");
-
     setColors((current) => ({ ...current, [target]: next }));
   };
 

@@ -6165,21 +6165,27 @@ ol.doc-list ol.doc-list ol.doc-list {
   min-height: 0;
 }
 
-/* The editor's own cells: choosable, and marked when chosen. */
+/*
+ * The editor's own cells.
+ *
+ * The marking is on the cell rather than on what stands in it: the whole cell
+ * is what was chosen, padding and empty space included, and that is where the
+ * press was caught.
+ */
+.pub-table-cell:has(> .pub-editor-cell.is-chosen) {
+  outline: 2px solid var(--admin-accent);
+  outline-offset: -2px;
+}
+
+/* Opened: the caret is in it, or the thing it holds is being worked on. */
+.pub-table-cell:has(> .pub-editor-cell.is-inside) {
+  outline-style: dashed;
+}
+
 .pub-editor-cell {
   position: relative;
   height: 100%;
   min-height: 1.5rem;
-  outline: 2px solid transparent;
-  outline-offset: -2px;
-}
-
-.pub-editor-cell.is-chosen {
-  outline-color: var(--admin-accent);
-}
-
-.pub-editor-cell.is-writing > :not(.pub-editor-cell-writing) {
-  visibility: hidden;
 }
 
 /* Where a table is picked up once its cells have taken over pressing. */
@@ -6228,10 +6234,20 @@ ol.doc-list ol.doc-list ol.doc-list {
   opacity: 1;
 }
 
+/*
+ * The cell's words.
+ *
+ * Always present for the chosen cell, so the text controls are in the bar
+ * whether or not anybody has gone inside; only interactive once they have,
+ * because a press on a closed cell belongs to the cell.
+ */
 .pub-editor-cell-writing {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
+  position: relative;
+  height: 100%;
+}
+
+.pub-editor-cell-writing:not(.is-open) {
+  pointer-events: none;
 }
 
 .pub-history {
@@ -6485,6 +6501,20 @@ ol.doc-list ol.doc-list ol.doc-list {
 
 .pub-table-bar .pub-format-group:last-child {
   border-right: 0;
+}
+
+/* A number with its name beside it, so a field is never a mystery box. */
+.pub-format-field {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-size: 0.6875rem;
+  color: var(--admin-muted);
+  white-space: nowrap;
+}
+
+.pub-format-field input {
+  width: 3.5rem;
 }
 
 .pub-format-check {

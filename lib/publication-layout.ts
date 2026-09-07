@@ -108,6 +108,15 @@ export type PublicationTable = {
   /** Every other body row washed with the accent, which makes a wide table readable. */
   bandedRows: boolean;
   /**
+   * The gap between cells, in canvas units.
+   *
+   * Nought is the ordinary table where cells share their lines. Anything more
+   * separates them into tiles, which is a decision about the whole grid rather
+   * than about any cell in it — two neighbours cannot disagree about the gap
+   * between them.
+   */
+  cellSpacing?: number;
+  /**
    * The one colour the table's look is built from: its heading fill, its
    * banding and its lines. One choice rather than several that have to be kept
    * in agreement — see `tableScheme`.
@@ -454,6 +463,7 @@ export function createTable(columns = 3, rows = 3): PublicationTable {
     headerRow: true,
     headerColumn: false,
     bandedRows: false,
+    cellSpacing: 0,
     accentColor: DEFAULT_TABLE_ACCENT,
     /*
      * Only the padding. Lines, fills and heading colours come from the scheme,
@@ -575,6 +585,7 @@ export function normalizeTable(input: unknown): PublicationTable {
     headerRow: raw.headerRow === undefined ? true : Boolean(raw.headerRow),
     headerColumn: Boolean(raw.headerColumn),
     bandedRows: Boolean(raw.bandedRows),
+    cellSpacing: Math.max(0, Math.round(num(raw.cellSpacing, 0))),
     accentColor: str(raw.accentColor) || DEFAULT_TABLE_ACCENT,
   };
 
