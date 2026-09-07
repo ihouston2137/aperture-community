@@ -37,8 +37,9 @@ import type { AdminExit } from "@/lib/admin-exit";
 import type { BuilderSources } from "@/lib/builder-sources";
 import { protectedMediaUrl } from "@/lib/protected-media-url";
 import { plainTextToRichText, richTextToPlainText } from "@/lib/rich-text";
-import { formatColor, parseColor } from "@/lib/color";
+import { parseColor } from "@/lib/color";
 import type { StyleValues } from "@/lib/style-values";
+import { cleanStyle, DEFAULT_TABLE_ACCENT } from "@/lib/table-style";
 import {
   createPublicationBlock,
   createPublicationPage,
@@ -58,6 +59,7 @@ import {
   withColumnRemoved,
   withRowAdded,
   withRowRemoved,
+  withAxisChanged,
   withCellKind,
   withColumnWidth,
   withRowHeight,
@@ -287,6 +289,23 @@ function StyleButton({ label, onOpen }: { label: string; onOpen: () => void }) {
  * grid currently has chosen: the whole table when nothing inside it is, and a
  * row and column when a cell is.
  */
+/**
+ * The table controls, in the bar above the canvas.
+ *
+ * Grouped by what each thing dresses, because that is the question people
+ * actually get stuck on:
+ *
+ *   Table   — the accent the whole look is built from, and which rows and
+ *             columns are headings or banded.
+ *   Column  — how wide, and anything said about a whole column.
+ *   Row     — how tall, and anything said about a whole row.
+ *   Cell    — what it holds, its fill, its lines, its padding.
+ *   Text    — the words inside: their size, weight and where they sit.
+ *
+ * Everything from Column rightwards acts on whatever cells are chosen, and the
+ * labels say how many. Anything set here beats the automatic scheme, so
+ * colouring a row and then switching banding on leaves that row alone.
+ */
 function TableFormatBar({
   block,
   range,
@@ -295,78 +314,48 @@ function TableFormatBar({
   cell,
   onChange,
   onKind,
-  onDress,
+  onDressCells,
+  onDressAxis,
   onSize,
 }: {
   block: PublicationBlock;
   /** How many cells the buttons act on, for labelling. */
   range: number;
-  /** The rows and columns those cells sit in, which sizing acts on. */
+  /** The rows and columns those cells sit in. */
   rows: number[];
   columns: number[];
-  /** The cell whose kind and dressing are shown, if one is chosen. */
+  /** The cell the range was started at, whose settings are shown. */
   cell: PublicationTableCell | null;
   onChange: (change: (table: PublicationTable) => PublicationTable) => void;
   onKind: (type: (typeof TABLE_CELL_BLOCK_TYPES)[number]) => void;
-  onDress: (patch: StyleValues) => void;
-  onSize: (change: {
-    rows?: number[];
-    columns?: number[];
-    height?: number;
-    width?: number;
-  }) => void;
+  onDressCells: (patch: StyleValues) => void;
+  onDressAxis: (axis: "rows" | "columns", patch: StyleValues) => void;
+  onSize: (axis: "rows" | "columns", size: number) => void;
 }) {
   const table = block.table;
   if (!table) return null;
 
   const style = cell?.style ?? {};
-  const padding = style.paddingTop ?? 0;
+  const chosen = range > 0;
+  const rowStyle = rows.length ? table.rows[rows[0]].style ?? {} : {};
+  const columnStyle = columns.length ? table.columns[columns[0]].style ?? {} : {};
 
   return (
     <div className="pub-table-bar">
+      {/* ------------------------------------------------------------ Table */}
       <span className="pub-format-group">
-        <span className="pub-format-label">Rows</span>
-        <button
-          type="button"
-          className="btn btn-sm"
-          title="Add a row below"
-          onClick={() => onChange((current) => withRowAdded(current))}
-        >
-          +
-        </button>
-        <button
-          type="button"
-          className="btn btn-sm"
-          disabled={table.rows.length <= 1}
-          title="Remove the chosen row"
-          onClick={() => onChange((current) => withRowRemoved(current, current.rows.length - 1))}
-        >
-          −
-        </button>
-        <span className="pub-format-label">Columns</span>
-        <button
-          type="button"
-          className="btn btn-sm"
-          title="Add a column"
-          onClick={() => onChange((current) => withColumnAdded(current))}
-        >
-          +
-        </button>
-        <button
-          type="button"
-          className="btn btn-sm"
-          disabled={table.columns.length <= 1}
-          title="Remove the last column"
-          onClick={() =>
-            onChange((current) => withColumnRemoved(current, current.columns.length - 1))
+        <span className="pub-format-title">Table</span>
+        <input
+          type="color"
+          className="pub-format-swatch"
+          aria-label="Table colour"
+          title="The colour the heading, banding and lines are built from"
+          value={parseColor(table.accentColor, DEFAULT_TABLE_ACCENT).hex}
+          onChange={(event) =>
+            onChange((current) => ({ ...current, accentColor: event.target.value }))
           }
-        >
-          −
-        </button>
-      </span>
-
-      <span className="pub-format-group">
-        <label className="pub-format-check">
+        />
+        <label className="pub-format-check" title="Dress the first row as a heading">
           <input
             type="checkbox"
             checked={table.headerRow}
@@ -374,9 +363,9 @@ function TableFormatBar({
               onChange((current) => ({ ...current, headerRow: event.target.checked }))
             }
           />
-          Header row
+          Head row
         </label>
-        <label className="pub-format-check">
+        <label className="pub-format-check" title="Dress the first column as a heading">
           <input
             type="checkbox"
             checked={table.headerColumn}
@@ -384,11 +373,9 @@ function TableFormatBar({
               onChange((current) => ({ ...current, headerColumn: event.target.checked }))
             }
           />
-          Header column
+          Head col
         </label>
-        {/* Banding is a colour, not a fixed grey: the tint that reads on a
-            white page disappears on a dark one. */}
-        <label className="pub-format-check">
+        <label className="pub-format-check" title="Wash every other body row">
           <input
             type="checkbox"
             checked={table.bandedRows}
@@ -398,36 +385,141 @@ function TableFormatBar({
           />
           Banded
         </label>
-        {table.bandedRows ? (
-          <input
-            type="color"
-            className="pub-format-swatch"
-            aria-label="Band colour"
-            title="Band colour"
-            value={parseColor(table.bandColor, "#94a3b8").hex}
-            onChange={(event) =>
-              onChange((current) => ({
-                ...current,
-                // Banding tints a row; an opaque band would hide the page.
-                bandColor: formatColor(event.target.value, 0.18),
-              }))
-            }
-          />
-        ) : null}
       </span>
 
-      {/* Everything from here acts on the cells that are chosen. */}
+      {/* ----------------------------------------------------------- Column */}
       <span className="pub-format-group">
-        <span className="pub-format-label">
+        <span className="pub-format-title">
+          {columns.length > 1 ? `${columns.length} columns` : "Column"}
+        </span>
+        <button
+          type="button"
+          className="btn btn-sm"
+          title="Add a column after the chosen one"
+          onClick={() => onChange((current) => withColumnAdded(current, columns[columns.length - 1]))}
+        >
+          <IconView name="Plus" size={13} />
+        </button>
+        <button
+          type="button"
+          className="btn btn-sm"
+          disabled={!chosen || table.columns.length <= 1}
+          title="Remove the chosen columns"
+          onClick={() =>
+            onChange((current) =>
+              [...columns].sort((a, b) => b - a).reduce(withColumnRemoved, current)
+            )
+          }
+        >
+          <IconView name="Minus" size={13} />
+        </button>
+        <input
+          type="number"
+          className="pub-format-number"
+          aria-label="Column width"
+          title="Width, in canvas units"
+          min={MIN_TABLE_CELL}
+          step={10}
+          disabled={!chosen}
+          value={columns.length ? table.columns[columns[0]].size : ""}
+          onChange={(event) => {
+            const next = Number(event.target.value);
+            if (Number.isFinite(next)) onSize("columns", next);
+          }}
+        />
+        <input
+          type="color"
+          className="pub-format-swatch"
+          aria-label="Column fill"
+          title="Fill the whole column"
+          disabled={!chosen}
+          value={parseColor(columnStyle.backgroundColor, "#ffffff").hex}
+          onChange={(event) =>
+            onDressAxis("columns", { backgroundColor: event.target.value })
+          }
+        />
+        <button
+          type="button"
+          className="btn btn-sm"
+          title="No column fill"
+          disabled={!chosen}
+          onClick={() => onDressAxis("columns", { backgroundColor: undefined })}
+        >
+          <IconView name="Ban" size={13} />
+        </button>
+      </span>
+
+      {/* -------------------------------------------------------------- Row */}
+      <span className="pub-format-group">
+        <span className="pub-format-title">
+          {rows.length > 1 ? `${rows.length} rows` : "Row"}
+        </span>
+        <button
+          type="button"
+          className="btn btn-sm"
+          title="Add a row below the chosen one"
+          onClick={() => onChange((current) => withRowAdded(current, rows[rows.length - 1]))}
+        >
+          <IconView name="Plus" size={13} />
+        </button>
+        <button
+          type="button"
+          className="btn btn-sm"
+          disabled={!chosen || table.rows.length <= 1}
+          title="Remove the chosen rows"
+          onClick={() =>
+            onChange((current) =>
+              [...rows].sort((a, b) => b - a).reduce(withRowRemoved, current)
+            )
+          }
+        >
+          <IconView name="Minus" size={13} />
+        </button>
+        <input
+          type="number"
+          className="pub-format-number"
+          aria-label="Row height"
+          title="Least height, in canvas units — a row grows to fit its words"
+          min={MIN_TABLE_CELL}
+          step={10}
+          disabled={!chosen}
+          value={rows.length ? table.rows[rows[0]].size : ""}
+          onChange={(event) => {
+            const next = Number(event.target.value);
+            if (Number.isFinite(next)) onSize("rows", next);
+          }}
+        />
+        <input
+          type="color"
+          className="pub-format-swatch"
+          aria-label="Row fill"
+          title="Fill the whole row"
+          disabled={!chosen}
+          value={parseColor(rowStyle.backgroundColor, "#ffffff").hex}
+          onChange={(event) => onDressAxis("rows", { backgroundColor: event.target.value })}
+        />
+        <button
+          type="button"
+          className="btn btn-sm"
+          title="No row fill"
+          disabled={!chosen}
+          onClick={() => onDressAxis("rows", { backgroundColor: undefined })}
+        >
+          <IconView name="Ban" size={13} />
+        </button>
+      </span>
+
+      {/* ------------------------------------------------------------- Cell */}
+      <span className="pub-format-group">
+        <span className="pub-format-title">
           {range > 1 ? `${range} cells` : "Cell"}
         </span>
-
         <select
           className="pub-format-select"
           aria-label="What the cell holds"
           title="What the cell holds"
           value={cell?.block.type ?? "richText"}
-          disabled={!cell}
+          disabled={!chosen}
           onChange={(event) =>
             onKind(event.target.value as (typeof TABLE_CELL_BLOCK_TYPES)[number])
           }
@@ -438,113 +530,74 @@ function TableFormatBar({
             </option>
           ))}
         </select>
-
         <input
           type="color"
           className="pub-format-swatch"
-          aria-label="Cell background"
-          title="Cell background"
-          disabled={!cell}
+          aria-label="Cell fill"
+          title="Fill these cells"
+          disabled={!chosen}
           value={parseColor(style.backgroundColor, "#ffffff").hex}
-          onChange={(event) => onDress({ backgroundColor: event.target.value })}
+          onChange={(event) => onDressCells({ backgroundColor: event.target.value })}
         />
         <button
           type="button"
           className="btn btn-sm"
-          title="No background"
-          disabled={!cell}
-          onClick={() => onDress({ backgroundColor: undefined })}
+          title="No cell fill"
+          disabled={!chosen}
+          onClick={() => onDressCells({ backgroundColor: undefined })}
         >
-          <IconView name="Ban" size={14} />
+          <IconView name="Ban" size={13} />
         </button>
-
-        <input
-          type="color"
-          className="pub-format-swatch"
-          aria-label="Cell border colour"
-          title="Cell border colour"
-          disabled={!cell}
-          value={parseColor(style.borderColor, "#94a3b8").hex}
-          onChange={(event) =>
-            onDress({
-              borderColor: event.target.value,
-              // Choosing a colour means wanting a line, so one is drawn.
-              borderStyle: style.borderStyle === "none" ? "solid" : style.borderStyle ?? "solid",
-              borderWidth: style.borderWidth || 0.0625,
-            })
-          }
-        />
         <select
           className="pub-format-select"
-          aria-label="Cell border"
-          title="Cell border"
-          disabled={!cell}
-          value={style.borderStyle ?? "none"}
+          aria-label="Cell lines"
+          title="Lines around these cells"
+          disabled={!chosen}
+          value={style.borderStyle ?? ""}
           onChange={(event) =>
-            onDress({
-              borderStyle: event.target.value as StyleValues["borderStyle"],
+            onDressCells({
+              // Empty means "say nothing", which lets the table's own lines
+              // show again; `none` is the decision to have none at all.
+              borderStyle: (event.target.value || undefined) as StyleValues["borderStyle"],
               borderWidth: style.borderWidth || 0.0625,
             })
           }
         >
-          <option value="none">No border</option>
+          <option value="">Lines from the table</option>
+          <option value="none">No lines</option>
           <option value="solid">Solid</option>
           <option value="dashed">Dashed</option>
           <option value="dotted">Dotted</option>
         </select>
-
-        {/* Size follows the selection too: choose a row of cells and the
-            height applies to that row, a column and the width to that one. */}
-        <span className="pub-format-label">
-          {rows.length > 1 ? `H×${rows.length}` : "Height"}
-        </span>
         <input
-          type="number"
-          className="pub-format-number"
-          aria-label="Row height in canvas units"
-          title="Height of the rows the chosen cells are in"
-          min={MIN_TABLE_CELL}
-          step={10}
-          disabled={rows.length === 0}
-          value={table.rows[rows[0]] ?? ""}
-          onChange={(event) => {
-            const next = Number(event.target.value);
-            if (Number.isFinite(next)) onSize({ rows, height: next });
-          }}
+          type="color"
+          className="pub-format-swatch"
+          aria-label="Cell line colour"
+          title="Line colour"
+          disabled={!chosen}
+          value={parseColor(style.borderColor, DEFAULT_TABLE_ACCENT).hex}
+          onChange={(event) =>
+            onDressCells({
+              borderColor: event.target.value,
+              borderStyle: !style.borderStyle || style.borderStyle === "none" ? "solid" : style.borderStyle,
+              borderWidth: style.borderWidth || 0.0625,
+            })
+          }
         />
-
-        <span className="pub-format-label">
-          {columns.length > 1 ? `W×${columns.length}` : "Width"}
-        </span>
-        <input
-          type="number"
-          className="pub-format-number"
-          aria-label="Column width in canvas units"
-          title="Width of the columns the chosen cells are in"
-          min={MIN_TABLE_CELL}
-          step={10}
-          disabled={columns.length === 0}
-          value={table.columns[columns[0]] ?? ""}
-          onChange={(event) => {
-            const next = Number(event.target.value);
-            if (Number.isFinite(next)) onSize({ columns, width: next });
-          }}
-        />
-
-        <span className="pub-format-label">Padding</span>
         <input
           type="number"
           className="pub-format-number"
           aria-label="Cell padding in rem"
-          title="Cell padding, in rem"
+          title="Padding, in rem"
           min={0}
           step={0.125}
-          disabled={!cell}
-          value={padding}
+          disabled={!chosen}
+          value={style.paddingTop ?? ""}
+          placeholder="—"
           onChange={(event) => {
             const next = Number(event.target.value);
             if (!Number.isFinite(next)) return;
-            onDress({
+            onDressCells({
               paddingTop: next,
               paddingRight: next,
               paddingBottom: next,
@@ -552,6 +605,70 @@ function TableFormatBar({
             });
           }}
         />
+      </span>
+
+      {/* ------------------------------------------------------------- Text */}
+      <span className="pub-format-group">
+        <span className="pub-format-title">Text</span>
+        <input
+          type="color"
+          className="pub-format-swatch"
+          aria-label="Text colour"
+          title="Colour of the words in these cells"
+          disabled={!chosen}
+          value={parseColor(style.color, "#0f172a").hex}
+          onChange={(event) => onDressCells({ color: event.target.value })}
+        />
+        <input
+          type="number"
+          className="pub-format-number"
+          aria-label="Text size in rem"
+          title="Size of the words, in rem"
+          min={0.5}
+          step={0.125}
+          disabled={!chosen}
+          value={style.fontSize ?? ""}
+          placeholder="—"
+          onChange={(event) => {
+            const next = Number(event.target.value);
+            if (Number.isFinite(next)) onDressCells({ fontSize: next });
+          }}
+        />
+        <select
+          className="pub-format-select"
+          aria-label="Text weight"
+          title="Weight of the words"
+          disabled={!chosen}
+          value={style.fontWeight ?? ""}
+          onChange={(event) =>
+            onDressCells({
+              fontWeight: event.target.value ? Number(event.target.value) : undefined,
+            })
+          }
+        >
+          <option value="">Weight</option>
+          <option value="400">Regular</option>
+          <option value="600">Semibold</option>
+          <option value="700">Bold</option>
+        </select>
+        {/* Where the words sit in the cell: across it, and up and down it. */}
+        <select
+          className="pub-format-select"
+          aria-label="Text alignment"
+          title="Where the words sit across the cell"
+          disabled={!chosen}
+          value={style.textAlign ?? ""}
+          onChange={(event) =>
+            onDressCells({
+              textAlign: (event.target.value || undefined) as StyleValues["textAlign"],
+            })
+          }
+        >
+          <option value="">Align</option>
+          <option value="left">Left</option>
+          <option value="center">Centre</option>
+          <option value="right">Right</option>
+        </select>
       </span>
     </div>
   );
@@ -2094,23 +2211,33 @@ export function PublicationEditor({
   const chosenRows = [...new Set(cellRange?.addresses.map((at) => at.row) ?? [])];
   const chosenColumns = [...new Set(cellRange?.addresses.map((at) => at.column) ?? [])];
 
-  /** Sets the height of the chosen rows, or the width of the chosen columns. */
-  function resizeChosen(change: {
-    rows?: number[];
-    columns?: number[];
-    height?: number;
-    width?: number;
-  }) {
+  /** Sets the size of the chosen rows or columns. */
+  function resizeChosen(axis: "rows" | "columns", size: number) {
     if (!cellRange) return;
-    updateTable(cellRange.blockId, (table) => {
-      if (change.rows && change.height !== undefined) {
-        return withRowHeight(table, change.rows, change.height);
-      }
-      if (change.columns && change.width !== undefined) {
-        return withColumnWidth(table, change.columns, change.width);
-      }
-      return table;
-    });
+    const indexes = axis === "rows" ? chosenRows : chosenColumns;
+    updateTable(cellRange.blockId, (table) =>
+      axis === "rows"
+        ? withRowHeight(table, indexes, size)
+        : withColumnWidth(table, indexes, size)
+    );
+  }
+
+  /**
+   * Dresses whole rows or columns.
+   *
+   * Merged into what the axis already says, so setting a fill does not discard
+   * an alignment set separately; `undefined` in the patch clears that one key,
+   * which is how "no fill" is said.
+   */
+  function dressAxis(axis: "rows" | "columns", patch: StyleValues) {
+    if (!cellRange) return;
+    const indexes = axis === "rows" ? chosenRows : chosenColumns;
+    updateTable(cellRange.blockId, (table) =>
+      withAxisChanged(table, axis, indexes, (entry) => ({
+        ...entry,
+        style: cleanStyle({ ...entry.style, ...patch }),
+      }))
+    );
   }
 
   /** Changes what the chosen cells hold. Each cell holds exactly one thing. */
@@ -2126,7 +2253,10 @@ export function PublicationEditor({
    * cells were given separately.
    */
   function dressChosenCells(patch: StyleValues) {
-    updateChosenCells((cell) => ({ ...cell, style: { ...cell.style, ...patch } }));
+    updateChosenCells((cell) => ({
+      ...cell,
+      style: cleanStyle({ ...cell.style, ...patch }),
+    }));
   }
 
   /** Rewrites a table block's grid, keeping its box the size of the grid. */
@@ -2138,7 +2268,33 @@ export function PublicationEditor({
     if (!block?.table) return;
 
     const table = change(block.table);
-    updateBlock(blockId, { table, ...tableSize(table) });
+    const size = tableSize(table);
+    // The height is a floor here too: a table already grown to fit its words
+    // must not shrink back just because a colour was changed.
+    updateBlock(blockId, {
+      table,
+      width: size.width,
+      height: Math.max(size.height, block.height),
+    });
+  }
+
+  /**
+   * Grows a table block to whatever its grid actually drew.
+   *
+   * Row heights are minimums, so a cell with more words than fit makes the
+   * table taller than the sum of them. The block's box is what the outline,
+   * the handles and the export all read, so it has to be the measured height
+   * rather than the intended one — otherwise the rows past the bottom edge are
+   * simply cut off, which is exactly what was happening.
+   */
+  function measuredTable(blockId: string, drawn: number) {
+    const block = activeBlocks.find((entry) => entry.id === blockId);
+    if (!block?.table) return;
+
+    const height = Math.round(drawn);
+    // A pixel of rounding is not a change worth recording in the history.
+    if (Math.abs(height - block.height) <= 1) return;
+    updateBlock(blockId, { height });
   }
 
   /**
@@ -3097,7 +3253,8 @@ export function PublicationEditor({
                 cell={cellContext?.cell ?? null}
                 onChange={(change) => updateTable(tableSelection.block.id, change)}
                 onKind={setCellKind}
-                onDress={dressChosenCells}
+                onDressCells={dressChosenCells}
+                onDressAxis={dressAxis}
                 onSize={resizeChosen}
               />
             ) : null}
@@ -3315,6 +3472,7 @@ export function PublicationEditor({
                   <PublicationTableView
                     table={block.table}
                     sources={canvasSources}
+                    onMeasured={(height) => measuredTable(block.id, height)}
                     renderCell={(cell, at) => {
                       const chosen =
                         cellRange?.blockId === block.id &&

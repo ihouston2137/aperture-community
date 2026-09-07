@@ -6134,27 +6134,29 @@ ol.doc-list ol.doc-list ol.doc-list {
 
 /* ------------------------------------------------ Publication tables */
 
+/*
+ * Nothing here clips.
+ *
+ * A row height is a minimum, so a cell with more words than fit makes its row
+ * — and the table — taller than the numbers say. Clipping was what cut the
+ * bottom rows off; the block's box is grown to the measured height instead.
+ */
 .pub-table-box {
-  overflow: hidden;
+  overflow: visible;
 }
 
 .pub-table {
   width: 100%;
-  height: 100%;
   border-collapse: collapse;
   table-layout: fixed;
 }
 
-/* Only what a cell always is. Its lines and its padding are the table's own
-   data — see `createTable` — so that they can be changed and removed. */
+/* Only what a cell always is. Everything about how it looks is resolved in
+   `lib/table-style.ts` and arrives as an inline style, so that a cell asked to
+   have no lines really has none — a rule here could not be overruled. */
 .pub-table-cell {
   vertical-align: top;
   text-align: left;
-  overflow: hidden;
-}
-
-.pub-table-cell.is-banded {
-  background: color-mix(in srgb, currentColor 8%, transparent);
 }
 
 /* A cell holds one block, and it fills the cell. */
@@ -6430,6 +6432,27 @@ ol.doc-list ol.doc-list ol.doc-list {
 
 .pub-format-number {
   width: 4rem;
+}
+
+/* Names the level a group of controls dresses: table, column, row, cell, text. */
+.pub-format-title {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--admin-muted);
+  white-space: nowrap;
+}
+
+/* Each level is a group, divided from the next so it reads as one thing. */
+.pub-table-bar .pub-format-group {
+  gap: 0.2rem;
+  padding-right: 0.5rem;
+  border-right: 1px solid var(--admin-border);
+}
+
+.pub-table-bar .pub-format-group:last-child {
+  border-right: 0;
 }
 
 .pub-format-check {

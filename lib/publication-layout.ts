@@ -9,6 +9,7 @@ import {
 import { sanitizeMediaPath } from "./protected-media-url";
 import { normalizeRichText, plainTextToRichText } from "./rich-text";
 import { normalizeStyleValues, type StyleValues } from "./style-values";
+import { DEFAULT_TABLE_ACCENT } from "./table-style";
 
 /**
  * Publications (zines, presentations and social posts) are fixed-canvas
@@ -82,22 +83,39 @@ export type PublicationTableCell = {
   style?: StyleValues;
 };
 
+/**
+ * A column or a row: how big it is, and anything it says about its own cells.
+ *
+ * The style rides on the axis rather than in a map keyed by index, so that
+ * inserting or removing a row carries the styles of the rows around it with
+ * it. A map would need reindexing on every structural change, and would get it
+ * wrong exactly once.
+ */
+export type TableAxis = {
+  /** Width for a column, height for a row, in canvas units. */
+  size: number;
+  style?: StyleValues;
+};
+
 export type PublicationTable = {
-  /** Column widths and row heights, in canvas units. */
-  columns: number[];
-  rows: number[];
+  columns: TableAxis[];
+  rows: TableAxis[];
   /** Indexed `[row][column]`; always `rows.length` by `columns.length`. */
   cells: PublicationTableCell[][];
   /** Whether the first row and column are headings, dressed as such. */
   headerRow: boolean;
   headerColumn: boolean;
-  /** Every other row tinted, which is what makes a wide table readable. */
+  /** Every other body row washed with the accent, which makes a wide table readable. */
   bandedRows: boolean;
-  /** The tint itself, so banding is a choice rather than one fixed grey. */
-  bandColor?: string;
-  /** The grid itself: its outline, its rules and its background. */
+  /**
+   * The one colour the table's look is built from: its heading fill, its
+   * banding and its lines. One choice rather than several that have to be kept
+   * in agreement — see `tableScheme`.
+   */
+  accentColor?: string;
+  /** The grid itself: its outline and the background behind everything. */
   tableStyle?: StyleValues;
-  /** The default for every cell, and for the heading cells over it. */
+  /** Said about every cell, over the scheme; and about the heading cells. */
   cellStyle?: StyleValues;
   headerStyle?: StyleValues;
 };
@@ -428,40 +446,65 @@ export function createTable(columns = 3, rows = 3): PublicationTable {
   const rowCount = Math.min(MAX_TABLE_ROWS, Math.max(1, rows));
 
   return {
-    columns: Array.from({ length: columnCount }, () => TABLE_COLUMN_WIDTH),
-    rows: Array.from({ length: rowCount }, () => TABLE_ROW_HEIGHT),
+    columns: Array.from({ length: columnCount }, () => ({ size: TABLE_COLUMN_WIDTH })),
+    rows: Array.from({ length: rowCount }, () => ({ size: TABLE_ROW_HEIGHT })),
     cells: Array.from({ length: rowCount }, () =>
       Array.from({ length: columnCount }, createTableCell)
     ),
     headerRow: true,
     headerColumn: false,
     bandedRows: false,
-    bandColor: DEFAULT_BAND_COLOR,
+    accentColor: DEFAULT_TABLE_ACCENT,
     /*
-     * A new table looks like a table, and the look is its own data.
-     *
-     * Kept here rather than in a stylesheet because a rule in the stylesheet
-     * could not be turned off: "no border" is the absence of a border style,
-     * which is indistinguishable from never having set one, so a default
-     * painted in CSS would be a table that can never lose its lines.
+     * Only the padding. Lines, fills and heading colours come from the scheme,
+     * so that changing the accent changes the whole look rather than leaving a
+     * fixed grey border behind it.
      */
     cellStyle: {
-      borderStyle: "solid",
-      borderWidth: 0.0625,
-      borderColor: "#94a3b8",
-      paddingTop: 0.5,
+      paddingTop: 0.4,
       paddingRight: 0.5,
-      paddingBottom: 0.5,
+      paddingBottom: 0.4,
       paddingLeft: 0.5,
     },
   };
 }
 
-/** A table block's box is the grid it holds, so the two never disagree. */
+/**
+ * A table box: as wide as its columns, and at least as tall as its rows.
+ *
+ * "At least", because a row height is a minimum rather than a fixed size —
+ * words that need another line get one, the way they do in every table anybody
+ * has used. The editor measures what was actually drawn and grows the block to
+ * match; this is the floor that measurement starts from.
+ */
 export function tableSize(table: PublicationTable): { width: number; height: number } {
   return {
-    width: table.columns.reduce((total, width) => total + width, 0),
-    height: table.rows.reduce((total, height) => total + height, 0),
+    width: table.columns.reduce((total, column) => total + column.size, 0),
+    height: table.rows.reduce((total, row) => total + row.size, 0),
+  };
+}
+
+/**
+ * Scales a table to a new box, which is what dragging its corner means.
+ *
+ * The columns and rows take the change, so the table really is that size
+ * afterwards rather than being snapped back the next time it is touched.
+ */
+export function withTableScaled(
+  table: PublicationTable,
+  scaleX: number,
+  scaleY: number
+): PublicationTable {
+  const scale = (axis: TableAxis[], factor: number) =>
+    axis.map((entry) => ({
+      ...entry,
+      size: Math.max(MIN_TABLE_CELL, Math.round(entry.size * factor)),
+    }));
+
+  return {
+    ...table,
+    columns: scale(table.columns, scaleX),
+    rows: scale(table.rows, scaleY),
   };
 }
 
@@ -476,22 +519,27 @@ export function tableSize(table: PublicationTable): { width: number; height: num
 export function normalizeTable(input: unknown): PublicationTable {
   const raw = (input ?? {}) as Record<string, unknown>;
 
-  const sizes = (value: unknown, fallback: number, cap: number): number[] => {
+  /** Columns and rows were plain numbers before they could carry a style. */
+  const axis = (value: unknown, fallback: number, cap: number): TableAxis[] => {
     const list = Array.isArray(value) ? value : [];
-    const kept = list
-      .slice(0, cap)
-      .map((entry) => Math.max(MIN_TABLE_CELL, Math.round(num(entry, fallback))));
-    return kept.length > 0 ? kept : [fallback];
+    const kept = list.slice(0, cap).map((entry) => {
+      const stored = (entry ?? {}) as Record<string, unknown>;
+      const size = typeof entry === "number" ? entry : num(stored.size, fallback);
+      const next: TableAxis = { size: Math.max(MIN_TABLE_CELL, Math.round(size)) };
+      if (stored.style) next.style = normalizeStyleValues(stored.style);
+      return next;
+    });
+    return kept.length > 0 ? kept : [{ size: fallback }];
   };
 
-  const columns = sizes(raw.columns, TABLE_COLUMN_WIDTH, MAX_TABLE_COLUMNS);
-  const rows = sizes(raw.rows, TABLE_ROW_HEIGHT, MAX_TABLE_ROWS);
+  const columns = axis(raw.columns, TABLE_COLUMN_WIDTH, MAX_TABLE_COLUMNS);
+  const rows = axis(raw.rows, TABLE_ROW_HEIGHT, MAX_TABLE_ROWS);
 
   const storedRows = Array.isArray(raw.cells) ? raw.cells : [];
 
-  const cells = rows.map((_height, rowIndex) => {
+  const cells = rows.map((_row, rowIndex) => {
     const storedRow = Array.isArray(storedRows[rowIndex]) ? storedRows[rowIndex] : [];
-    return columns.map((_width, columnIndex) => {
+    return columns.map((_column, columnIndex) => {
       const stored = (storedRow as unknown[])[columnIndex] as
         | Record<string, unknown>
         | undefined;
@@ -527,7 +575,7 @@ export function normalizeTable(input: unknown): PublicationTable {
     headerRow: raw.headerRow === undefined ? true : Boolean(raw.headerRow),
     headerColumn: Boolean(raw.headerColumn),
     bandedRows: Boolean(raw.bandedRows),
-    bandColor: str(raw.bandColor) || DEFAULT_BAND_COLOR,
+    accentColor: str(raw.accentColor) || DEFAULT_TABLE_ACCENT,
   };
 
   if (raw.tableStyle) table.tableStyle = normalizeStyleValues(raw.tableStyle);
@@ -537,16 +585,17 @@ export function normalizeTable(input: unknown): PublicationTable {
   return table;
 }
 
-/** Where a cell sits, which is how the editor names the one being worked on. */
-export type CellAddress = { row: number; column: number };
+/* ------------------------------------------------------- Changing a grid */
 
 /** Adds a column beside `at`, or at the end when `at` is not given. */
 export function withColumnAdded(table: PublicationTable, at?: number): PublicationTable {
   if (table.columns.length >= MAX_TABLE_COLUMNS) return table;
+  const from = Math.min(at ?? table.columns.length - 1, table.columns.length - 1);
   const index = at === undefined ? table.columns.length : Math.max(0, at + 1);
 
   const columns = [...table.columns];
-  columns.splice(index, 0, table.columns[Math.min(at ?? 0, table.columns.length - 1)]);
+  // The new column matches the one it was added beside, style and all.
+  columns.splice(index, 0, { ...table.columns[from] });
 
   return {
     ...table,
@@ -561,10 +610,11 @@ export function withColumnAdded(table: PublicationTable, at?: number): Publicati
 
 export function withRowAdded(table: PublicationTable, at?: number): PublicationTable {
   if (table.rows.length >= MAX_TABLE_ROWS) return table;
+  const from = Math.min(at ?? table.rows.length - 1, table.rows.length - 1);
   const index = at === undefined ? table.rows.length : Math.max(0, at + 1);
 
   const rows = [...table.rows];
-  rows.splice(index, 0, table.rows[Math.min(at ?? 0, table.rows.length - 1)]);
+  rows.splice(index, 0, { ...table.rows[from] });
 
   const cells = [...table.cells];
   cells.splice(index, 0, table.columns.map(createTableCell));
@@ -577,7 +627,7 @@ export function withColumnRemoved(table: PublicationTable, at: number): Publicat
   if (table.columns.length <= 1 || at < 0 || at >= table.columns.length) return table;
   return {
     ...table,
-    columns: table.columns.filter((_width, index) => index !== at),
+    columns: table.columns.filter((_column, index) => index !== at),
     cells: table.cells.map((row) => row.filter((_cell, index) => index !== at)),
   };
 }
@@ -586,28 +636,34 @@ export function withRowRemoved(table: PublicationTable, at: number): Publication
   if (table.rows.length <= 1 || at < 0 || at >= table.rows.length) return table;
   return {
     ...table,
-    rows: table.rows.filter((_height, index) => index !== at),
+    rows: table.rows.filter((_row, index) => index !== at),
     cells: table.cells.filter((_row, index) => index !== at),
   };
 }
 
-/**
- * Sets the height of the named rows, or the width of the named columns.
- *
- * Taken from a selection rather than typed against a row number: somebody
- * evening up a table has the cells in front of them, not a list of indices.
- */
+/** Changes the named rows or columns: their size, their dressing, or both. */
+export function withAxisChanged(
+  table: PublicationTable,
+  axis: "rows" | "columns",
+  indexes: number[],
+  change: (entry: TableAxis) => TableAxis
+): PublicationTable {
+  const wanted = new Set(indexes);
+  const next = table[axis].map((entry, index) =>
+    wanted.has(index) ? change(entry) : entry
+  );
+  return axis === "rows" ? { ...table, rows: next } : { ...table, columns: next };
+}
+
 export function withRowHeight(
   table: PublicationTable,
   rows: number[],
   height: number
 ): PublicationTable {
-  const wanted = new Set(rows);
-  const next = Math.max(MIN_TABLE_CELL, Math.round(height));
-  return {
-    ...table,
-    rows: table.rows.map((current, index) => (wanted.has(index) ? next : current)),
-  };
+  return withAxisChanged(table, "rows", rows, (entry) => ({
+    ...entry,
+    size: Math.max(MIN_TABLE_CELL, Math.round(height)),
+  }));
 }
 
 export function withColumnWidth(
@@ -615,15 +671,14 @@ export function withColumnWidth(
   columns: number[],
   width: number
 ): PublicationTable {
-  const wanted = new Set(columns);
-  const next = Math.max(MIN_TABLE_CELL, Math.round(width));
-  return {
-    ...table,
-    columns: table.columns.map((current, index) =>
-      wanted.has(index) ? next : current
-    ),
-  };
+  return withAxisChanged(table, "columns", columns, (entry) => ({
+    ...entry,
+    size: Math.max(MIN_TABLE_CELL, Math.round(width)),
+  }));
 }
+
+/** Where a cell sits, which is how the editor names the one being worked on. */
+export type CellAddress = { row: number; column: number };
 
 /** Replaces one cell, leaving the rest of the grid untouched. */
 export function withCellChanged(
@@ -858,11 +913,16 @@ export function normalizePublicationBlock(input: unknown): PublicationBlock | nu
       break;
     case "table": {
       block.table = normalizeTable(raw.table);
-      // The box is the grid: a block whose stored size disagreed with its
-      // columns would draw a table that did not fill it, or overflowed it.
+      /*
+       * The width is the columns, exactly — nothing makes a table wider than
+       * they say. The height is only a floor: a row grows to fit its words, so
+       * a stored height larger than the sum of the rows is what was measured
+       * on the page and is kept. Forcing it back to the sum is what cut the
+       * bottom rows off.
+       */
       const size = tableSize(block.table);
       block.width = size.width;
-      block.height = size.height;
+      block.height = Math.max(size.height, num(raw.height, 0));
       break;
     }
     case "story":
@@ -1459,13 +1519,26 @@ export function resizeSelection(
 
   return blocks.map((block) => {
     if (!chosen.has(block.id)) return block;
-    return {
+
+    const resized: PublicationBlock = {
       ...block,
       x: Math.round(from.x + (block.x - from.x) * scaleX),
       y: Math.round(from.y + (block.y - from.y) * scaleY),
       width: Math.max(MIN_BLOCK_SIZE, Math.round(block.width * scaleX)),
       height: Math.max(MIN_BLOCK_SIZE, Math.round(block.height * scaleY)),
     };
+
+    /*
+     * A table's box is its columns and rows, not a number stored beside them.
+     * Resizing one has to reach the grid, or the box would be corrected back
+     * to the grid the next time the table was touched and the drag undone.
+     */
+    if (resized.table) {
+      resized.table = withTableScaled(resized.table, scaleX, scaleY);
+      Object.assign(resized, tableSize(resized.table));
+    }
+
+    return resized;
   });
 }
 

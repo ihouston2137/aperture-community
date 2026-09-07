@@ -1,6 +1,6 @@
 "use client";
 
-import type { CSSProperties } from "react";
+import { useEffect, useRef, type CSSProperties } from "react";
 
 import { customStyleClassName } from "@/lib/custom-style-css";
 import type {
@@ -11,6 +11,7 @@ import type {
 import { protectedMediaUrl } from "@/lib/protected-media-url";
 import { plainTextToRichText, richTextToPlainText } from "@/lib/rich-text";
 import { shapeSurfaceOf, styleValuesToCss } from "@/lib/style-values";
+import { resolveStyle, tableCellCss, tableScheme } from "@/lib/table-style";
 
 import { LucideIconView } from "./lucide-icon";
 import { QrCode } from "./qr-code";
@@ -92,7 +93,7 @@ export function CellBlockView({
   return (
     <div
       className="pub-cell-item"
-      style={{ width: "100%", height: flows ? "100%" : `${block.height}px` }}
+      style={{ width: "100%", minHeight: flows ? undefined : `${block.height}px` }}
     >
       <PublicationBlockView block={block} sources={sources} interactive={false} />
     </div>
@@ -112,6 +113,7 @@ export function PublicationTableView({
   className,
   style,
   renderCell,
+  onMeasured,
 }: {
   table: PublicationTable | undefined;
   sources: PublicationSources;
@@ -122,49 +124,78 @@ export function PublicationTableView({
     cell: PublicationTableCell,
     at: { row: number; column: number }
   ) => React.ReactNode;
+  /**
+   * How tall the grid actually came out.
+   *
+   * Row heights are minimums, so words that need another line make the table
+   * taller than the numbers say. The editor uses this to grow the block's box
+   * to what was drawn; the viewer has no use for it.
+   */
+  onMeasured?: (height: number) => void;
 }) {
+  const box = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const node = box.current;
+    if (!node || !onMeasured) return;
+
+    const observer = new ResizeObserver(([entry]) => {
+      onMeasured(entry.contentRect.height);
+    });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [onMeasured]);
+
   if (!table) return <div className="pb-empty-drop">No table</div>;
 
-  const grid = styleValuesToCss(table.tableStyle) as CSSProperties | undefined;
-  const cellCss = styleValuesToCss(table.cellStyle) as CSSProperties | undefined;
-  const headerCss = styleValuesToCss(table.headerStyle) as CSSProperties | undefined;
+  const scheme = tableScheme(table.accentColor);
 
   return (
     <div
+      ref={box}
       className={`pub-table-box${className ? ` ${className}` : ""}`}
-      style={{ width: "100%", height: "100%", ...style }}
+      style={{ width: "100%", ...style }}
     >
-      <table className="pub-table" style={grid}>
+      <table className="pub-table" style={styleValuesToCss(table.tableStyle)}>
         <colgroup>
-          {table.columns.map((width, index) => (
-            <col key={index} style={{ width: `${width}px` }} />
+          {table.columns.map((column, index) => (
+            <col key={index} style={{ width: `${column.size}px` }} />
           ))}
         </colgroup>
         <tbody>
           {table.cells.map((row, rowIndex) => (
-            <tr key={rowIndex} style={{ height: `${table.rows[rowIndex]}px` }}>
+            // A row height is a minimum: CSS treats it that way on a table row,
+            // and so does everybody who has ever typed too much into a cell.
+            <tr key={rowIndex} style={{ height: `${table.rows[rowIndex].size}px` }}>
               {row.map((cell, columnIndex) => {
                 const heading =
                   (table.headerRow && rowIndex === 0) ||
                   (table.headerColumn && columnIndex === 0);
+                const banded =
+                  table.bandedRows &&
+                  !heading &&
+                  (table.headerRow ? rowIndex % 2 === 0 : rowIndex % 2 === 1);
+
+                /*
+                 * Everything with an opinion about this cell, weakest first.
+                 * Resolved as values so that "no border" can beat a border set
+                 * further up — see `resolveStyle`.
+                 */
+                const resolved = resolveStyle([
+                  scheme.base,
+                  table.cellStyle,
+                  banded ? scheme.band : undefined,
+                  heading ? scheme.header : undefined,
+                  heading ? table.headerStyle : undefined,
+                  table.columns[columnIndex].style,
+                  table.rows[rowIndex].style,
+                  cell.style,
+                ]);
+
                 const Cell = heading ? "th" : "td";
-                const banded = table.bandedRows && !heading && rowIndex % 2 === 1;
 
                 return (
-                  <Cell
-                    key={cell.id}
-                    className={`pub-table-cell${banded ? " is-banded" : ""}`}
-                    style={{
-                      ...cellCss,
-                      ...(heading ? headerCss : undefined),
-                      // The band sits under the cell's own dressing, so a cell
-                      // given a colour of its own keeps it on a banded row.
-                      ...(banded && table.bandColor
-                        ? { backgroundColor: table.bandColor }
-                        : undefined),
-                      ...(styleValuesToCss(cell.style) as CSSProperties),
-                    }}
-                  >
+                  <Cell key={cell.id} className="pub-table-cell" style={tableCellCss(resolved)}>
                     {renderCell ? (
                       renderCell(cell, { row: rowIndex, column: columnIndex })
                     ) : (
