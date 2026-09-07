@@ -72,6 +72,30 @@ export function normalizeRichText(html: string | null | undefined): string {
   );
 }
 
+/**
+ * Plain words as the rich text that says the same thing.
+ *
+ * Every blank line starts a new paragraph and a single newline is a break,
+ * which is what the plain text meant. The text is escaped rather than trusted:
+ * it was never markup, so anything in it that looks like markup is a
+ * coincidence and has to stay visible as the characters somebody typed.
+ */
+export function plainTextToRichText(text: string | null | undefined): string {
+  const value = (text ?? "").trim();
+  if (!value) return "";
+
+  const escape = (part: string) =>
+    part
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+
+  return value
+    .split(/\n{2,}/)
+    .map((paragraph) => `<p>${escape(paragraph).replace(/\n/g, "<br>")}</p>`)
+    .join("");
+}
+
 export function richTextToPlainText(html: string | null | undefined): string {
   if (!html) return "";
   return sanitizeRichText(html)

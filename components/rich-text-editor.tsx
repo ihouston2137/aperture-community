@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type Quill from "quill";
 import "quill/dist/quill.snow.css";
 
@@ -112,6 +113,10 @@ export function RichTextEditor({
   placeholder,
   fonts = [],
   minHeight = 12,
+  toolbarHost: externalToolbarHost = undefined,
+  bare = false,
+  autoFocus = false,
+  onBlur,
 }: {
   value: string;
   onChange: (html: string) => void;
@@ -119,6 +124,23 @@ export function RichTextEditor({
   fonts?: string[];
   /** rem */
   minHeight?: number;
+  /**
+   * Where the toolbar is put, when it belongs somewhere other than above the
+   * writing area — a bar over a canvas, say, shared by whatever is being
+   * edited at the time. The element itself rather than a ref, so React
+   * re-renders this editor when the bar arrives and the portal has a node to
+   * aim at without an effect to notice one.
+   *
+   * The element is still created and removed by this component. That is the
+   * whole reason the toolbar is a portal and not a container somebody else
+   * owns: the discarded-editor-still-listening problem described above comes
+   * back the moment teardown stops taking the toolbar with it.
+   */
+  toolbarHost?: HTMLElement | null;
+  /** No frame and no min-height: the editor is standing in for the block itself. */
+  bare?: boolean;
+  autoFocus?: boolean;
+  onBlur?: () => void;
 }) {
   const toolbarHost = useRef<HTMLDivElement>(null);
   const editorHost = useRef<HTMLDivElement>(null);
@@ -128,10 +150,13 @@ export function RichTextEditor({
   // Kept current in an effect rather than during render, which React forbids.
   const onChangeRef = useRef(onChange);
   const placeholderRef = useRef(placeholder);
+  const onBlurRef = useRef(onBlur);
+  const autoFocusRef = useRef(autoFocus);
   useEffect(() => {
     onChangeRef.current = onChange;
     placeholderRef.current = placeholder;
-  }, [onChange, placeholder]);
+    onBlurRef.current = onBlur;
+  }, [onChange, placeholder, onBlur]);
   /** The last HTML this editor produced, so its own value coming back is a no-op. */
   const emittedRef = useRef(value);
   const initialValueRef = useRef(value);
@@ -141,7 +166,19 @@ export function RichTextEditor({
   /** `null` means the selection inherits its size rather than setting one. */
   const [size, setSize] = useState<number | null>(null);
 
+  /*
+   * Whether the toolbar has somewhere to be.
+   *
+   * Quill is built around its toolbar element, so there is nothing to build
+   * until that element is on the page. In place, it always is; portalled, it
+   * arrives on the render after the host's ref is read, and this holds the
+   * editor back until then rather than letting it start without one.
+   */
+  const toolbarReady = externalToolbarHost !== undefined ? externalToolbarHost !== null : true;
+
   useEffect(() => {
+    if (!toolbarReady) return;
+
     let cancelled = false;
     let toolbarEl: HTMLDivElement | null = null;
     let editorEl: HTMLDivElement | null = null;
@@ -209,8 +246,19 @@ export function RichTextEditor({
         setSize(parseSize(format.size));
       });
 
+      if (onBlurRef.current) {
+        // `selection-change` with a null range is Quill's "focus has left".
+        quill.on("selection-change", (range, previous) => {
+          if (range === null && previous !== null) onBlurRef.current?.();
+        });
+      }
+
       quillRef.current = quill;
       setReady(true);
+      // The caret starts in the words rather than nowhere: this editor is
+      // opened by double-clicking the text it is standing in for, and that
+      // gesture means "let me type here".
+      if (autoFocusRef.current) quill.focus();
     })();
 
     return () => {
@@ -222,7 +270,7 @@ export function RichTextEditor({
       toolbarEl?.remove();
       editorEl?.remove();
     };
-  }, []);
+  }, [toolbarReady]);
 
   // The value is otherwise uncontrolled. This only fires when something outside
   // replaces it, such as the builder switching to a different block.
@@ -262,12 +310,8 @@ export function RichTextEditor({
     setFont(next);
   };
 
-  return (
-    <div
-      className="rich-text-editor"
-      style={{ "--rte-min-height": `${minHeight}rem` } as React.CSSProperties}
-    >
-      <div className="rte-toolbar">
+  const toolbar = (
+    <div className={`rte-toolbar${bare ? " is-detached" : ""}`}>
         <span className="rte-group">
           <select
             className="rte-font-select"
@@ -319,10 +363,31 @@ export function RichTextEditor({
           </button>
         </span>
 
-        {/* Quill's own controls are built into a child of this host, which this
-            component creates and removes. */}
-        <div className="rte-toolbar-host" ref={toolbarHost} />
-      </div>
+      {/* Quill's own controls are built into a child of this host, which this
+          component creates and removes. */}
+      <div className="rte-toolbar-host" ref={toolbarHost} />
+    </div>
+  );
+
+  return (
+    <div
+      className={`rich-text-editor${bare ? " is-bare" : ""}`}
+      style={{ "--rte-min-height": `${minHeight}rem` } as React.CSSProperties}
+    >
+      {/*
+        The toolbar goes wherever it was asked to go, and is still made and
+        unmade here. A portal moves where React puts the node without moving
+        who owns it, which is exactly the distinction that matters: an editor
+        being torn down still takes its toolbar with it, so a discarded one can
+        never be left listening on buttons the next editor is using.
+
+        Rendered in place when nowhere else is named, and skipped entirely
+        until the host exists — a portal needs a node, and the bar above a
+        canvas is mounted by the time this editor is opened.
+      */}
+      {externalToolbarHost === undefined
+        ? toolbar
+        : externalToolbarHost && createPortal(toolbar, externalToolbarHost)}
 
       <div className="rte-editor-host" ref={editorHost} />
     </div>

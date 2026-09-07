@@ -20,7 +20,9 @@ import {
   TextField,
 } from "@/components/builder/settings-fields";
 import {
+  blockHtml,
   PublicationBlockView,
+  PublicationTableView,
   publicationBlockStyle,
   type PublicationSources,
 } from "@/components/publication-blocks";
@@ -33,6 +35,7 @@ import { IconSearchField } from "@/components/icon-search";
 import type { AdminExit } from "@/lib/admin-exit";
 import type { BuilderSources } from "@/lib/builder-sources";
 import { protectedMediaUrl } from "@/lib/protected-media-url";
+import { plainTextToRichText, richTextToPlainText } from "@/lib/rich-text";
 import {
   createPublicationBlock,
   createPublicationPage,
@@ -45,6 +48,15 @@ import {
   boundsOf,
   distributeBlocks,
   effectiveBackground,
+  resizeSelection,
+  tableSize,
+  withCellChanged,
+  withColumnAdded,
+  withColumnRemoved,
+  withRowAdded,
+  withRowRemoved,
+  TABLE_CELL_BLOCK_TYPES,
+  type PublicationTable,
   emptyBackground,
   withGroupMembers,
   withLayoutBackground,
@@ -76,8 +88,7 @@ import {
 import { savePublicationAction } from "./actions";
 
 const BLOCK_ICONS: Record<string, string> = {
-  text: "Type",
-  richText: "Pilcrow",
+  richText: "Type",
   image: "Image",
   video: "Video",
   button: "MousePointerClick",
@@ -85,6 +96,7 @@ const BLOCK_ICONS: Record<string, string> = {
   icon: "Sparkles",
   shape: "Square",
   customShape: "Shapes",
+  table: "Table",
   story: "Newspaper",
   collection: "Images",
   form: "ClipboardList",
@@ -92,8 +104,7 @@ const BLOCK_ICONS: Record<string, string> = {
 };
 
 const BLOCK_LABELS: Record<string, string> = {
-  text: "Text",
-  richText: "Rich text",
+  richText: "Text",
   image: "Image",
   video: "Video",
   button: "Button",
@@ -101,6 +112,7 @@ const BLOCK_LABELS: Record<string, string> = {
   icon: "Icon",
   shape: "Shape",
   customShape: "Custom shape",
+  table: "Table",
   story: "Story",
   collection: "Collection",
   form: "Form",
@@ -112,7 +124,16 @@ const BLOCK_LABELS: Record<string, string> = {
  * corners, border, shadow, spacing. An icon is not one of these — it takes its
  * colour from the typography section.
  */
-const TEXTLESS_BLOCKS = new Set(["image", "video"]);
+const TEXTLESS_BLOCKS = new Set(["image", "video", "table"]);
+
+/**
+ * Blocks whose words are written in place, on the canvas.
+ *
+ * Every one of them keeps its words in `html`, so the same editor serves all
+ * four — a caption, a button's face and the writing on a shape are the same
+ * kind of thing and take the same toolbar.
+ */
+const WRITEABLE_BLOCKS = new Set(["richText", "button", "shape", "customShape"]);
 
 /** What the style panel is called for each block. */
 const STYLE_PANEL_TITLES: Record<string, string> = {
@@ -236,6 +257,130 @@ function StyleButton({ label, onOpen }: { label: string; onOpen: () => void }) {
     >
       {label}…
     </button>
+  );
+}
+
+/**
+ * The table controls, in the bar above the canvas.
+ *
+ * A table is edited by working on it rather than by filling in a panel beside
+ * it, so its controls sit where the rich-text ones do and act on whatever the
+ * grid currently has chosen: the whole table when nothing inside it is, and a
+ * row and column when a cell is.
+ */
+function TableFormatBar({
+  block,
+  cell,
+  onChange,
+  onAddContent,
+}: {
+  block: PublicationBlock;
+  cell: { row: number; column: number } | null;
+  onChange: (change: (table: PublicationTable) => PublicationTable) => void;
+  onAddContent: (type: PublicationBlockType) => void;
+}) {
+  const table = block.table;
+  if (!table) return null;
+
+  return (
+    <div className="pub-table-bar">
+      <span className="pub-format-group">
+        <span className="pub-format-label">Rows</span>
+        <button
+          type="button"
+          className="btn btn-sm"
+          title="Add a row below the one selected"
+          onClick={() => onChange((current) => withRowAdded(current, cell?.row))}
+        >
+          +
+        </button>
+        <button
+          type="button"
+          className="btn btn-sm"
+          disabled={!cell || table.rows.length <= 1}
+          title="Remove the selected row"
+          onClick={() => cell && onChange((current) => withRowRemoved(current, cell.row))}
+        >
+          −
+        </button>
+      </span>
+
+      <span className="pub-format-group">
+        <span className="pub-format-label">Columns</span>
+        <button
+          type="button"
+          className="btn btn-sm"
+          title="Add a column beside the one selected"
+          onClick={() => onChange((current) => withColumnAdded(current, cell?.column))}
+        >
+          +
+        </button>
+        <button
+          type="button"
+          className="btn btn-sm"
+          disabled={!cell || table.columns.length <= 1}
+          title="Remove the selected column"
+          onClick={() =>
+            cell && onChange((current) => withColumnRemoved(current, cell.column))
+          }
+        >
+          −
+        </button>
+      </span>
+
+      <span className="pub-format-group">
+        <label className="pub-format-check">
+          <input
+            type="checkbox"
+            checked={table.headerRow}
+            onChange={(event) =>
+              onChange((current) => ({ ...current, headerRow: event.target.checked }))
+            }
+          />
+          Header row
+        </label>
+        <label className="pub-format-check">
+          <input
+            type="checkbox"
+            checked={table.headerColumn}
+            onChange={(event) =>
+              onChange((current) => ({ ...current, headerColumn: event.target.checked }))
+            }
+          />
+          Header column
+        </label>
+        <label className="pub-format-check">
+          <input
+            type="checkbox"
+            checked={table.bandedRows}
+            onChange={(event) =>
+              onChange((current) => ({ ...current, bandedRows: event.target.checked }))
+            }
+          />
+          Banded
+        </label>
+      </span>
+
+      {/* A cell holds anything a page can, so the bar offers all of it — this
+          is the difference between a table of words and a table. */}
+      <span className="pub-format-group">
+        <span className="pub-format-label">
+          {cell ? `Add to R${cell.row + 1}C${cell.column + 1}` : "Choose a cell to fill it"}
+        </span>
+        {TABLE_CELL_BLOCK_TYPES.map((type) => (
+          <button
+            key={type}
+            type="button"
+            className="btn btn-sm"
+            disabled={!cell}
+            title={BLOCK_LABELS[type] ?? type}
+            onClick={() => onAddContent(type)}
+          >
+            <IconView name={BLOCK_ICONS[type] ?? "Square"} size={14} />
+          </button>
+        ))}
+      </span>
+    </div>
   );
 }
 
@@ -379,6 +524,8 @@ export function PublicationEditor({
   >(null);
 
   const selectedId = selectedIds.length === 1 ? selectedIds[0] : null;
+
+
   const setSelectedId = (id: string | null) => {
     setSelectedIds(id ? [id] : []);
     if (!id) setOpenGroupId(null);
@@ -456,6 +603,20 @@ export function PublicationEditor({
   );
 
   /**
+   * The box drawn around a selection of several, and the block its resize
+   * handle reports as the one being dragged.
+   *
+   * Absent for a selection of one, which wears its own handles. The anchor is
+   * only somewhere for the drag to start from — `startDrag` resizes everything
+   * selected, not the block it is handed.
+   */
+  const selectionBox = (() => {
+    const chosen = activeBlocks.filter((block) => selectedIds.includes(block.id));
+    if (chosen.length < 2) return null;
+    return { bounds: boundsOf(chosen), anchor: chosen[0] };
+  })();
+
+  /**
    * What this page shows but does not own: the publication's repeated blocks
    * and its layout's. Drawn at full strength — they are part of the page as the
    * reader will see it — but not selectable, because they belong elsewhere.
@@ -521,6 +682,56 @@ export function PublicationEditor({
    * it should not redraw a canvas of a hundred blocks.
    */
   const canvasRef = useRef<HTMLDivElement | null>(null);
+  /**
+   * The bar above the canvas that the rich-text toolbar is portalled into.
+   *
+   * One bar rather than a toolbar per block: a block being written in is
+   * already the thing being looked at, and a toolbar growing out of it would
+   * cover the page around it — which is the arrangement being judged.
+   */
+  const [formatBar, setFormatBar] = useState<HTMLDivElement | null>(null);
+  /**
+   * The text block the caret is in, if any.
+   *
+   * Writing happens on the canvas, in the block itself, rather than in a panel
+   * beside it. Held as an id so it survives the blocks being replaced on every
+   * edit, and cleared whenever the selection moves elsewhere.
+   */
+  const [writing, setWriting] = useState<{ ownerId: string; textId: string } | null>(
+    null
+  );
+  /**
+   * The cell being worked on, if any.
+   *
+   * A table is one block on the canvas, so selecting a table and selecting a
+   * cell inside it are two different depths of the same selection: the block
+   * id says which table, the address says which cell of it. Cleared whenever
+   * the block selection moves, the same way writing is.
+   */
+  const [cellAt, setCellAt] = useState<
+    { blockId: string; row: number; column: number } | null
+  >(null);
+  /*
+   * Writing and cell choice both end when the selection leaves the block.
+   *
+   * Read from the selection rather than cleared when it changes: every route
+   * out — clicking the canvas, choosing another block, deleting this one,
+   * changing page — moves the selection, and deriving it means none of them
+   * has to remember to let go. The owner is the block on the canvas, not the
+   * words: text in a table cell belongs to the table, which is what stays
+   * selected while it is being written in.
+   */
+  const editingTextId =
+    writing && writing.ownerId === selectedId ? writing.textId : null;
+  const activeCell = cellAt && cellAt.blockId === selectedId ? cellAt : null;
+  /*
+   * Writing ends when the selection leaves the block.
+   *
+   * Every route out — clicking the canvas, choosing another block, deleting
+   * this one, changing page — moves the selection, so this is the one place
+   * that has to let go rather than each of them remembering to.
+   */
+
   const spaceDown = useRef(false);
   useEffect(() => {
     const down = (event: KeyboardEvent) => {
@@ -969,15 +1180,16 @@ export function PublicationEditor({
 
   /** Pasted words, as a text block wide enough to hold them. */
   function pasteText(text: string) {
-    const block = createPublicationBlock("text");
-    block.text = text.slice(0, 5000);
+    const words = text.slice(0, 5000);
+    const block = createPublicationBlock("richText");
+    block.html = plainTextToRichText(words);
     block.zIndex = activeBlocks.length + 1;
 
     // Roughly as tall as the words need. An estimate, not a measurement — the
     // block is resizable, and the point is only that a paragraph does not
     // arrive in a box built for one line.
     const width = Math.min(activeCanvas.width - 160, 900);
-    const lines = block.text
+    const lines = words
       .split("\n")
       .reduce((total, line) => total + Math.max(1, Math.ceil(line.length / 48)), 0);
 
@@ -1134,7 +1346,67 @@ export function PublicationEditor({
     // Reads the selection and the blocks as they stand, like the key handler.
   });
 
-  /** Lines the selection up, against itself or against the page. */
+  /* --------------------------------------------------------------- Tables */
+
+  /**
+   * The table the format bar is acting on, and the cell inside it, if any.
+   *
+   * Derived rather than held: the blocks are replaced on every edit, so a held
+   * copy would go stale the moment a column was resized.
+   */
+  const tableSelection = (() => {
+    if (!selected || selected.type !== "table" || !selected.table) return null;
+    const cell = activeCell
+      ? { row: activeCell.row, column: activeCell.column }
+      : null;
+    return { block: selected, cell };
+  })();
+
+  /** Rewrites a table block's grid, keeping its box the size of the grid. */
+  function updateTable(
+    blockId: string,
+    change: (table: PublicationTable) => PublicationTable
+  ) {
+    const block = activeBlocks.find((entry) => entry.id === blockId);
+    if (!block?.table) return;
+
+    const table = change(block.table);
+    updateBlock(blockId, { table, ...tableSize(table) });
+  }
+
+  /** Puts a new block into a cell, at the end of whatever is already there. */
+  function addToCell(
+    blockId: string,
+    at: { row: number; column: number },
+    type: PublicationBlockType
+  ) {
+    const item = createPublicationBlock(type);
+    // Inside a cell a block is sized by the cell, not placed on the canvas, so
+    // it starts modest and fills the width it is given.
+    item.width = 240;
+    item.height = type === "richText" || type === "button" ? 40 : 120;
+    item.x = 0;
+    item.y = 0;
+    item.zIndex = 1;
+
+    updateTable(blockId, (table) =>
+      withCellChanged(table, at, (cell) => ({
+        ...cell,
+        content: [...cell.content, item],
+      }))
+    );
+    setSelectedIds([blockId]);
+    setCellAt({ blockId, ...at });
+  }
+
+  /**
+   * Lines the selection up, against itself or against the page.
+   *
+   * A group counts as one thing and travels whole — the arrangement inside it
+   * is the reason it was grouped, so lining a group up must not take it apart.
+   * The exception is a group that has been opened, where the member somebody
+   * chose lines up on its own.
+   */
   function align(alignment: (typeof ALIGNMENTS)[number], against: "each other" | "page") {
     const chosen = activeBlocks.filter((block) => selectedIds.includes(block.id));
     if (chosen.length === 0) return;
@@ -1146,13 +1418,14 @@ export function PublicationEditor({
         alignment,
         against === "page"
           ? { x: 0, y: 0, width: activeCanvas.width, height: activeCanvas.height }
-          : boundsOf(chosen)
+          : boundsOf(chosen),
+        openGroupId
       )
     );
   }
 
   function distribute(axis: "horizontal" | "vertical") {
-    setActiveBlocks(distributeBlocks(activeBlocks, selectedIds, axis));
+    setActiveBlocks(distributeBlocks(activeBlocks, selectedIds, axis, openGroupId));
   }
 
   /**
@@ -1255,8 +1528,14 @@ export function PublicationEditor({
     event.stopPropagation();
     event.preventDefault();
 
+    /*
+     * A resize keeps whatever is selected rather than narrowing to the block
+     * whose handle was grabbed. The handle belongs to the selection's box, and
+     * a group or a multiple selection scales as one — the alternative, silently
+     * dropping to one block, would resize something other than what is lit up.
+     */
     if (mode === "move") selectBlock(event, block);
-    else setSelectedIds([block.id]);
+    else if (!selectedIds.includes(block.id)) setSelectedIds(blockSelection(block));
 
     const startX = event.clientX;
     const startY = event.clientY;
@@ -1268,28 +1547,38 @@ export function PublicationEditor({
      * pointer event would compound each rounding, and a selection dragged
      * across the page would drift apart.
      */
-    const moving =
-      mode === "move"
-        ? (selectedIds.includes(block.id)
-            ? withGroupMembers(activeBlocks, selectedIds)
-            : blockSelection(block))
-        : [block.id];
+    const moving = selectedIds.includes(block.id)
+      ? withGroupMembers(activeBlocks, selectedIds)
+      : blockSelection(block);
     const origins = new Map(
       activeBlocks
         .filter((entry) => moving.includes(entry.id))
         .map((entry) => [entry.id, { x: entry.x, y: entry.y }])
     );
-    const origin = { width: block.width, height: block.height };
+
+    /*
+     * The box a resize works on, and the blocks as they stood inside it.
+     *
+     * Held once, before the first move, and every frame recomputed from it:
+     * scaling the current blocks by each frame's small factor would compound
+     * the rounding, and a block dragged out and back would not come home.
+     */
+    const startBlocks = activeBlocks;
+    const origin = boundsOf(
+      activeBlocks.filter((entry) => moving.includes(entry.id))
+    );
 
     const onMove = (moveEvent: PointerEvent) => {
       const deltaX = (moveEvent.clientX - startX) / zoom;
       const deltaY = (moveEvent.clientY - startY) / zoom;
 
       if (mode === "resize") {
-        updateBlock(block.id, {
-          width: Math.max(16, Math.round(origin.width + deltaX)),
-          height: Math.max(16, Math.round(origin.height + deltaY)),
-        });
+        setActiveBlocks(
+          resizeSelection(startBlocks, moving, origin, {
+            width: origin.width + deltaX,
+            height: origin.height + deltaY,
+          })
+        );
         return;
       }
 
@@ -2018,6 +2307,42 @@ export function PublicationEditor({
         </aside>
 
         {/* -------------------------------------------------------- Canvas */}
+        <div className="pub-stage">
+          {/*
+            The formatting bar, above the canvas and across it.
+
+            It holds whatever the thing being edited puts there: the rich-text
+            toolbar while the caret is in a block's words, table controls while
+            a table is selected. Always mounted, so a toolbar always has
+            somewhere to arrive, and unobtrusive when there is nothing in it.
+          */}
+          <div
+            className={`pub-format-bar${
+              editingTextId || tableSelection ? " is-active" : ""
+            }`}
+            // A press in the bar must not reach the workspace behind it, which
+            // would drop the selection the bar is acting on.
+            onPointerDown={(event) => event.stopPropagation()}
+          >
+            <div className="pub-format-bar-slot" ref={setFormatBar} />
+            {tableSelection ? (
+              <TableFormatBar
+                block={tableSelection.block}
+                cell={tableSelection.cell}
+                onChange={(change) => updateTable(tableSelection.block.id, change)}
+                onAddContent={(type) =>
+                  tableSelection.cell &&
+                  addToCell(tableSelection.block.id, tableSelection.cell, type)
+                }
+              />
+            ) : null}
+            {!editingTextId && !tableSelection ? (
+              <span className="pub-format-bar-hint">
+                Double-click text to write in it
+              </span>
+            ) : null}
+          </div>
+
         <div
           className={`builder-workspace pub-workspace${panning ? " is-panning" : ""}`}
           ref={stageHostRef}
@@ -2131,7 +2456,7 @@ export function PublicationEditor({
                 key={`${repeated ? "r" : "p"}-${block.id}`}
                 className={`pub-editor-block${
                   selectedIds.includes(block.id) ? " is-selected" : ""
-                }${
+                }${editingTextId === block.id ? " is-writing" : ""}${
                   block.groupId && block.groupId === openGroupId ? " is-in-group" : ""
                 }`}
                 style={{
@@ -2146,7 +2471,11 @@ export function PublicationEditor({
                   pointerEvents: repeated ? "none" : "auto",
                 }}
                 onPointerDown={
-                  repeated ? undefined : (event) => startDrag(event, block, "move")
+                  // A block being written in belongs to the caret, not to the
+                  // drag: pressing inside the words has to place the cursor.
+                  repeated || editingTextId === block.id
+                    ? undefined
+                    : (event) => startDrag(event, block, "move")
                 }
                 onContextMenu={
                   repeated
@@ -2168,24 +2497,162 @@ export function PublicationEditor({
                         });
                       }
                 }
-                /* Opens the group this block is in, so the next press picks
-                   the block rather than the whole arrangement. */
+                /*
+                 * Double-click goes one level in.
+                 *
+                 * On a grouped block that means opening the group, so the next
+                 * press picks the block rather than the whole arrangement; on a
+                 * block already reachable it means writing in its words. A
+                 * grouped text block therefore takes two double-clicks to
+                 * write in, which is the same order a drawing tool uses.
+                 */
                 onDoubleClick={
-                  repeated || !block.groupId
+                  repeated
                     ? undefined
                     : (event) => {
                         event.stopPropagation();
-                        setOpenGroupId(block.groupId ?? null);
+                        if (block.groupId && block.groupId !== openGroupId) {
+                          setOpenGroupId(block.groupId);
+                          setSelectedIds([block.id]);
+                          return;
+                        }
+                        if (!WRITEABLE_BLOCKS.has(block.type)) return;
                         setSelectedIds([block.id]);
+                        setStyleSlot(null);
+                        setWriting({ ownerId: block.id, textId: block.id });
                       }
                 }
               >
-                {/* Blocks are non-interactive here so clicks select instead. */}
-                <PublicationBlockView
-                  block={block}
-                  sources={canvasSources}
-                  interactive={false}
-                />
+                {/*
+                  A table draws its own cells here so that one can be chosen,
+                  filled and written in; everything else is drawn as it will
+                  publish, and is deaf to the pointer so clicks select it.
+                */}
+                {!repeated && block.type === "table" ? (
+                  <PublicationTableView
+                    table={block.table}
+                    sources={canvasSources}
+                    renderCell={(cell, at) => {
+                      const chosen =
+                        activeCell?.blockId === block.id &&
+                        activeCell.row === at.row &&
+                        activeCell.column === at.column;
+
+                      return (
+                        <div
+                          className={`pub-cell-stack pub-editor-cell${
+                            chosen ? " is-chosen" : ""
+                          }`}
+                          onPointerDown={(event) => {
+                            // The cell takes the press so the table does not
+                            // start dragging out from under the choice.
+                            event.stopPropagation();
+                            setSelectedIds([block.id]);
+                            setStyleSlot(null);
+                            setCellAt({ blockId: block.id, ...at });
+                          }}
+                        >
+                          {cell.content.map((item) => (
+                            <div
+                              key={item.id}
+                              className={`pub-editor-cell-item${
+                                editingTextId === item.id ? " is-writing" : ""
+                              }`}
+                              /* One toolbar, so only one thing may be open in
+                                 it: writing in a cell is asked for the same way
+                                 writing in a block is. */
+                              onDoubleClick={(event) => {
+                                if (!WRITEABLE_BLOCKS.has(item.type)) return;
+                                event.stopPropagation();
+                                setSelectedIds([block.id]);
+                                setCellAt({ blockId: block.id, ...at });
+                                setWriting({ ownerId: block.id, textId: item.id });
+                              }}
+                            >
+                              <PublicationBlockView
+                                block={item}
+                                sources={canvasSources}
+                                interactive={false}
+                              />
+                              <button
+                                type="button"
+                                className="pub-editor-cell-remove"
+                                title="Remove from this cell"
+                                onPointerDown={(event) => event.stopPropagation()}
+                                onClick={() =>
+                                  updateTable(block.id, (table) =>
+                                    withCellChanged(table, at, (entry) => ({
+                                      ...entry,
+                                      content: entry.content.filter(
+                                        (other) => other.id !== item.id
+                                      ),
+                                    }))
+                                  )
+                                }
+                              >
+                                ×
+                              </button>
+                              {editingTextId === item.id ? (
+                                <div className="pub-editor-cell-writing">
+                                  <RichTextEditor
+                                    value={blockHtml(item)}
+                                    autoFocus
+                                    onChange={(html) =>
+                                      updateTable(block.id, (table) =>
+                                        withCellChanged(table, at, (entry) => ({
+                                          ...entry,
+                                          content: entry.content.map((other) =>
+                                            other.id === item.id
+                                              ? { ...other, html }
+                                              : other
+                                          ),
+                                        }))
+                                      )
+                                    }
+                                    fonts={sources.fonts}
+                                    toolbarHost={formatBar}
+                                    bare
+                                  />
+                                </div>
+                              ) : null}
+                            </div>
+                          ))}
+                          {cell.content.length === 0 ? (
+                            <span className="pub-editor-cell-empty">Empty</span>
+                          ) : null}
+                        </div>
+                      );
+                    }}
+                  />
+                ) : (
+                  <PublicationBlockView
+                    block={block}
+                    sources={canvasSources}
+                    interactive={false}
+                  />
+                )}
+
+                {/*
+                  The words, written where they will be read.
+
+                  Laid over the block rather than replacing it, so a shape
+                  stays drawn under its label and a button keeps its face while
+                  the words on it are changed. The block underneath still
+                  renders its own text, which would show through, so it is
+                  hidden for as long as the editor is standing in for it.
+                */}
+                {!repeated && editingTextId === block.id ? (
+                  <div className="pub-editor-writing">
+                    <RichTextEditor
+                      value={blockHtml(block)}
+                      onChange={(html) => updateBlock(block.id, { html })}
+                      fonts={sources.fonts}
+                      toolbarHost={formatBar}
+                      bare
+                      autoFocus
+                    />
+                  </div>
+                ) : null}
                 {!repeated && selectedId === block.id ? (
                   <>
                     <span
@@ -2205,6 +2672,31 @@ export function PublicationEditor({
                 ) : null}
               </div>
             ))}
+
+            {/*
+              The box around a selection of several, with the handle that
+              scales it. A lone block carries its own handles; more than one
+              has no single block to hang them on, and the arrangement is what
+              is being resized, so the box gets them instead.
+            */}
+            {selectionBox ? (
+              <div
+                className="pub-editor-selection"
+                style={{
+                  left: `${selectionBox.bounds.x}px`,
+                  top: `${selectionBox.bounds.y}px`,
+                  width: `${selectionBox.bounds.width}px`,
+                  height: `${selectionBox.bounds.height}px`,
+                }}
+              >
+                <span
+                  className="pub-editor-handle"
+                  style={{ right: "-0.3rem", bottom: "-0.3rem", cursor: "nwse-resize" }}
+                  title="Drag to resize everything selected"
+                  onPointerDown={(event) => startDrag(event, selectionBox.anchor, "resize")}
+                />
+              </div>
+            ) : null}
 
             {marquee ? (
               <div
@@ -2315,6 +2807,7 @@ export function PublicationEditor({
             </div>
           </>
         ) : null}
+        </div>
 
         <aside className="builder-inspector">
           {/*
@@ -2549,31 +3042,14 @@ export function PublicationEditor({
               <div className="inspector-section">
                 <h4 className="inspector-title">Content</h4>
 
-                {selected.type === "text" ? (
-                  <>
-                    <div className="field">
-                      <label>Text</label>
-                      <textarea
-                        rows={3}
-                        value={selected.text ?? ""}
-                        onChange={(event) => updateBlock(selected.id, { text: event.target.value })}
-                      />
-                    </div>
-                    <StyleButton label="Text style" onOpen={() => setStyleSlot("text")} />
-                  </>
-                ) : null}
-
                 {selected.type === "richText" ? (
                   <>
-                    <RichTextEditor
-                      value={selected.html ?? ""}
-                      onChange={(html) => updateBlock(selected.id, { html })}
-                      fonts={sources.fonts}
-                      minHeight={10}
-                    />
                     <p className="help-text">
-                      Sizes are stored in rem and scale with the viewer.
+                      Double-click the block to write in it. The bar above the
+                      canvas formats whatever the caret is in; sizes are stored
+                      in rem and scale with the viewer.
                     </p>
+                    <StyleButton label="Text style" onOpen={() => setStyleSlot("text")} />
                   </>
                 ) : null}
 
@@ -2631,11 +3107,9 @@ export function PublicationEditor({
 
                 {selected.type === "button" ? (
                   <>
-                    <TextField
-                      label="Label"
-                      value={selected.label ?? ""}
-                      onChange={(label) => updateBlock(selected.id, { label })}
-                    />
+                    <p className="help-text">
+                      Double-click the button to write its face.
+                    </p>
                     {/* What it does when pressed is the click action below,
                         which every block carries — a second link field on the
                         button alone was a second answer to one question, and
@@ -2706,17 +3180,10 @@ export function PublicationEditor({
                         now, so there is no separate colour field. */}
                     <StyleButton label="Shape style" onOpen={() => setStyleSlot("shape")} />
 
-                    <div className="field">
-                      <label>Text on the shape</label>
-                      <textarea
-                        rows={2}
-                        value={selected.text ?? ""}
-                        onChange={(event) =>
-                          updateBlock(selected.id, { text: event.target.value })
-                        }
-                      />
-                    </div>
-                    {selected.text ? (
+                    <p className="help-text">
+                      Double-click the shape to write on it.
+                    </p>
+                    {richTextToPlainText(blockHtml(selected)).trim() ? (
                       <>
                         <SelectField
                           label="Text placement"

@@ -7,7 +7,7 @@ import {
   type SponsorScrollSettings,
 } from "./page-layout";
 import { sanitizeMediaPath } from "./protected-media-url";
-import { normalizeRichText } from "./rich-text";
+import { normalizeRichText, plainTextToRichText } from "./rich-text";
 import { normalizeStyleValues, type StyleValues } from "./style-values";
 
 /**
@@ -21,7 +21,6 @@ export const PUBLICATION_KINDS = ["zine", "presentation", "post"] as const;
 export type PublicationKind = (typeof PUBLICATION_KINDS)[number];
 
 export const PUBLICATION_BLOCK_TYPES = [
-  "text",
   "richText",
   "image",
   "video",
@@ -30,6 +29,7 @@ export const PUBLICATION_BLOCK_TYPES = [
   "icon",
   "shape",
   "customShape",
+  "table",
   "story",
   "collection",
   "form",
@@ -56,6 +56,60 @@ export const POST_VIEW_PRESETS = [
   { id: "story", label: "Story", width: 1080, height: 1920 },
   { id: "landscape", label: "Landscape", width: 1200, height: 630 },
 ] as const;
+
+/**
+ * What a table cell holds: ordinary blocks, laid out in flow.
+ *
+ * A cell is a box rather than a canvas, so the blocks in it stack down the
+ * cell in the order they are listed and their `x`, `y` and `zIndex` are
+ * ignored. That is the whole difference between a cell and the page: content
+ * placed by coordinate would be stranded the moment a column was resized, and
+ * resizing columns is most of what anybody does to a table.
+ *
+ * They are `PublicationBlock`s and not a smaller shape of their own so that
+ * every content type a page can hold — words, a picture, an icon, a shape, an
+ * uploaded outline — is already renderable inside a cell, by the same renderer,
+ * with the same styles and the same toolbar.
+ */
+export type PublicationTableCell = {
+  id: string;
+  content: PublicationBlock[];
+  /** Dresses this cell alone, over the table's own cell style. */
+  style?: StyleValues;
+};
+
+export type PublicationTable = {
+  /** Column widths and row heights, in canvas units. */
+  columns: number[];
+  rows: number[];
+  /** Indexed `[row][column]`; always `rows.length` by `columns.length`. */
+  cells: PublicationTableCell[][];
+  /** Whether the first row and column are headings, dressed as such. */
+  headerRow: boolean;
+  headerColumn: boolean;
+  /** Every other row tinted, which is what makes a wide table readable. */
+  bandedRows: boolean;
+  /** The grid itself: its outline, its rules and its background. */
+  tableStyle?: StyleValues;
+  /** The default for every cell, and for the heading cells over it. */
+  cellStyle?: StyleValues;
+  headerStyle?: StyleValues;
+};
+
+/** Blocks a cell may hold. A table is not among them: cells do not nest. */
+export const TABLE_CELL_BLOCK_TYPES = [
+  "richText",
+  "image",
+  "icon",
+  "shape",
+  "customShape",
+  "button",
+  "video",
+  "qrCode",
+] as const;
+
+export const MAX_TABLE_COLUMNS = 20;
+export const MAX_TABLE_ROWS = 60;
 
 export type PublicationBlock = {
   id: string;
@@ -94,12 +148,22 @@ export type PublicationBlock = {
   /**
    * Where a shape's text sits. `inside` is held to the shape's own outline, the
    * same as on a page; `above` puts it over the shape in the block's box. The
-   * words themselves are `text`, styled by `textStyle` — so a shape and the
+   * words themselves are `html`, styled by `textStyle` — so a shape and the
    * writing on it are dressed separately.
    */
   textPlacement?: ShapeTextPlacement;
 
+  /**
+   * Superseded by `html`.
+   *
+   * There was once a plain text block beside the rich one, and a shape carried
+   * its words here as a plain string. Both are rich text now — one kind of text
+   * area, so the toolbar means the same thing wherever the caret is. Kept on
+   * the type so a publication saved before the change still reads; lifted into
+   * `html` the first time it is normalized, and never written.
+   */
   text?: string;
+  /** Every block's words, as rich text. */
   html?: string;
   mediaId?: string;
   mediaUrl?: string;
@@ -112,6 +176,7 @@ export type PublicationBlock = {
   muted?: boolean;
   controls?: boolean;
 
+  /** Superseded by `html`: a button's face is rich text like any other. */
   label?: string;
   /**
    * Superseded by `clickAction` and `clickTarget`.
@@ -140,6 +205,9 @@ export type PublicationBlock = {
    * that could disagree with the one they can see.
    */
   sponsorScroll?: SponsorScrollSettings;
+
+  /** `table` — the grid, its cells and how all of it is dressed. */
+  table?: PublicationTable;
 
   /** Click action for visual blocks: navigate, jump to a page, or nothing. */
   clickAction?: "none" | "link" | "page";
@@ -288,6 +356,186 @@ function pick<T extends string>(value: unknown, allowed: readonly T[], fallback:
   return allowed.includes(value as T) ? (value as T) : fallback;
 }
 
+/* -------------------------------------------------------------- Tables */
+
+/** Default column width and row height, in canvas units. */
+const TABLE_COLUMN_WIDTH = 240;
+const TABLE_ROW_HEIGHT = 90;
+
+export function createTableCell(): PublicationTableCell {
+  return { id: makeId("pubcell"), content: [] };
+}
+
+export function createTable(columns = 3, rows = 3): PublicationTable {
+  const columnCount = Math.min(MAX_TABLE_COLUMNS, Math.max(1, columns));
+  const rowCount = Math.min(MAX_TABLE_ROWS, Math.max(1, rows));
+
+  return {
+    columns: Array.from({ length: columnCount }, () => TABLE_COLUMN_WIDTH),
+    rows: Array.from({ length: rowCount }, () => TABLE_ROW_HEIGHT),
+    cells: Array.from({ length: rowCount }, () =>
+      Array.from({ length: columnCount }, createTableCell)
+    ),
+    headerRow: true,
+    headerColumn: false,
+    bandedRows: false,
+  };
+}
+
+/** A table block's box is the grid it holds, so the two never disagree. */
+export function tableSize(table: PublicationTable): { width: number; height: number } {
+  return {
+    width: table.columns.reduce((total, width) => total + width, 0),
+    height: table.rows.reduce((total, height) => total + height, 0),
+  };
+}
+
+/**
+ * A table read back from storage, squared off.
+ *
+ * The grid is the authority on its own shape: `cells` is forced to exactly as
+ * many rows and columns as `rows` and `columns` describe, so a document saved
+ * by an older version, hand-edited, or half-written by a failed save can never
+ * produce a ragged table the renderer has to guess at.
+ */
+export function normalizeTable(input: unknown): PublicationTable {
+  const raw = (input ?? {}) as Record<string, unknown>;
+
+  const sizes = (value: unknown, fallback: number, cap: number): number[] => {
+    const list = Array.isArray(value) ? value : [];
+    const kept = list
+      .slice(0, cap)
+      .map((entry) => Math.max(24, Math.round(num(entry, fallback))));
+    return kept.length > 0 ? kept : [fallback];
+  };
+
+  const columns = sizes(raw.columns, TABLE_COLUMN_WIDTH, MAX_TABLE_COLUMNS);
+  const rows = sizes(raw.rows, TABLE_ROW_HEIGHT, MAX_TABLE_ROWS);
+
+  const storedRows = Array.isArray(raw.cells) ? raw.cells : [];
+
+  const cells = rows.map((_height, rowIndex) => {
+    const storedRow = Array.isArray(storedRows[rowIndex]) ? storedRows[rowIndex] : [];
+    return columns.map((_width, columnIndex) => {
+      const stored = (storedRow as unknown[])[columnIndex] as
+        | Record<string, unknown>
+        | undefined;
+      if (!stored || typeof stored !== "object") return createTableCell();
+
+      const content = (Array.isArray(stored.content) ? stored.content : [])
+        .map((entry) => normalizePublicationBlock(entry))
+        .filter(
+          (block): block is PublicationBlock =>
+            // A cell holds content, not compositions, and never another table.
+            block !== null &&
+            (TABLE_CELL_BLOCK_TYPES as readonly string[]).includes(block.type)
+        );
+
+      const cell: PublicationTableCell = {
+        id: str(stored.id) || makeId("pubcell"),
+        content,
+      };
+      if (stored.style) cell.style = normalizeStyleValues(stored.style);
+      return cell;
+    });
+  });
+
+  const table: PublicationTable = {
+    columns,
+    rows,
+    cells,
+    headerRow: raw.headerRow === undefined ? true : Boolean(raw.headerRow),
+    headerColumn: Boolean(raw.headerColumn),
+    bandedRows: Boolean(raw.bandedRows),
+  };
+
+  if (raw.tableStyle) table.tableStyle = normalizeStyleValues(raw.tableStyle);
+  if (raw.cellStyle) table.cellStyle = normalizeStyleValues(raw.cellStyle);
+  if (raw.headerStyle) table.headerStyle = normalizeStyleValues(raw.headerStyle);
+
+  return table;
+}
+
+/** Where a cell sits, which is how the editor names the one being worked on. */
+export type CellAddress = { row: number; column: number };
+
+/** Adds a column beside `at`, or at the end when `at` is not given. */
+export function withColumnAdded(table: PublicationTable, at?: number): PublicationTable {
+  if (table.columns.length >= MAX_TABLE_COLUMNS) return table;
+  const index = at === undefined ? table.columns.length : Math.max(0, at + 1);
+
+  const columns = [...table.columns];
+  columns.splice(index, 0, table.columns[Math.min(at ?? 0, table.columns.length - 1)]);
+
+  return {
+    ...table,
+    columns,
+    cells: table.cells.map((row) => {
+      const next = [...row];
+      next.splice(index, 0, createTableCell());
+      return next;
+    }),
+  };
+}
+
+export function withRowAdded(table: PublicationTable, at?: number): PublicationTable {
+  if (table.rows.length >= MAX_TABLE_ROWS) return table;
+  const index = at === undefined ? table.rows.length : Math.max(0, at + 1);
+
+  const rows = [...table.rows];
+  rows.splice(index, 0, table.rows[Math.min(at ?? 0, table.rows.length - 1)]);
+
+  const cells = [...table.cells];
+  cells.splice(index, 0, table.columns.map(createTableCell));
+
+  return { ...table, rows, cells };
+}
+
+/** Removing the last column or row would leave no table, so it is refused. */
+export function withColumnRemoved(table: PublicationTable, at: number): PublicationTable {
+  if (table.columns.length <= 1 || at < 0 || at >= table.columns.length) return table;
+  return {
+    ...table,
+    columns: table.columns.filter((_width, index) => index !== at),
+    cells: table.cells.map((row) => row.filter((_cell, index) => index !== at)),
+  };
+}
+
+export function withRowRemoved(table: PublicationTable, at: number): PublicationTable {
+  if (table.rows.length <= 1 || at < 0 || at >= table.rows.length) return table;
+  return {
+    ...table,
+    rows: table.rows.filter((_height, index) => index !== at),
+    cells: table.cells.filter((_row, index) => index !== at),
+  };
+}
+
+/** Replaces one cell, leaving the rest of the grid untouched. */
+export function withCellChanged(
+  table: PublicationTable,
+  at: CellAddress,
+  change: (cell: PublicationTableCell) => PublicationTableCell
+): PublicationTable {
+  const row = table.cells[at.row];
+  if (!row || !row[at.column]) return table;
+
+  return {
+    ...table,
+    cells: table.cells.map((cells, rowIndex) =>
+      rowIndex === at.row
+        ? cells.map((cell, columnIndex) =>
+            columnIndex === at.column ? change(cell) : cell
+          )
+        : cells
+    ),
+  };
+}
+
+/** The content blocks of every cell, for anything that walks a page. */
+export function tableContentBlocks(table: PublicationTable): PublicationBlock[] {
+  return table.cells.flatMap((row) => row.flatMap((cell) => cell.content));
+}
+
 export function createPublicationBlock(type: PublicationBlockType): PublicationBlock {
   const block: PublicationBlock = {
     id: makeId("pubblock"),
@@ -302,18 +550,22 @@ export function createPublicationBlock(type: PublicationBlockType): PublicationB
   };
 
   switch (type) {
-    case "text":
-      block.text = "Text";
+    case "richText":
+      block.html = "<p>Text</p>";
       block.textStyle = { fontSize: 3, color: "#ffffff" };
       break;
-    case "richText":
-      block.html = "<p>Rich text</p>";
-      break;
     case "button":
-      block.label = "Open";
+      block.html = "<p>Open</p>";
       block.height = 80;
       block.width = 240;
       break;
+    case "table": {
+      block.table = createTable();
+      const size = tableSize(block.table);
+      block.width = size.width;
+      block.height = size.height;
+      break;
+    }
     case "qrCode":
       block.qrValue = "https://example.com";
       block.width = 240;
@@ -336,13 +588,13 @@ export function createPublicationBlock(type: PublicationBlockType): PublicationB
     case "shape":
       block.shapeKind = "rectangle";
       block.color = "#2b6cb0";
-      block.text = "";
+      block.html = "";
       block.textPlacement = "inside";
       break;
     case "customShape":
       block.shapeSlug = "";
       block.color = "#2b6cb0";
-      block.text = "";
+      block.html = "";
       block.textPlacement = "inside";
       break;
     default:
@@ -375,10 +627,35 @@ export function createPublicationPage(index = 0): PublicationPage {
   };
 }
 
+/**
+ * The words a block carries, as rich text.
+ *
+ * There is one kind of text on a publication canvas now, and it is rich. A
+ * block saved before that carried plain words in `text`; they are lifted into
+ * `html` here rather than by a migration, so a publication nobody has opened
+ * since reads correctly the first time it is asked for.
+ */
+function richTextOf(raw: Record<string, unknown>, ...legacyKeys: string[]): string {
+  const html = normalizeRichText(str(raw.html));
+  if (html) return html;
+
+  for (const key of legacyKeys) {
+    const plain = str(raw[key]);
+    if (plain) return normalizeRichText(plainTextToRichText(plain));
+  }
+  return "";
+}
+
 export function normalizePublicationBlock(input: unknown): PublicationBlock | null {
   if (!input || typeof input !== "object") return null;
   const raw = input as Record<string, unknown>;
-  const type = raw.type as PublicationBlockType;
+  /*
+   * The plain text block is gone: one text block, and it is rich.
+   *
+   * Read before the type is checked, so a stored `text` block becomes a rich
+   * one rather than being dropped as an unknown kind.
+   */
+  const type = (raw.type === "text" ? "richText" : raw.type) as PublicationBlockType;
   if (!PUBLICATION_BLOCK_TYPES.includes(type)) return null;
 
   const block: PublicationBlock = {
@@ -404,11 +681,8 @@ export function normalizePublicationBlock(input: unknown): PublicationBlock | nu
   if (raw.shapeStyle) block.shapeStyle = normalizeStyleValues(raw.shapeStyle);
 
   switch (type) {
-    case "text":
-      block.text = str(raw.text);
-      break;
     case "richText":
-      block.html = normalizeRichText(str(raw.html));
+      block.html = richTextOf(raw, "text");
       break;
     case "image":
     case "video":
@@ -423,7 +697,9 @@ export function normalizePublicationBlock(input: unknown): PublicationBlock | nu
       block.controls = Boolean(raw.controls);
       break;
     case "button":
-      block.label = str(raw.label, "Button");
+      // A button's face is a text area like any other, so it is rich too. The
+      // plain `label` it used to carry is what a button saved before this says.
+      block.html = richTextOf(raw, "label") || plainTextToRichText("Button");
       block.newTab = Boolean(raw.newTab);
       /*
        * A link set on the button itself, carried over to the click action.
@@ -456,15 +732,24 @@ export function normalizePublicationBlock(input: unknown): PublicationBlock | nu
       block.color = str(raw.color, "#2b6cb0");
       block.radius = num(raw.radius, 0);
       // Words on the shape, with their own style and their own placement.
-      block.text = str(raw.text);
+      block.html = richTextOf(raw, "text");
       block.textPlacement = pick(raw.textPlacement, SHAPE_TEXT_PLACEMENTS, "inside");
       break;
     case "customShape":
       block.shapeSlug = str(raw.shapeSlug);
       block.color = str(raw.color, "#2b6cb0");
-      block.text = str(raw.text);
+      block.html = richTextOf(raw, "text");
       block.textPlacement = pick(raw.textPlacement, SHAPE_TEXT_PLACEMENTS, "inside");
       break;
+    case "table": {
+      block.table = normalizeTable(raw.table);
+      // The box is the grid: a block whose stored size disagreed with its
+      // columns would draw a table that did not fill it, or overflowed it.
+      const size = tableSize(block.table);
+      block.width = size.width;
+      block.height = size.height;
+      break;
+    }
     case "story":
       block.storyId = str(raw.storyId);
       break;
@@ -864,91 +1149,208 @@ export function boundsOf(blocks: PublicationBlock[]): {
 }
 
 /**
- * Lines the chosen blocks up against each other, or against the page.
+ * What a command moves as one thing: a lone block, or a whole group.
+ *
+ * Arranging acts on *units*, not on blocks. A group is an arrangement somebody
+ * made deliberately, and lining its members up individually takes that
+ * arrangement apart — aligning a group left used to stack every member on the
+ * same edge, which is the one thing grouping them said not to do. Dragging has
+ * always moved a group by one delta; this is the same rule, written down where
+ * every arranging command can reach it.
+ *
+ * A group that has been opened is the exception. Double-clicking into one says
+ * "I am working on the members now", so while it is open each selected member
+ * is its own unit and lines up on its own.
+ */
+export type ArrangeUnit = {
+  ids: string[];
+  bounds: { x: number; y: number; width: number; height: number };
+};
+
+export function selectionUnits(
+  blocks: PublicationBlock[],
+  ids: string[],
+  openGroupId?: string | null
+): ArrangeUnit[] {
+  const chosen = blocks.filter((block) => ids.includes(block.id));
+
+  const units: ArrangeUnit[] = [];
+  const byGroup = new Map<string, PublicationBlock[]>();
+
+  for (const block of chosen) {
+    const group = block.groupId;
+    if (!group || group === openGroupId) {
+      units.push({ ids: [block.id], bounds: boundsOf([block]) });
+      continue;
+    }
+    const members = byGroup.get(group);
+    if (members) members.push(block);
+    else byGroup.set(group, [block]);
+  }
+
+  for (const members of byGroup.values()) {
+    units.push({ ids: members.map((block) => block.id), bounds: boundsOf(members) });
+  }
+
+  return units;
+}
+
+/** Applies one offset to every block named by the units. */
+function shiftUnits(
+  blocks: PublicationBlock[],
+  moves: Map<string, { dx: number; dy: number }>
+): PublicationBlock[] {
+  return blocks.map((block) => {
+    const move = moves.get(block.id);
+    if (!move) return block;
+    return {
+      ...block,
+      x: Math.round(block.x + move.dx),
+      y: Math.round(block.y + move.dy),
+    };
+  });
+}
+
+/**
+ * Lines the chosen units up against each other, or against the page.
  *
  * Against each other, the edge they meet at is the outermost one already in
- * use — aligning left moves everything to the leftmost block rather than to
- * some new place, so one block stays where it was and the arrangement is
+ * use — aligning left moves everything to the leftmost unit rather than to
+ * some new place, so one unit stays where it was and the arrangement is
  * recognisably the same arrangement.
+ *
+ * Each unit is moved by a single offset, so a group arrives at the edge intact
+ * rather than collapsing onto it.
  */
 export function alignBlocks(
   blocks: PublicationBlock[],
   ids: string[],
   alignment: Alignment,
-  against: { x: number; y: number; width: number; height: number }
+  against: { x: number; y: number; width: number; height: number },
+  openGroupId?: string | null
 ): PublicationBlock[] {
-  const chosen = new Set(ids);
+  const units = selectionUnits(blocks, ids, openGroupId);
+  if (units.length === 0) return blocks;
 
-  return blocks.map((block) => {
-    if (!chosen.has(block.id)) return block;
+  const moves = new Map<string, { dx: number; dy: number }>();
+
+  for (const unit of units) {
+    const { bounds } = unit;
+    let dx = 0;
+    let dy = 0;
 
     switch (alignment) {
       case "left":
-        return { ...block, x: Math.round(against.x) };
+        dx = against.x - bounds.x;
+        break;
       case "centre":
-        return {
-          ...block,
-          x: Math.round(against.x + (against.width - block.width) / 2),
-        };
+        dx = against.x + (against.width - bounds.width) / 2 - bounds.x;
+        break;
       case "right":
-        return { ...block, x: Math.round(against.x + against.width - block.width) };
+        dx = against.x + against.width - bounds.width - bounds.x;
+        break;
       case "top":
-        return { ...block, y: Math.round(against.y) };
+        dy = against.y - bounds.y;
+        break;
       case "middle":
-        return {
-          ...block,
-          y: Math.round(against.y + (against.height - block.height) / 2),
-        };
+        dy = against.y + (against.height - bounds.height) / 2 - bounds.y;
+        break;
       case "bottom":
-        return { ...block, y: Math.round(against.y + against.height - block.height) };
+        dy = against.y + against.height - bounds.height - bounds.y;
+        break;
     }
-  });
+
+    for (const id of unit.ids) moves.set(id, { dx, dy });
+  }
+
+  return shiftUnits(blocks, moves);
 }
 
 /**
- * Spreads the chosen blocks evenly between the two at the ends.
+ * Spreads the chosen units evenly between the two at the ends.
  *
  * The outermost two do not move — they are what "between" means — and the
- * gaps between the rest are made equal. Gaps rather than centres, so blocks of
+ * gaps between the rest are made equal. Gaps rather than centres, so units of
  * different sizes end up evenly *spaced* rather than evenly *pitched*, which
  * is what somebody spacing things out is looking at.
  *
- * Fewer than three blocks has no middle to move, so nothing happens.
+ * A group counts once and travels whole, the same as it does when aligned.
+ * Fewer than three units has no middle to move, so nothing happens.
  */
 export function distributeBlocks(
   blocks: PublicationBlock[],
   ids: string[],
-  axis: "horizontal" | "vertical"
+  axis: "horizontal" | "vertical",
+  openGroupId?: string | null
 ): PublicationBlock[] {
-  const chosen = blocks.filter((block) => ids.includes(block.id));
-  if (chosen.length < 3) return blocks;
+  const units = selectionUnits(blocks, ids, openGroupId);
+  if (units.length < 3) return blocks;
 
-  const size = (block: PublicationBlock) =>
-    axis === "horizontal" ? block.width : block.height;
-  const start = (block: PublicationBlock) =>
-    axis === "horizontal" ? block.x : block.y;
+  const size = (unit: ArrangeUnit) =>
+    axis === "horizontal" ? unit.bounds.width : unit.bounds.height;
+  const start = (unit: ArrangeUnit) =>
+    axis === "horizontal" ? unit.bounds.x : unit.bounds.y;
 
-  const ordered = [...chosen].sort((a, b) => start(a) - start(b));
+  const ordered = [...units].sort((a, b) => start(a) - start(b));
   const first = ordered[0];
   const last = ordered[ordered.length - 1];
 
   const span = start(last) + size(last) - start(first);
-  const filled = ordered.reduce((total, block) => total + size(block), 0);
+  const filled = ordered.reduce((total, unit) => total + size(unit), 0);
   // A negative gap means they overlap; spreading them is still the right
   // answer, and the overlap is simply shared out evenly.
   const gap = (span - filled) / (ordered.length - 1);
 
-  const placed = new Map<string, number>();
+  const moves = new Map<string, { dx: number; dy: number }>();
   let cursor = start(first);
-  for (const block of ordered) {
-    placed.set(block.id, Math.round(cursor));
-    cursor += size(block) + gap;
+  for (const unit of ordered) {
+    const delta = cursor - start(unit);
+    for (const id of unit.ids) {
+      moves.set(id, axis === "horizontal" ? { dx: delta, dy: 0 } : { dx: 0, dy: delta });
+    }
+    cursor += size(unit) + gap;
   }
 
+  return shiftUnits(blocks, moves);
+}
+
+/** The smallest a block is allowed to become, in canvas units. */
+export const MIN_BLOCK_SIZE = 16;
+
+/**
+ * Resizes a whole selection by dragging one corner of the box around it.
+ *
+ * Every block is placed within the selection's box by proportion rather than
+ * by offset, so a group keeps its arrangement while it grows: the gaps between
+ * its members scale with it, and a block sitting a third of the way across
+ * stays a third of the way across. Resizing one block on its own is the same
+ * arithmetic with a box of one.
+ *
+ * Font sizes are left alone. Text in a publication is authored in rem and
+ * scales with the viewer, and rewriting every style on a drag would make
+ * dragging a corner an edit nobody asked for.
+ */
+export function resizeSelection(
+  blocks: PublicationBlock[],
+  ids: string[],
+  from: { x: number; y: number; width: number; height: number },
+  to: { width: number; height: number }
+): PublicationBlock[] {
+  const chosen = new Set(ids);
+  if (chosen.size === 0 || from.width <= 0 || from.height <= 0) return blocks;
+
+  const scaleX = Math.max(to.width, MIN_BLOCK_SIZE) / from.width;
+  const scaleY = Math.max(to.height, MIN_BLOCK_SIZE) / from.height;
+
   return blocks.map((block) => {
-    const at = placed.get(block.id);
-    if (at === undefined) return block;
-    return axis === "horizontal" ? { ...block, x: at } : { ...block, y: at };
+    if (!chosen.has(block.id)) return block;
+    return {
+      ...block,
+      x: Math.round(from.x + (block.x - from.x) * scaleX),
+      y: Math.round(from.y + (block.y - from.y) * scaleY),
+      width: Math.max(MIN_BLOCK_SIZE, Math.round(block.width * scaleX)),
+      height: Math.max(MIN_BLOCK_SIZE, Math.round(block.height * scaleY)),
+    };
   });
 }
 

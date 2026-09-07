@@ -3,8 +3,13 @@
 import type { CSSProperties } from "react";
 
 import { customStyleClassName } from "@/lib/custom-style-css";
-import type { PublicationBlock } from "@/lib/publication-layout";
+import type {
+  PublicationBlock,
+  PublicationTable,
+  PublicationTableCell,
+} from "@/lib/publication-layout";
 import { protectedMediaUrl } from "@/lib/protected-media-url";
+import { plainTextToRichText, richTextToPlainText } from "@/lib/rich-text";
 import { shapeSurfaceOf, styleValuesToCss } from "@/lib/style-values";
 
 import { LucideIconView } from "./lucide-icon";
@@ -38,6 +43,22 @@ export const emptyPublicationSources: PublicationSources = {
   forms: {},
 };
 
+/**
+ * A block's words, wherever they were stored.
+ *
+ * Text on a publication canvas is rich text and lives in `html`. A block saved
+ * before that carried plain words — in `text` for a text block or a shape's
+ * label, in `label` for a button — and `normalizePublicationBlock` lifts them
+ * across on read. This covers the case where a block reaches a renderer
+ * without having passed through it, which the editor's own in-flight state
+ * does whenever a block has just been made.
+ */
+export function blockHtml(block: PublicationBlock): string {
+  if (block.html) return block.html;
+  const plain = block.text ?? block.label ?? "";
+  return plain ? plainTextToRichText(plain) : "";
+}
+
 /** Absolute placement in canvas units — the stage handles scaling. */
 export function publicationBlockStyle(block: PublicationBlock): CSSProperties {
   return {
@@ -48,6 +69,124 @@ export function publicationBlockStyle(block: PublicationBlock): CSSProperties {
     transform: block.rotation ? `rotate(${block.rotation}deg)` : undefined,
     zIndex: block.zIndex,
   };
+}
+
+/**
+ * One block inside a table cell.
+ *
+ * A cell is a box, so its content flows: the block's `x`, `y` and `zIndex` say
+ * nothing here, and its `width` and `height` become a maximum rather than a
+ * placement. Words take the height they need; a picture, an icon or a shape
+ * takes the height it was given, so a row of logos stays a row of logos when
+ * the column beside it grows.
+ */
+function CellContentView({
+  block,
+  sources,
+}: {
+  block: PublicationBlock;
+  sources: PublicationSources;
+}) {
+  const flows = block.type === "richText" || block.type === "button";
+
+  return (
+    <div
+      className="pub-cell-item"
+      style={{
+        width: "100%",
+        maxWidth: `${block.width}px`,
+        height: flows ? "auto" : `${block.height}px`,
+      }}
+    >
+      <PublicationBlockView block={block} sources={sources} interactive={false} />
+    </div>
+  );
+}
+
+/**
+ * The grid.
+ *
+ * Drawn with real table elements so a heading row is a heading row to anything
+ * reading the page aloud, and so the export — which photographs the rendered
+ * page — gets the table it can see.
+ */
+export function PublicationTableView({
+  table,
+  sources,
+  className,
+  style,
+  renderCell,
+}: {
+  table: PublicationTable | undefined;
+  sources: PublicationSources;
+  className?: string;
+  style?: CSSProperties;
+  /** The editor draws its own cells, so it can put a caret in one. */
+  renderCell?: (
+    cell: PublicationTableCell,
+    at: { row: number; column: number }
+  ) => React.ReactNode;
+}) {
+  if (!table) return <div className="pb-empty-drop">No table</div>;
+
+  const grid = styleValuesToCss(table.tableStyle) as CSSProperties | undefined;
+  const cellCss = styleValuesToCss(table.cellStyle) as CSSProperties | undefined;
+  const headerCss = styleValuesToCss(table.headerStyle) as CSSProperties | undefined;
+
+  return (
+    <div
+      className={`pub-table-box${className ? ` ${className}` : ""}`}
+      style={{ width: "100%", height: "100%", ...style }}
+    >
+      <table className="pub-table" style={grid}>
+        <colgroup>
+          {table.columns.map((width, index) => (
+            <col key={index} style={{ width: `${width}px` }} />
+          ))}
+        </colgroup>
+        <tbody>
+          {table.cells.map((row, rowIndex) => (
+            <tr key={rowIndex} style={{ height: `${table.rows[rowIndex]}px` }}>
+              {row.map((cell, columnIndex) => {
+                const heading =
+                  (table.headerRow && rowIndex === 0) ||
+                  (table.headerColumn && columnIndex === 0);
+                const Cell = heading ? "th" : "td";
+                const banded =
+                  table.bandedRows && !heading && rowIndex % 2 === 1;
+
+                return (
+                  <Cell
+                    key={cell.id}
+                    className={`pub-table-cell${banded ? " is-banded" : ""}`}
+                    style={{
+                      ...cellCss,
+                      ...(heading ? headerCss : undefined),
+                      ...(styleValuesToCss(cell.style) as CSSProperties),
+                    }}
+                  >
+                    {renderCell ? (
+                      renderCell(cell, { row: rowIndex, column: columnIndex })
+                    ) : (
+                      <div className="pub-cell-stack">
+                        {cell.content.map((item) => (
+                          <CellContentView
+                            key={item.id}
+                            block={item}
+                            sources={sources}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </Cell>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
 }
 
 export function PublicationBlockView({
@@ -82,23 +221,12 @@ export function PublicationBlockView({
   let content: React.ReactNode = null;
 
   switch (block.type) {
-    case "text":
-      content = (
-        <div
-          className={textProps.className || undefined}
-          style={{ width: "100%", height: "100%", ...textProps.style }}
-        >
-          {block.text}
-        </div>
-      );
-      break;
-
     case "richText":
       content = (
         <div
           className={`rich-text ${textProps.className}`.trim()}
           style={{ width: "100%", height: "100%", overflow: "hidden", ...textProps.style }}
-          dangerouslySetInnerHTML={{ __html: block.html ?? "" }}
+          dangerouslySetInnerHTML={{ __html: blockHtml(block) }}
         />
       );
       break;
@@ -151,12 +279,13 @@ export function PublicationBlockView({
 
     case "button":
       content = (
-        <span
-          className={`pb-button ${textProps.className}`.trim()}
+        // A div rather than a span: a button's face is rich text now, and rich
+        // text is paragraphs, which cannot live inside an inline element.
+        <div
+          className={`pb-button rich-text ${textProps.className}`.trim()}
           style={{ width: "100%", height: "100%", ...textProps.style }}
-        >
-          {block.label}
-        </span>
+          dangerouslySetInnerHTML={{ __html: blockHtml(block) }}
+        />
       );
       break;
 
@@ -213,8 +342,14 @@ export function PublicationBlockView({
        * drawing.
        */
       const surface = shapeSurfaceOf(block.shapeStyle);
-      const text = (block.text ?? "").trim();
-      const above = Boolean(text) && (block.textPlacement ?? "inside") === "above";
+      const html = blockHtml(block);
+      // Rich text is markup even when it says nothing, so an empty paragraph
+      // must not count as words the shape has to make room for.
+      const hasWords = richTextToPlainText(html).trim() !== "";
+      const above = hasWords && (block.textPlacement ?? "inside") === "above";
+      const words = hasWords ? (
+        <span className="rich-text" dangerouslySetInnerHTML={{ __html: html }} />
+      ) : null;
 
       /*
        * The shape's own shadow, cast by its outline.
@@ -231,7 +366,7 @@ export function PublicationBlockView({
         color: surface.color ?? block.color ?? "#2b6cb0",
         borderWidth: surface.borderWidth ?? 0,
         borderColor: surface.borderColor ?? "#000000",
-        text: above ? "" : text,
+        text: above ? null : words,
         textClassName: textProps.className || undefined,
         textStyle: textProps.style,
         // A block's box is fixed, so text above it takes its share of the
@@ -273,12 +408,24 @@ export function PublicationBlockView({
             }`}
             style={textProps.style}
           >
-            {text}
+            {words}
           </span>
           {shape}
         </div>
       ) : (
         shape
+      );
+      break;
+    }
+
+    case "table": {
+      content = (
+        <PublicationTableView
+          table={block.table}
+          sources={sources}
+          className={textProps.className || undefined}
+          style={textProps.style}
+        />
       );
       break;
     }

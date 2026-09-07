@@ -6025,6 +6025,50 @@ ol.doc-list ol.doc-list ol.doc-list {
    `overflow: visible` lets a canvas larger than the space carry on under the
    side panels, which are painted over it — the editor stays a window onto a
    surface bigger than itself, instead of shrinking the page to fit. */
+/* The canvas column: a formatting bar, then the workspace under it. The
+   workspace keeps its own scrolling and panning, so the bar has to be a
+   sibling rather than something floating inside it. */
+.pub-stage {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+}
+
+/* Always present so a toolbar always has somewhere to arrive; quiet until
+   something puts controls in it. */
+.pub-format-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+  padding: 0 0.5rem;
+  border-bottom: 1px solid var(--admin-border);
+  background: var(--admin-panel, var(--admin-bg));
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.pub-format-bar-slot {
+  display: flex;
+  align-items: center;
+}
+
+.pub-format-bar-hint {
+  font-size: 0.75rem;
+  color: var(--admin-muted);
+}
+
+/* Inside the bar the toolbar is a row of controls, not a panel with a frame
+   and a heading above a writing area. */
+.pub-format-bar .rich-text-editor,
+.pub-format-bar .rte-toolbar.is-detached {
+  border: 0;
+  background: none;
+  margin: 0;
+  padding: 0;
+}
+
 .pub-workspace {
   position: relative;
   overflow: visible;
@@ -6091,6 +6135,173 @@ ol.doc-list ol.doc-list ol.doc-list {
   border: 1px solid var(--admin-accent);
   background: color-mix(in srgb, var(--admin-accent) 12%, transparent);
   pointer-events: none;
+}
+
+/* ------------------------------------------------ Publication tables */
+
+.pub-table-box {
+  overflow: hidden;
+}
+
+.pub-table {
+  width: 100%;
+  height: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+/* A visible grid by default, so a table dropped on a canvas reads as one
+   before anybody has styled it. The table's own style overrides this. */
+.pub-table-cell {
+  border: 1px solid currentColor;
+  padding: 0.5rem;
+  vertical-align: top;
+  text-align: left;
+  overflow: hidden;
+}
+
+.pub-table-cell.is-banded {
+  background: color-mix(in srgb, currentColor 8%, transparent);
+}
+
+/* Cell content flows: the blocks in a cell stack down it in order, rather than
+   standing where a coordinate put them. */
+.pub-cell-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  height: 100%;
+}
+
+.pub-cell-item {
+  position: relative;
+  flex: 0 0 auto;
+  min-height: 0;
+}
+
+/* The editor's own cells: choosable, fillable, and marked when chosen. */
+.pub-editor-cell {
+  min-height: 1.5rem;
+  outline: 2px solid transparent;
+  outline-offset: -2px;
+}
+
+.pub-editor-cell.is-chosen {
+  outline-color: var(--admin-accent);
+}
+
+.pub-editor-cell-item {
+  position: relative;
+}
+
+.pub-editor-cell-empty {
+  font-size: 0.75rem;
+  opacity: 0.45;
+}
+
+.pub-editor-cell-remove {
+  position: absolute;
+  top: -0.4rem;
+  right: -0.4rem;
+  z-index: 3;
+  width: 1.1rem;
+  height: 1.1rem;
+  padding: 0;
+  line-height: 1;
+  border: 1px solid var(--admin-border);
+  border-radius: 50%;
+  background: var(--admin-bg);
+  color: var(--admin-text);
+  cursor: pointer;
+  opacity: 0;
+}
+
+.pub-editor-cell-item:hover .pub-editor-cell-remove {
+  opacity: 1;
+}
+
+.pub-editor-cell-item.is-writing > :not(.pub-editor-cell-writing) {
+  visibility: hidden;
+}
+
+.pub-editor-cell-writing {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+}
+
+.pub-table-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: nowrap;
+}
+
+.pub-format-group {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.pub-format-label {
+  font-size: 0.75rem;
+  color: var(--admin-muted);
+  white-space: nowrap;
+}
+
+.pub-format-check {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+/* A block being written in. Its own words are hidden while the editor stands
+   in for them — both would otherwise show, one over the other. */
+.pub-editor-block.is-writing > :not(.pub-editor-writing):not(.pub-editor-handle) {
+  visibility: hidden;
+}
+
+.pub-editor-writing {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+}
+
+/* The editor fills the block exactly, so the words sit where they will be read
+   rather than shifting into a panel of their own. */
+.pub-editor-writing .rich-text-editor.is-bare,
+.pub-editor-writing .rte-editor-host,
+.pub-editor-writing .ql-container.ql-snow {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+  background: none;
+}
+
+.pub-editor-writing .ql-editor {
+  min-height: 0;
+  height: 100%;
+  padding: 0;
+  /* The caret is the only thing marking the block while it is being written
+     in; a focus ring would sit over the design being judged. */
+  outline: 1px dashed var(--admin-accent);
+  outline-offset: 2px;
+}
+
+/* The box around a selection of several. Transparent to the pointer so a press
+   inside it still reaches the block underneath; its handle takes its own back. */
+.pub-editor-selection {
+  position: absolute;
+  z-index: 59;
+  border: 1px dashed var(--admin-accent);
+  pointer-events: none;
+}
+
+.pub-editor-selection .pub-editor-handle {
+  pointer-events: auto;
 }
 
 /* A block whose group is open: picked one at a time until something outside
