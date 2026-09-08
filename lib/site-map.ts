@@ -25,7 +25,8 @@ import {
   Story,
   Zine,
 } from "./models";
-import { NOT_DELETED, publicationHref, type PublicationKind } from "./publication-layout";
+import { publicationHref, type PublicationKind } from "./publication-layout";
+import { NOT_DELETED } from "./soft-delete";
 import type { SiteNode } from "./site-tree";
 
 /**
@@ -84,7 +85,7 @@ export async function loadContentCatalogue(): Promise<Map<string, CatalogueEntry
       SitePage.find().select("title slug status isHome visibility").sort({ title: 1 }).lean<any[]>(),
       Story.find().select("headline slug status visibility").sort({ headline: 1 }).lean<any[]>(),
       Collection.find().select("name slug isPublic imageIds visibility").sort({ name: 1 }).lean<any[]>(),
-      Documentation.find().select("title slug status visibility").sort({ title: 1 }).lean<any[]>(),
+      Documentation.find(NOT_DELETED).select("title slug status visibility").sort({ title: 1 }).lean<any[]>(),
       Zine.find({ isTemplate: { $ne: true }, ...NOT_DELETED })
         .select("title slug status kind visibility")
         .sort({ title: 1 })
@@ -94,6 +95,7 @@ export async function loadContentCatalogue(): Promise<Map<string, CatalogueEntry
         .sort({ title: 1 })
         .lean<any[]>(),
       DocPage.aggregate<{ _id: string; count: number }>([
+        { $match: NOT_DELETED },
         { $group: { _id: "$documentationId", count: { $sum: 1 } } },
       ]),
     ]);

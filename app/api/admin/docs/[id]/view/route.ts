@@ -20,6 +20,10 @@ export async function GET(
   await connectDB();
 
   const doc = await DocPage.findById(id).lean<any>();
+  // A document in the bin is not served, here or anywhere else.
+  if (doc?.deletedAt) {
+    return NextResponse.json({ error: "Not found." }, { status: 404 });
+  }
   if (!doc) return NextResponse.json({ error: "Not found." }, { status: 404 });
 
   const set = await getDocSetById(String(doc.documentationId ?? ""));

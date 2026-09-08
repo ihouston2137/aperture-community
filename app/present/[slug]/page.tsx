@@ -7,8 +7,8 @@ import { Zine } from "@/lib/models";
 import {
   normalizePublicationPages,
   normalizeRepeatedBlocks,
-  NOT_DELETED,
 } from "@/lib/publication-layout";
+import { NOT_DELETED } from "@/lib/soft-delete";
 
 async function findPresentation(slug: string) {
   await connectDB();

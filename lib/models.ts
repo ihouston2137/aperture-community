@@ -1635,9 +1635,21 @@ const DocumentationSchema = new Schema<any>(
     templateId: { type: String, default: "" },
 
     visibility: { type: ContentVisibilitySchema, default: () => ({}) },
+
+    /**
+     * In the bin, and when it went there.
+     *
+     * A documentation set is everything anybody wrote down, and deleting one
+     * used to take every page with it. It goes here instead: out of every list
+     * and no longer served, but whole, and able to come back with its pages.
+     */
+    deletedAt: { type: Date, default: null },
+    deletedBy: { type: String, default: "" },
   },
   { timestamps: true }
 );
+
+DocumentationSchema.index({ deletedAt: 1, order: 1 });
 
 export const Documentation = model("Documentation", DocumentationSchema);
 
@@ -1672,12 +1684,17 @@ const DocPageSchema = new Schema<any>(
     /** Front-matter keys the importer did not claim, kept for export. */
     frontMatter: { type: Mixed, default: {} },
     sourceFilename: { type: String, default: "" },
+
+    /** In the bin. A binned page leaves the tree; its children lift to the root. */
+    deletedAt: { type: Date, default: null },
+    deletedBy: { type: String, default: "" },
   },
   { timestamps: true }
 );
 
 // A set's tree is always read as "the pages of this set, in order".
 DocPageSchema.index({ documentationId: 1, parentId: 1, order: 1 });
+DocPageSchema.index({ documentationId: 1, deletedAt: 1 });
 // Slugs are unique per set, which is what lets two sets both have an "Overview".
 DocPageSchema.index({ documentationId: 1, slug: 1 }, { unique: true });
 

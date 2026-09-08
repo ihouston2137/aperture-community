@@ -19,6 +19,7 @@ import {
   type DocView,
 } from "./doc-tree";
 import { DocPage, DocTemplate, Documentation } from "./models";
+import { isDeleted, NOT_DELETED } from "./soft-delete";
 import type { PageRow } from "./page-layout";
 
 /**
@@ -59,7 +60,10 @@ function toSummary(doc: Record<string, any>): DocSummary {
 
 export async function listDocSets(publishedOnly = false): Promise<DocSetSummary[]> {
   await connectDB();
-  const filter = publishedOnly ? { status: "published" } : {};
+  // Every read here leaves out the bin. This is the one place documentation is
+  // loaded from, so putting it here is putting it everywhere.
+  const filter: Record<string, unknown> = { ...NOT_DELETED };
+  if (publishedOnly) filter.status = "published";
   const sets = await Documentation.find(filter)
     .sort({ order: 1, title: 1 })
     .lean<any[]>();
@@ -69,12 +73,12 @@ export async function listDocSets(publishedOnly = false): Promise<DocSetSummary[
 export async function getDocSetById(id: string): Promise<DocSetSummary | null> {
   await connectDB();
   const set = await Documentation.findById(id).lean<any>();
-  return set ? toSetSummary(set) : null;
+  return set && !isDeleted(set) ? toSetSummary(set) : null;
 }
 
 export async function getDocSetBySlug(slug: string): Promise<DocSetSummary | null> {
   await connectDB();
-  const set = await Documentation.findOne({ slug }).lean<any>();
+  const set = await Documentation.findOne({ slug, ...NOT_DELETED }).lean<any>();
   return set ? toSetSummary(set) : null;
 }
 
@@ -83,7 +87,7 @@ export async function listDocs(
   publishedOnly = false
 ): Promise<DocSummary[]> {
   await connectDB();
-  const filter: Record<string, unknown> = { documentationId };
+  const filter: Record<string, unknown> = { documentationId, ...NOT_DELETED };
   if (publishedOnly) filter.status = "published";
 
   const docs = await DocPage.find(filter)
@@ -96,7 +100,7 @@ export async function listDocs(
 /** One page of one set. Slugs are unique per set, so both are needed. */
 export async function getDocBySlug(documentationId: string, slug: string) {
   await connectDB();
-  return DocPage.findOne({ documentationId, slug }).lean<any>();
+  return DocPage.findOne({ documentationId, slug, ...NOT_DELETED }).lean<any>();
 }
 
 /** The set's tree, which is what a contents rail renders. */

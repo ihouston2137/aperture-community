@@ -4,12 +4,14 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { requirePermission } from "@/lib/access";
+import { getSession } from "@/lib/session";
 import { connectDB } from "@/lib/db";
 import { normalizeDocBlocks, stripInlineMarkdown } from "@/lib/doc-layout";
 import { parseMarkdown } from "@/lib/doc-markdown";
 import { docUsageLabel } from "@/lib/doc-tree";
 import { clearMediaUsage, syncMediaUsage } from "@/lib/media-usage-sync";
 import { DocPage, Documentation, MediaAsset } from "@/lib/models";
+import { NOT_DELETED } from "@/lib/soft-delete";
 import { slugify, uniqueSlug } from "@/lib/slug";
 
 async function guard() {
@@ -117,6 +119,13 @@ export async function saveDocAction(formData: FormData) {
     templateId: String(formData.get("templateId") ?? "").trim(),
   };
 
+  // The editor cannot open something in the bin, but this action is reachable
+  // on its own and must not write over what a restore would bring back.
+  if (id) {
+    const existing = await DocPage.findById(id).select("deletedAt").lean<any>();
+    if (existing?.deletedAt) return;
+  }
+
   let docId = id;
   if (id) {
     await DocPage.findByIdAndUpdate(id, payload);
@@ -132,6 +141,16 @@ export async function saveDocAction(formData: FormData) {
   redirect(`/admin/docs/${documentationId}/pages/${docId}/edit?saved=1`);
 }
 
+/**
+ * Puts a document in the bin.
+ *
+ * Not removed: a document is somebody's writing, and it can be put back whole.
+ * It leaves the tree — its children lift to the root of the set, which is what
+ * already happens to a page whose parent is not there — and stops being served.
+ *
+ * Its pictures stay recorded as in use. Something that can come back must not
+ * come back to find them thrown away.
+ */
 export async function deleteDocAction(formData: FormData) {
   await guard();
 
@@ -139,16 +158,63 @@ export async function deleteDocAction(formData: FormData) {
   const documentationId = String(formData.get("documentationId") ?? "").trim();
   if (!id) return;
 
-  // Children are lifted to the root of their set rather than deleted with the
-  // parent: losing a section heading should not silently take its pages too.
+  const session = await getSession();
+  await DocPage.findByIdAndUpdate(id, {
+    $set: { deletedAt: new Date(), deletedBy: session?.name || session?.email || "" },
+  });
+
+  revalidatePath(`/admin/docs/${documentationId}`);
+  revalidatePath("/docs", "layout");
+  redirect(`/admin/docs/${documentationId}?deleted=1`);
+}
+
+/** Takes a document back out of the bin, where it left off. */
+export async function restoreDocAction(formData: FormData) {
+  await guard();
+
+  const id = String(formData.get("id") ?? "").trim();
+  const documentationId = String(formData.get("documentationId") ?? "").trim();
+  if (!id) return;
+
+  await DocPage.findByIdAndUpdate(id, { $set: { deletedAt: null, deletedBy: "" } });
+
+  revalidatePath(`/admin/docs/${documentationId}`);
+  revalidatePath("/docs", "layout");
+  redirect(`/admin/docs/${documentationId}?restored=1`);
+}
+
+/**
+ * Removes a document for good.
+ *
+ * Only from the bin, only with the permission for it, and only when its slug is
+ * typed — naming the thing being destroyed rather than confirming a prompt.
+ */
+export async function purgeDocAction(formData: FormData) {
+  await requirePermission("docs.purge");
+  await connectDB();
+
+  const id = String(formData.get("id") ?? "").trim();
+  const typed = String(formData.get("confirm") ?? "").trim();
+  if (!id) return;
+
+  const doc = await DocPage.findById(id).lean<any>();
+  if (!doc) return;
+
+  const documentationId = String(doc.documentationId ?? "");
+  if (!doc.deletedAt) redirect(`/admin/docs/${documentationId}?purge=not-deleted`);
+  if (typed !== doc.slug) {
+    redirect(`/admin/docs/${documentationId}?purge=mismatch&id=${id}`);
+  }
+
+  // Children were already at the root while it sat in the bin, so nothing is
+  // stranded by this; the last thing to go is its hold on its pictures.
   await DocPage.updateMany({ parentId: id }, { $set: { parentId: "" } });
   await DocPage.findByIdAndDelete(id);
-  // Its pictures are no longer shown anywhere, so they stop counting as used.
   await clearMediaUsage(id);
 
   revalidatePath(`/admin/docs/${documentationId}`);
   revalidatePath("/docs", "layout");
-  redirect(`/admin/docs/${documentationId}`);
+  redirect(`/admin/docs/${documentationId}?purged=1`);
 }
 
 /** A page's slug has to be unique inside its set, not across the site. */
@@ -318,7 +384,7 @@ export async function splitDocIntoPagesAction(formData: FormData) {
   if (!id) return;
 
   const doc = await DocPage.findById(id).lean<any>();
-  if (!doc) return;
+  if (!doc || doc.deletedAt) return;
 
   const documentationId = String(doc.documentationId ?? "");
   const blocks = normalizeDocBlocks(doc.content);
@@ -387,13 +453,13 @@ export async function moveDocAction(formData: FormData) {
   if (!id) return;
 
   const doc = await DocPage.findById(id).lean<any>();
-  if (!doc) return;
+  if (!doc || doc.deletedAt) return;
 
   const documentationId = String(doc.documentationId ?? "");
   const parentId = String(doc.parentId ?? "");
 
   if (direction === "up" || direction === "down") {
-    const siblings = await DocPage.find({ documentationId, parentId })
+    const siblings = await DocPage.find({ documentationId, parentId, ...NOT_DELETED })
       .sort({ order: 1, title: 1 })
       .lean<any[]>();
 
@@ -423,7 +489,7 @@ export async function moveDocAction(formData: FormData) {
   if (direction === "in") {
     // A document becomes a child of the sibling directly above it, which is how
     // an outline indents.
-    const siblings = await DocPage.find({ documentationId, parentId })
+    const siblings = await DocPage.find({ documentationId, parentId, ...NOT_DELETED })
       .sort({ order: 1, title: 1 })
       .lean<any[]>();
     const position = siblings.findIndex((entry) => String(entry._id) === id);
@@ -477,14 +543,66 @@ export async function saveDocSetAction(formData: FormData) {
   redirect(`/admin/docs/${setId}?saved=1`);
 }
 
+/**
+ * Puts a whole documentation set in the bin.
+ *
+ * This was the most destructive button in the admin: a set owns its pages, so
+ * deleting one took everything anybody had written in it. Now the set alone is
+ * marked, and its pages are left exactly as they are — out of sight because
+ * their set is, and all of them back the moment it is.
+ */
 export async function deleteDocSetAction(formData: FormData) {
   await guard();
 
   const id = String(formData.get("id") ?? "").trim();
   if (!id) return;
 
-  // A page outside a set is unreachable, so the set's pages go with it. This is
-  // the one delete here that is not recoverable by re-parenting.
+  const session = await getSession();
+  await Documentation.findByIdAndUpdate(id, {
+    $set: { deletedAt: new Date(), deletedBy: session?.name || session?.email || "" },
+  });
+
+  revalidatePath("/admin/docs");
+  revalidatePath("/docs", "layout");
+  redirect("/admin/docs?deleted=1");
+}
+
+/** Takes a set back out of the bin, and its pages with it. */
+export async function restoreDocSetAction(formData: FormData) {
+  await guard();
+
+  const id = String(formData.get("id") ?? "").trim();
+  if (!id) return;
+
+  await Documentation.findByIdAndUpdate(id, { $set: { deletedAt: null, deletedBy: "" } });
+
+  revalidatePath("/admin/docs");
+  revalidatePath("/docs", "layout");
+  redirect("/admin/docs?restored=1");
+}
+
+/**
+ * Removes a set and everything in it, for good.
+ *
+ * The largest thing this admin can destroy, so it asks the most: it must
+ * already be in the bin, it needs the permission for removing things for good,
+ * and the set's slug has to be typed out.
+ */
+export async function purgeDocSetAction(formData: FormData) {
+  await requirePermission("docs.purge");
+  await connectDB();
+
+  const id = String(formData.get("id") ?? "").trim();
+  const typed = String(formData.get("confirm") ?? "").trim();
+  if (!id) return;
+
+  const set = await Documentation.findById(id).lean<any>();
+  if (!set) return;
+
+  if (!set.deletedAt) redirect("/admin/docs?purge=not-deleted");
+  if (typed !== set.slug) redirect(`/admin/docs?purge=mismatch&id=${id}`);
+
+  // A page outside a set is unreachable, so the set's pages go with it.
   const doomed = await DocPage.find({ documentationId: id }).select("_id").lean<any[]>();
   await DocPage.deleteMany({ documentationId: id });
   await Documentation.findByIdAndDelete(id);
@@ -494,5 +612,5 @@ export async function deleteDocSetAction(formData: FormData) {
 
   revalidatePath("/admin/docs");
   revalidatePath("/docs", "layout");
-  redirect("/admin/docs");
+  redirect("/admin/docs?purged=1");
 }

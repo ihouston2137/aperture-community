@@ -2,16 +2,20 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { AdminHeader, EmptyState, Panel, StatusBadge } from "@/components/admin-ui";
-import { requirePermission } from "@/lib/access";
+import { checkPermission, requirePermission } from "@/lib/access";
 import { adminExit } from "@/lib/admin-exit";
 import { connectDB } from "@/lib/db";
 import { buildDocTree, getDocSetById, listDocs, type DocNode } from "@/lib/docs";
-import { DocTemplate } from "@/lib/models";
+import { DocPage, DocTemplate } from "@/lib/models";
+import { getSession } from "@/lib/session";
+import { IN_BIN } from "@/lib/soft-delete";
 
 import {
   deleteDocAction,
   importDocsAction,
   moveDocAction,
+  purgeDocAction,
+  restoreDocAction,
   splitDocIntoPagesAction,
 } from "../actions";
 import { DocSetForm } from "../doc-set-form";
@@ -23,20 +27,25 @@ export default async function DocSetPage({
   searchParams,
 }: {
   params: Promise<{ documentation: string }>;
-  searchParams: Promise<{ from?: string }>;
+  searchParams: Promise<{ from?: string; purge?: string; id?: string }>;
 }) {
   await requirePermission("docs.manage");
 
   const { documentation } = await params;
-  const { from } = await searchParams;
+  const { from, purge, id: purgeId } = await searchParams;
+  const canPurge = await checkPermission(await getSession(), "docs.purge");
   const exit = adminExit(from, { href: "/admin/docs", label: "All documentation" });
   const set = await getDocSetById(documentation);
   if (!set) notFound();
 
   await connectDB();
-  const [pages, templateDocs] = await Promise.all([
+  const [pages, templateDocs, binned] = await Promise.all([
     listDocs(set._id),
     DocTemplate.find().select("name").sort({ name: 1 }).lean<any[]>(),
+    // The bin for this set, newest first.
+    DocPage.find({ documentationId: set._id, ...IN_BIN })
+      .sort({ deletedAt: -1 })
+      .lean<any[]>(),
   ]);
 
   const tree = buildDocTree(pages);
@@ -51,6 +60,16 @@ export default async function DocSetPage({
             <Link href={exit.href} className="btn">
               ← {exit.label}
             </Link>
+            {/* The whole set as one markdown file: for reading and handing on,
+                where the zip beside it is for moving the documents. */}
+            <a
+              className="btn"
+              href={`/api/admin/docs/set/${set._id}/export`}
+              download
+              title="Every document in this set as a single markdown file"
+            >
+              Export as one file
+            </a>
             <Link
               href={`/admin/docs/${set._id}/pages/new`}
               className="btn btn-primary"
@@ -102,6 +121,71 @@ export default async function DocSetPage({
           <DocTreeView nodes={tree} depth={0} setId={set._id} setSlug={set.slug} />
         </Panel>
       )}
+
+      {/*
+        The bin.
+        A document deleted here is kept whole and can be put back; while it sits
+        here it is out of the tree, out of the export and not served. Removing
+        one for good is separate, needs its own permission, and asks for the
+        document to be named.
+      */}
+      {binned.length > 0 ? (
+        <Panel title={`Deleted documents (${binned.length})`}>
+          <p className="help-text" style={{ marginTop: 0 }}>
+            These are kept whole and can be put back where they were.
+            {canPurge
+              ? " Removing one for good cannot be undone."
+              : " Removing one for good needs a further permission."}
+          </p>
+          <ul className="admin-list">
+            {binned.map((doc) => (
+              <li key={String(doc._id)} className="admin-list-row">
+                <div>
+                  <strong>{doc.title}</strong>
+                  <div className="admin-subtitle">
+                    {doc.slug}
+                    {doc.deletedAt
+                      ? ` · deleted ${new Date(doc.deletedAt).toLocaleDateString()}`
+                      : ""}
+                    {doc.deletedBy ? ` by ${doc.deletedBy}` : ""}
+                  </div>
+                  {purge === "mismatch" && purgeId === String(doc._id) ? (
+                    <div className="admin-subtitle" role="alert">
+                      That was not the right slug, so nothing was removed.
+                    </div>
+                  ) : null}
+                </div>
+                <div className="admin-list-actions">
+                  <form action={restoreDocAction}>
+                    <input type="hidden" name="id" value={String(doc._id)} />
+                    <input type="hidden" name="documentationId" value={set._id} />
+                    <button type="submit" className="btn btn-sm">
+                      Put back
+                    </button>
+                  </form>
+                  {canPurge ? (
+                    <form action={purgeDocAction} className="admin-list-actions">
+                      <input type="hidden" name="id" value={String(doc._id)} />
+                      <input
+                        type="text"
+                        name="confirm"
+                        className="input"
+                        style={{ maxWidth: "11rem" }}
+                        placeholder={`Type ${doc.slug}`}
+                        aria-label={`Type ${doc.slug} to remove it for good`}
+                        autoComplete="off"
+                      />
+                      <button type="submit" className="btn btn-danger btn-sm">
+                        Remove for good
+                      </button>
+                    </form>
+                  ) : null}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </Panel>
+      ) : null}
     </>
   );
 }

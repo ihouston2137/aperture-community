@@ -27,7 +27,8 @@ import {
   User,
   Zine,
 } from "./models";
-import { NOT_DELETED, publicationHref } from "./publication-layout";
+import { publicationHref } from "./publication-layout";
+import { NOT_DELETED } from "./soft-delete";
 import { getSession } from "./session";
 import { getSiteContent } from "./site-settings";
 
@@ -65,7 +66,7 @@ export async function loadMenuTargets(): Promise<
       .select("title slug kind")
       .sort({ title: 1 })
       .lean<any[]>(),
-    Documentation.find({ status: "published" })
+    Documentation.find({ status: "published", ...NOT_DELETED })
       .select("title slug")
       .sort({ title: 1 })
       .lean<any[]>(),

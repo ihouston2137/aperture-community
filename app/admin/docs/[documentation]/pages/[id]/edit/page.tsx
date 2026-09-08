@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { requirePermission } from "@/lib/access";
 import { connectDB } from "@/lib/db";
@@ -28,6 +28,8 @@ export default async function EditDocPage({
 
   await connectDB();
   const doc = await DocPage.findById(id).lean<any>();
+  // Something in the bin is put back before it is written in again.
+  if (doc?.deletedAt) redirect(`/admin/docs/${documentation}`);
   if (!doc || String(doc.documentationId) !== set._id) notFound();
 
   const source = await loadDocEditorSource(set._id, id);

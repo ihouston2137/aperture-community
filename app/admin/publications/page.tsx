@@ -5,11 +5,8 @@ import { checkPermission, requirePermission } from "@/lib/access";
 import { connectDB } from "@/lib/db";
 import { Zine } from "@/lib/models";
 import { getSession } from "@/lib/session";
-import {
-  NOT_DELETED,
-  publicationHref,
-  PUBLICATION_KINDS,
-} from "@/lib/publication-layout";
+import { publicationHref, PUBLICATION_KINDS } from "@/lib/publication-layout";
+import { IN_BIN, NOT_DELETED } from "@/lib/soft-delete";
 
 import {
   createFromTemplateAction,
@@ -39,7 +36,7 @@ export default async function PublicationsPage({
   const all = await Zine.find(NOT_DELETED).sort({ updatedAt: -1 }).lean<any[]>();
   // The bin, newest first: what was deleted last is what somebody is most
   // likely to have deleted by mistake.
-  const binned = await Zine.find({ deletedAt: { $ne: null } })
+  const binned = await Zine.find(IN_BIN)
     .sort({ deletedAt: -1 })
     .lean<any[]>();
   // Templates are starting points, not work in progress, so they list apart

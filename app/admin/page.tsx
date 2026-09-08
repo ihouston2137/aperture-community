@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { NOT_DELETED } from "@/lib/publication-layout";
+import { NOT_DELETED } from "@/lib/soft-delete";
 import { AdminHeader, Notice, Panel } from "@/components/admin-ui";
 import { AnalyticsChart } from "@/components/admin/analytics-chart";
 import { getAnalyticsOverview } from "@/lib/analytics/report";

@@ -8,6 +8,7 @@ import { normalizeDocBlocks } from "@/lib/doc-layout";
 import { serializeMarkdown, type FrontMatter } from "@/lib/doc-markdown";
 import { buildDocTree, listDocSets, listDocs, type DocNode } from "@/lib/docs";
 import { DocPage } from "@/lib/models";
+import { NOT_DELETED } from "@/lib/soft-delete";
 import { getSession } from "@/lib/session";
 
 /**
@@ -29,7 +30,7 @@ export async function GET() {
 
   await connectDB();
 
-  const pages = await DocPage.find().lean<any[]>();
+  const pages = await DocPage.find(NOT_DELETED).lean<any[]>();
   const byId = new Map(pages.map((doc) => [String(doc._id), doc]));
 
   const files: { path: string; body: string }[] = [];
