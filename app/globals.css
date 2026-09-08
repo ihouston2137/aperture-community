@@ -907,13 +907,54 @@ input, select, textarea {
 }
 
 .rte-size-value {
-  min-width: 3.75rem;
+  min-width: 4.25rem;
   display: inline-flex;
   align-items: baseline;
   justify-content: center;
   gap: 0.15rem;
   font-size: 0.8125rem;
   font-variant-numeric: tabular-nums;
+}
+
+/* The size is typed as well as stepped, so the number is a field — but it sits
+   between the two buttons as one control rather than looking like a form. */
+.rte-size-input {
+  width: 2.75rem;
+  padding: 0.1rem 0.2rem;
+  border: 1px solid transparent;
+  border-radius: 0.25rem;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.rte-size-input:hover:not(:disabled),
+.rte-size-input:focus {
+  border-color: var(--admin-border);
+  background: var(--admin-bg);
+  outline: none;
+}
+
+.rte-size-input:focus {
+  border-color: var(--admin-accent);
+}
+
+.rte-size-input:disabled {
+  opacity: 0.4;
+}
+
+/* The spinners duplicate the − and + beside them. */
+.rte-size-input::-webkit-outer-spin-button,
+.rte-size-input::-webkit-inner-spin-button {
+  appearance: none;
+  margin: 0;
+}
+
+.rte-size-input {
+  -moz-appearance: textfield;
+  appearance: textfield;
 }
 
 /* An inherited size is shown as the base it would step from, not as a value
@@ -6608,10 +6649,41 @@ ol.doc-list ol.doc-list ol.doc-list {
   min-height: 0;
   height: 100%;
   padding: 0;
+  /*
+   * No scrollbar.
+   *
+   * Quill's editor scrolls its own overflow, and the scrollbar takes width out
+   * of the line — so the words re-wrapped and moved the instant there was one
+   * more line than the block had room for. Overflowing text is simply shown
+   * while it is being written; the block clips it again when it is let go.
+   */
+  overflow: visible;
   /* The caret is the only thing marking the block while it is being written
      in; a focus ring would sit over the design being judged. */
   outline: 1px dashed var(--admin-accent);
   outline-offset: 2px;
+}
+
+/*
+ * The block's own typography, all the way down to the caret.
+ *
+ * Quill dresses its own container — `font-family: Helvetica; font-size: 13px`
+ * on `.ql-container`, `text-align: left` on `.ql-editor` — and those sit
+ * *between* the block and its words. So the moment a block was clicked into,
+ * its font, its size and its alignment were all replaced by Quill's, and the
+ * text jumped; letting go put them back. Everything to do with how the words
+ * are set is inherited from the block instead, which is the only way the thing
+ * being typed can be the thing that publishes.
+ */
+.pub-editor-writing .ql-container,
+.pub-editor-writing .ql-editor,
+.pub-editor-cell-writing .ql-container,
+.pub-editor-cell-writing .ql-editor {
+  font: inherit;
+  letter-spacing: inherit;
+  text-align: inherit;
+  text-transform: inherit;
+  color: inherit;
 }
 
 /*

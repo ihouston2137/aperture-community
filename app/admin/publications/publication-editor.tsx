@@ -9,6 +9,7 @@ import {
   useRef,
   useState,
   useTransition,
+  type CSSProperties,
 } from "react";
 
 import { MediaField } from "@/app/admin/media/media-picker";
@@ -1042,6 +1043,16 @@ export function PublicationEditor({
     null
   );
   /**
+   * How far a drag has travelled so far, and what it is carrying.
+   *
+   * Held apart from the blocks themselves, so that moving something does not
+   * rewrite the page on every frame — see the move handler for why that matters
+   * to the text inside.
+   */
+  const [dragBy, setDragBy] = useState<
+    { ids: string[]; dx: number; dy: number } | null
+  >(null);
+  /**
    * The cell being worked on, if any.
    *
    * A table is one block on the canvas, so selecting a table and selecting a
@@ -2030,6 +2041,24 @@ export function PublicationEditor({
   }
 
   /**
+   * A block being carried, drawn where the pointer has taken it.
+   *
+   * `translate3d` rather than `translate` so the browser gives the block a
+   * layer of its own for the duration: what is already drawn is moved, rather
+   * than drawn again at a new sub-pixel offset. Any rotation the block carries
+   * is applied after the move, so it still turns about its own centre.
+   */
+  function draggedStyle(block: PublicationBlock): CSSProperties | undefined {
+    if (!dragBy || !dragBy.ids.includes(block.id)) return undefined;
+    return {
+      transform: `translate3d(${dragBy.dx}px, ${dragBy.dy}px, 0)${
+        block.rotation ? ` rotate(${block.rotation}deg)` : ""
+      }`,
+      willChange: "transform",
+    };
+  }
+
+  /**
    * Lines the selection up, against itself or against the page.
    *
    * A group counts as one thing and travels whole — the arrangement inside it
@@ -2169,6 +2198,8 @@ export function PublicationEditor({
 
     const startX = event.clientX;
     const startY = event.clientY;
+    /** How far the pointer took it, read once when it is let go. */
+    const travelled = { dx: 0, dy: 0 };
 
     /*
      * Everything that moves with it, and where each of them started.
@@ -2212,22 +2243,46 @@ export function PublicationEditor({
         return;
       }
 
+      /*
+       * Carried by transform, not by position.
+       *
+       * The canvas is scaled, so one canvas unit is a fraction of a screen
+       * pixel. Rewriting `left` and `top` every frame laid the block out afresh
+       * at a new sub-pixel offset each time, and the text inside was re-snapped
+       * to the device pixels underneath — so the words jittered up and down
+       * against their own box while it slid smoothly, and lining anything up by
+       * eye was guesswork. A transform moves what has already been drawn:
+       * nothing is measured or snapped again, and the words stay exactly where
+       * they sit in the block.
+       *
+       * The position itself is written once, when the pointer is let go.
+       */
+      travelled.dx = deltaX;
+      travelled.dy = deltaY;
+      setDragBy({ ids: moving, dx: deltaX, dy: deltaY });
+    };
+
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+
+      if (mode !== "move") return;
+      setDragBy(null);
+
+      // A press that never travelled is a click, and writes nothing.
+      if (travelled.dx === 0 && travelled.dy === 0) return;
+
       setActiveBlocks(
         activeBlocks.map((entry) => {
           const from = origins.get(entry.id);
           if (!from) return entry;
           return {
             ...entry,
-            x: Math.round(from.x + deltaX),
-            y: Math.round(from.y + deltaY),
+            x: Math.round(from.x + travelled.dx),
+            y: Math.round(from.y + travelled.dy),
           };
         })
       );
-    };
-
-    const onUp = () => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
     };
 
     window.addEventListener("pointermove", onMove);
@@ -3401,6 +3456,10 @@ export function PublicationEditor({
                   top: `${selectionBox.bounds.y}px`,
                   width: `${selectionBox.bounds.width}px`,
                   height: `${selectionBox.bounds.height}px`,
+                  // The box goes with what it is drawn around.
+                  transform: dragBy
+                    ? `translate3d(${dragBy.dx}px, ${dragBy.dy}px, 0)`
+                    : undefined,
                 }}
               >
                 <span

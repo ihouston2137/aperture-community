@@ -26,8 +26,15 @@ import { REM_BASE, normalizeRichTextSpaces } from "@/lib/rich-text";
 
 /** Font sizes are authored and stored in rem so text scales with the viewport. */
 const SIZE_STEP = 0.125;
-const MIN_SIZE = 0.5;
-const MAX_SIZE = 6;
+/*
+ * A floor but no ceiling.
+ *
+ * Something has to stop a size reaching zero, where the text would vanish with
+ * no way to click back into it. Nothing has to stop it being large: a title
+ * across a 1920-unit canvas is far past the six rem this used to allow, and the
+ * limit was only ever a guess at what a paragraph needs.
+ */
+const MIN_SIZE = 0.125;
 /** What an unstyled run renders at, and where stepping starts from. */
 const BASE_SIZE = 1;
 
@@ -367,6 +374,20 @@ export function RichTextEditor({
   const [font, setFont] = useState("");
   /** `null` means the selection inherits its size rather than setting one. */
   const [size, setSize] = useState<number | null>(null);
+  /*
+   * What the size field shows.
+   *
+   * Held apart from `size` so that a half-typed number is not read as a size:
+   * committing on every keystroke would clamp the "1" of "12" to the smallest
+   * allowed and change the field under whoever is typing it. Re-synced during
+   * the render that notices the caret has moved, so it follows the words.
+   */
+  const [sizeDraft, setSizeDraft] = useState("");
+  const [seenSize, setSeenSize] = useState<number | null>(null);
+  if (size !== seenSize) {
+    setSeenSize(size);
+    setSizeDraft(String(size ?? BASE_SIZE));
+  }
   /**
    * The colour at the caret, for the custom control.
    *
@@ -570,13 +591,23 @@ export function RichTextEditor({
     [selectTarget]
   );
 
-  const stepSize = (direction: 1 | -1) => {
-    const next = roundSize(
-      Math.min(MAX_SIZE, Math.max(MIN_SIZE, (size ?? BASE_SIZE) + direction * SIZE_STEP))
-    );
-    applyFormat("size", `${next}rem`);
+  const setSizeTo = (next: number) => {
+    const size = roundSize(Math.max(MIN_SIZE, next));
+    applyFormat("size", `${size}rem`);
     // Formatting a collapsed cursor emits no change event, so set it here too.
-    setSize(next);
+    setSize(size);
+    setSizeDraft(String(size));
+  };
+
+  const stepSize = (direction: 1 | -1) => {
+    setSizeTo((size ?? BASE_SIZE) + direction * SIZE_STEP);
+  };
+
+  /** Commits what was typed, or puts back what was there if it was not a size. */
+  const commitSize = () => {
+    const typed = Number(sizeDraft.trim());
+    if (sizeDraft.trim() !== "" && Number.isFinite(typed)) setSizeTo(typed);
+    else setSizeDraft(String(size ?? BASE_SIZE));
   };
 
   const changeFont = (next: string) => {
@@ -637,19 +668,42 @@ export function RichTextEditor({
           >
             −
           </button>
-          <span
-            className="rte-size-value"
-            data-inherited={size === null ? "true" : undefined}
-            title={size === null ? "Inherited size" : "Font size"}
-          >
-            {size ?? BASE_SIZE}
+          {/*
+            Typed as well as stepped. Stepping through a hundred eighths to
+            reach a title size is not a control, it is an obstacle — so the
+            number is a field, and it commits when you have finished with it
+            rather than on every keystroke.
+          */}
+          <span className="rte-size-value" data-inherited={size === null ? "true" : undefined}>
+            <input
+              type="number"
+              className="rte-size-input"
+              aria-label="Font size in rem"
+              title={size === null ? "Inherited size — type to set one" : "Font size, in rem"}
+              min={MIN_SIZE}
+              step={SIZE_STEP}
+              disabled={!ready}
+              value={sizeDraft}
+              onChange={(event) => setSizeDraft(event.target.value)}
+              onBlur={commitSize}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  commitSize();
+                }
+                if (event.key === "Escape") {
+                  setSizeDraft(String(size ?? BASE_SIZE));
+                  (event.target as HTMLInputElement).blur();
+                }
+              }}
+            />
             <small>rem</small>
           </span>
           <button
             type="button"
             className="rte-size-step"
             aria-label="Increase font size"
-            disabled={!ready || (size ?? BASE_SIZE) >= MAX_SIZE}
+            disabled={!ready}
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => stepSize(1)}
           >
