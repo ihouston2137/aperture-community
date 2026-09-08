@@ -124,6 +124,14 @@ export async function buildMediaUsageIndex(): Promise<MediaUsageIndex> {
         .select("headline featureMediaId featureMediaUrl storyImages content")
         .lean<any[]>(),
       Collection.find().select("name imageIds").lean<any[]>(),
+      /*
+       * Publications in the bin are counted too, on purpose.
+       *
+       * Something deleted can be put back, and a publication restored to find
+       * its pictures thrown away would be a worse loss than the delete this
+       * protects against. Their media is released when they are removed for
+       * good, which is the point at which nothing can come back for it.
+       */
       Zine.find()
         .select("title pages repeatedBlocks coverMediaId coverUrl audio")
         .lean<any[]>(),

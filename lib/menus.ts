@@ -27,7 +27,7 @@ import {
   User,
   Zine,
 } from "./models";
-import { publicationHref } from "./publication-layout";
+import { NOT_DELETED, publicationHref } from "./publication-layout";
 import { getSession } from "./session";
 import { getSiteContent } from "./site-settings";
 
@@ -61,7 +61,10 @@ export async function loadMenuTargets(): Promise<
     Story.find({ status: "published" }).select("headline slug").sort({ headline: 1 }).lean<any[]>(),
     // A collection is published by being public rather than by a status field.
     Collection.find({ isPublic: true }).select("name slug").sort({ name: 1 }).lean<any[]>(),
-    Zine.find({ status: "published" }).select("title slug kind").sort({ title: 1 }).lean<any[]>(),
+    Zine.find({ status: "published", ...NOT_DELETED })
+      .select("title slug kind")
+      .sort({ title: 1 })
+      .lean<any[]>(),
     Documentation.find({ status: "published" })
       .select("title slug")
       .sort({ title: 1 })

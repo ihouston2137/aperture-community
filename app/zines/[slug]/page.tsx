@@ -7,11 +7,12 @@ import { Zine } from "@/lib/models";
 import {
   normalizePublicationPages,
   normalizeRepeatedBlocks,
+  NOT_DELETED,
 } from "@/lib/publication-layout";
 
 async function findZine(slug: string) {
   await connectDB();
-  const doc = await Zine.findOne({ slug, kind: "zine", status: "published" }).lean<any>();
+  const doc = await Zine.findOne({ slug, kind: "zine", status: "published", ...NOT_DELETED }).lean<any>();
   if (!doc) return null;
   // The admin editor normalizes on load; the public route has to as well,
   // otherwise saved rich text keeps whatever Quill wrote, non-breaking

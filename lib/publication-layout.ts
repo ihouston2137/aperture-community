@@ -18,6 +18,16 @@ import { DEFAULT_TABLE_ACCENT } from "./table-style";
  * stage rather than jumping between breakpoints.
  */
 
+/**
+ * What every list means by "the publications".
+ *
+ * Anything in the bin is left out — of the admin lists, the menus, the site
+ * map and the public routes alike. Written once so that a new list cannot
+ * quietly forget it and start serving something somebody deleted. `null` and
+ * "never set" both mean not deleted, which is what an existing document says.
+ */
+export const NOT_DELETED = { deletedAt: null } as const;
+
 export const PUBLICATION_KINDS = ["zine", "presentation", "post"] as const;
 export type PublicationKind = (typeof PUBLICATION_KINDS)[number];
 

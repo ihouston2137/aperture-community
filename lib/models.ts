@@ -1531,10 +1531,25 @@ const ZineSchema = new Schema<any>(
     coverUrl: { type: String, default: "" },
     publishedAt: { type: Date, default: null },
 
+    /**
+     * In the bin, and when it went there.
+     *
+     * A publication is weeks of somebody's arrangement, and a delete button is
+     * one press. Deleting puts it here instead: it leaves every list and stops
+     * being served, but it is still whole, and can be put back. Removing it for
+     * good is a second, deliberate act — see `purgePublicationAction`.
+     */
+    deletedAt: { type: Date, default: null },
+    /** Who put it in the bin, so the list can say. */
+    deletedBy: { type: String, default: "" },
+
     visibility: { type: ContentVisibilitySchema, default: () => ({}) },
   },
   { timestamps: true }
 );
+
+// Every list asks for what is not in the bin, so that is what is indexed.
+ZineSchema.index({ deletedAt: 1, updatedAt: -1 });
 
 export const Zine = model("Zine", ZineSchema);
 

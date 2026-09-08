@@ -25,7 +25,7 @@ import {
   Story,
   Zine,
 } from "./models";
-import { publicationHref, type PublicationKind } from "./publication-layout";
+import { NOT_DELETED, publicationHref, type PublicationKind } from "./publication-layout";
 import type { SiteNode } from "./site-tree";
 
 /**
@@ -85,7 +85,7 @@ export async function loadContentCatalogue(): Promise<Map<string, CatalogueEntry
       Story.find().select("headline slug status visibility").sort({ headline: 1 }).lean<any[]>(),
       Collection.find().select("name slug isPublic imageIds visibility").sort({ name: 1 }).lean<any[]>(),
       Documentation.find().select("title slug status visibility").sort({ title: 1 }).lean<any[]>(),
-      Zine.find({ isTemplate: { $ne: true } })
+      Zine.find({ isTemplate: { $ne: true }, ...NOT_DELETED })
         .select("title slug status kind visibility")
         .sort({ title: 1 })
         .lean<any[]>(),

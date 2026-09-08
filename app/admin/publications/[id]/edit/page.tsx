@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { requirePermission } from "@/lib/access";
 import { adminExit } from "@/lib/admin-exit";
@@ -37,6 +37,9 @@ export default async function EditPublicationPage({
   await connectDB();
   const doc = await Zine.findById(id).lean<any>();
   if (!doc) notFound();
+  // Something in the bin is not edited: it is put back first, which is the
+  // whole point of it being there rather than gone.
+  if (doc.deletedAt) redirect("/admin/publications#bin");
 
   const pages = normalizePublicationPages(doc.pages);
   const repeatedBlocks = normalizeRepeatedBlocks(doc.repeatedBlocks);

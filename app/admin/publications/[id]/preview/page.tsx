@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { PublicationExport } from "@/components/publication-export";
 import { PublicationScreen } from "@/components/publication-screen";
@@ -26,6 +26,8 @@ export default async function PublicationPreviewPage({
 
   await connectDB();
   const raw = await Zine.findById(id).lean<any>();
+  // A preview of something in the bin would be a way to keep reading it.
+  if (raw?.deletedAt) redirect("/admin/publications#bin");
   if (!raw) notFound();
 
   // Normalized exactly as the public routes do, so the preview and the

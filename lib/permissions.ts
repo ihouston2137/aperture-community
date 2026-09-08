@@ -33,6 +33,10 @@ export const permissionGroups: PermissionGroup[] = [
       { key: "calendar.manage", label: "Manage calendar events" },
       { key: "docs.manage", label: "Manage documentation" },
       { key: "publications.manage", label: "Manage publications" },
+      {
+        key: "publications.purge",
+        label: "Permanently remove deleted publications",
+      },
     ],
   },
   {

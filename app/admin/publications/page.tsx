@@ -1,26 +1,47 @@
 import Link from "next/link";
 
 import { AdminHeader, Panel, StatusBadge } from "@/components/admin-ui";
-import { requirePermission } from "@/lib/access";
+import { checkPermission, requirePermission } from "@/lib/access";
 import { connectDB } from "@/lib/db";
 import { Zine } from "@/lib/models";
-import { publicationHref, PUBLICATION_KINDS } from "@/lib/publication-layout";
+import { getSession } from "@/lib/session";
+import {
+  NOT_DELETED,
+  publicationHref,
+  PUBLICATION_KINDS,
+} from "@/lib/publication-layout";
 
 import {
   createFromTemplateAction,
   createPublicationAction,
   deletePublicationAction,
   publishPublicationAction,
+  purgePublicationAction,
+  restorePublicationAction,
   toggleTemplateAction,
 } from "./actions";
 
 export const metadata = { title: "Publications" };
 
-export default async function PublicationsPage() {
+export default async function PublicationsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ purge?: string; id?: string }>;
+}) {
   await requirePermission("publications.manage");
+  const { purge, id: purgeId } = await searchParams;
   await connectDB();
 
-  const all = await Zine.find().sort({ updatedAt: -1 }).lean<any[]>();
+  // Removing for good is its own permission, so the controls for it only
+  // appear for somebody who has it.
+  const canPurge = await checkPermission(await getSession(), "publications.purge");
+
+  const all = await Zine.find(NOT_DELETED).sort({ updatedAt: -1 }).lean<any[]>();
+  // The bin, newest first: what was deleted last is what somebody is most
+  // likely to have deleted by mistake.
+  const binned = await Zine.find({ deletedAt: { $ne: null } })
+    .sort({ deletedAt: -1 })
+    .lean<any[]>();
   // Templates are starting points, not work in progress, so they list apart
   // from the publications themselves.
   const templates = all.filter((item) => item.isTemplate);
@@ -147,7 +168,11 @@ export default async function PublicationsPage() {
               </form>
               <form action={deletePublicationAction}>
                 <input type="hidden" name="id" value={String(publication._id)} />
-                <button type="submit" className="btn btn-danger btn-sm">
+                <button
+                  type="submit"
+                  className="btn btn-danger btn-sm"
+                  title="Move to the bin — it can be put back"
+                >
                   Delete
                 </button>
               </form>
@@ -158,6 +183,78 @@ export default async function PublicationsPage() {
           <li className="admin-subtitle">No publications yet.</li>
         ) : null}
       </ul>
+
+      {/*
+        The bin.
+        Deleting is reversible and this is where it is reversed. Nothing here
+        is served, listed or editable, but all of it is whole. Removing one for
+        good is a separate act, needs its own permission, and asks for the
+        publication to be named — see `purgePublicationAction`.
+      */}
+      {binned.length > 0 ? (
+        <div id="bin">
+        <Panel title={`Deleted (${binned.length})`}>
+          <p className="help-text" style={{ marginTop: 0 }}>
+            Deleted publications are kept whole and can be put back. They are
+            not listed anywhere else and are not served to readers.
+            {canPurge
+              ? " Removing one for good cannot be undone."
+              : " Removing one for good needs a further permission."}
+          </p>
+
+          <ul className="admin-list">
+            {binned.map((publication) => (
+              <li key={String(publication._id)} className="admin-list-row">
+                <div>
+                  <strong>{publication.title}</strong>
+                  <div className="admin-subtitle">
+                    {publication.kind} · {publication.slug}
+                    {publication.deletedAt
+                      ? ` · deleted ${new Date(publication.deletedAt).toLocaleDateString()}`
+                      : ""}
+                    {publication.deletedBy ? ` by ${publication.deletedBy}` : ""}
+                  </div>
+                  {purge === "mismatch" && purgeId === String(publication._id) ? (
+                    <div className="admin-subtitle" role="alert">
+                      That was not the right slug, so nothing was removed.
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="admin-list-actions">
+                  <form action={restorePublicationAction}>
+                    <input type="hidden" name="id" value={String(publication._id)} />
+                    <button type="submit" className="btn btn-sm">
+                      Put back
+                    </button>
+                  </form>
+
+                  {canPurge ? (
+                    /* The slug has to be typed: naming the thing being
+                       destroyed is a different act from confirming a prompt. */
+                    <form action={purgePublicationAction} className="admin-list-actions">
+                      <input type="hidden" name="id" value={String(publication._id)} />
+                      <input
+                        type="text"
+                        name="confirm"
+                        className="input"
+                        style={{ maxWidth: "11rem" }}
+                        placeholder={`Type ${publication.slug}`}
+                        aria-label={`Type ${publication.slug} to remove it for good`}
+                        autoComplete="off"
+                      />
+                      <button type="submit" className="btn btn-danger btn-sm">
+                        Remove for good
+                      </button>
+                    </form>
+                  ) : null}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </Panel>
+        </div>
+      ) : null}
     </>
   );
 }

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { requirePermission } from "@/lib/access";
+import { getSession } from "@/lib/session";
 import { connectDB } from "@/lib/db";
 import { clearMediaUsage, syncMediaUsage } from "@/lib/media-usage-sync";
 import { Zine } from "@/lib/models";
@@ -66,7 +67,8 @@ export async function createFromTemplateAction(formData: FormData) {
   if (!templateId || !title) return;
 
   const template = await Zine.findById(templateId).lean<any>();
-  if (!template) return;
+  // Nothing in the bin is a starting point for anything.
+  if (!template || template.deletedAt) return;
 
   const slug = await uniqueSlug(Zine, slugify(title), title);
   const created = await Zine.create({
@@ -102,7 +104,7 @@ export async function toggleTemplateAction(formData: FormData) {
   if (!id) return;
 
   const publication = await Zine.findById(id);
-  if (!publication) return;
+  if (!publication || publication.deletedAt) return;
 
   publication.isTemplate = !publication.isTemplate;
   await publication.save();
@@ -122,6 +124,14 @@ export async function savePublicationAction(
 
   const id = String(formData.get("id") ?? "");
   if (!id) return { ok: false, error: "That publication could not be found." };
+
+  // The editor cannot open something in the bin, but this action is reachable
+  // on its own and must not write over what a restore would bring back.
+  const existing = await Zine.findById(id).select("deletedAt").lean<any>();
+  if (!existing) return { ok: false, error: "That publication could not be found." };
+  if (existing.deletedAt) {
+    return { ok: false, error: "That publication is in the bin. Put it back first." };
+  }
 
   const title = String(formData.get("title") ?? "").trim();
   if (!title) return { ok: false, error: "Give the publication a title." };
@@ -203,21 +213,93 @@ export async function savePublicationAction(
   return { ok: true as const, slug };
 }
 
+/**
+ * Puts a publication in the bin.
+ *
+ * Not removed: a publication is weeks of somebody's arrangement and a delete
+ * button is one press, so the press is made reversible. It leaves every list,
+ * stops being served and cannot be edited, but it is still whole and can be
+ * put back by anybody who could have deleted it.
+ *
+ * Its media stays recorded as in use, deliberately. Something in the bin can
+ * come back, and a publication restored to find its pictures deleted would be
+ * a worse loss than the one this is preventing.
+ */
 export async function deletePublicationAction(formData: FormData) {
   await guard();
 
   const id = String(formData.get("id") ?? "");
   if (!id) return;
 
-  const publication = await Zine.findById(id).lean<any>();
-  await clearMediaUsage(id);
-  await Zine.findByIdAndDelete(id);
+  const session = await getSession();
+  const publication = await Zine.findByIdAndUpdate(id, {
+    $set: { deletedAt: new Date(), deletedBy: session?.name || session?.email || "" },
+  }).lean<any>();
 
   revalidatePath("/admin/publications");
   if (publication?.slug) {
     revalidatePath(publicationHref(publication.kind ?? "zine", publication.slug));
   }
-  redirect("/admin/publications");
+  redirect("/admin/publications?deleted=1");
+}
+
+/** Takes it back out of the bin, exactly as it was. */
+export async function restorePublicationAction(formData: FormData) {
+  await guard();
+
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+
+  const publication = await Zine.findByIdAndUpdate(id, {
+    $set: { deletedAt: null, deletedBy: "" },
+  }).lean<any>();
+
+  revalidatePath("/admin/publications");
+  if (publication?.slug) {
+    revalidatePath(publicationHref(publication.kind ?? "zine", publication.slug));
+  }
+  redirect("/admin/publications?restored=1");
+}
+
+/**
+ * Removes a publication for good.
+ *
+ * Three things stand between this and an accident, and each answers a different
+ * one: it can only be done to something already in the bin, so it is never the
+ * first press; it needs its own permission, so it is not simply whoever can
+ * edit; and it asks for the publication's slug to be typed, so the thing being
+ * destroyed has to be identified rather than merely confirmed.
+ *
+ * The media it held is released here — this is the point at which nothing can
+ * come back for it.
+ */
+export async function purgePublicationAction(formData: FormData) {
+  await requirePermission("publications.purge");
+  await connectDB();
+
+  const id = String(formData.get("id") ?? "");
+  const typed = String(formData.get("confirm") ?? "").trim();
+  if (!id) return;
+
+  const publication = await Zine.findById(id).lean<any>();
+  if (!publication) return;
+
+  // Only from the bin, and only when named.
+  if (!publication.deletedAt) {
+    redirect("/admin/publications?purge=not-deleted");
+  }
+  if (typed !== publication.slug) {
+    redirect(`/admin/publications?purge=mismatch&id=${id}`);
+  }
+
+  await clearMediaUsage(id);
+  await Zine.findByIdAndDelete(id);
+
+  revalidatePath("/admin/publications");
+  if (publication.slug) {
+    revalidatePath(publicationHref(publication.kind ?? "zine", publication.slug));
+  }
+  redirect("/admin/publications?purged=1");
 }
 
 export async function publishPublicationAction(formData: FormData) {
@@ -227,7 +309,9 @@ export async function publishPublicationAction(formData: FormData) {
   if (!id) return;
 
   const publication = await Zine.findById(id);
-  if (!publication) return;
+  // Publishing something deleted would put it back in front of readers by a
+  // side door; it has to be taken out of the bin first.
+  if (!publication || publication.deletedAt) return;
 
   const next = publication.status === "published" ? "draft" : "published";
   publication.status = next;
