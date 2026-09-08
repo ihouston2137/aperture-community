@@ -18,6 +18,19 @@ const STAR_POINTS = Array.from({ length: 10 }, (_, index) => {
 }).join(" ");
 
 /**
+ * A corner radius in grid units, for one axis of a stretched drawing.
+ *
+ * `radius` and `side` are both in rem; the answer is in the 0–100 units the
+ * shape is drawn in. Half the side is the most a corner can take — beyond that
+ * the two corners of an edge would overlap — which is 50 units, the same
+ * ceiling CSS applies to `border-radius`.
+ */
+function cornerUnits(radius: number, side: number): number {
+  if (radius <= 0 || side <= 0) return 0;
+  return Math.min(50, (radius / side) * 100);
+}
+
+/**
  * The silhouette a shape's text is clipped to, as a CSS `clip-path`.
  *
  * The SVG draws on a 0–100 grid stretched over the whole box, so every
@@ -174,13 +187,25 @@ export function Shape({
         aria-hidden="true"
         style={{ overflow: "visible" }}
       >
+        {/*
+          A corner is a corner, whatever shape the box is.
+
+          The drawing is a 0–100 grid stretched over the block, so one grid unit
+          is `width / 100` across and `height / 100` down. A single radius is
+          therefore stretched by the same amount as the box: on a wide, short
+          rectangle it came out as a long elliptical sweep rather than a
+          rounded corner. Each axis is given the radius it needs to end up the
+          same size on the page — which is what `border-radius` does everywhere
+          else, and what the text clip beside this already did.
+        */}
         {kind === "rectangle" ? (
           <rect
             x="0"
             y="0"
             width="100"
             height="100"
-            rx={radius > 0 ? Math.min(50, (radius / width) * 100) : 0}
+            rx={cornerUnits(radius, width)}
+            ry={cornerUnits(radius, height)}
             fill={color}
             {...border}
           />
