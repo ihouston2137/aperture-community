@@ -733,7 +733,16 @@ export function createPublicationBlock(type: PublicationBlockType): PublicationB
   switch (type) {
     case "richText":
       block.html = "<p>Text</p>";
-      block.textStyle = { fontSize: 3, color: "#ffffff" };
+      /*
+       * No size of its own.
+       *
+       * A block that starts at three rem is a block whose words disagree with
+       * the size the toolbar shows for them, and every one of them has to be
+       * corrected before anything can be typed. Left unset, the words are
+       * whatever the page gives them until somebody says otherwise — and the
+       * size field reads blank, which is the truth.
+       */
+      block.textStyle = { color: "#ffffff" };
       break;
     case "button":
       block.html = "<p>Open</p>";

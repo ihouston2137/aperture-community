@@ -3171,6 +3171,9 @@ export function PublicationEditor({
                 }`}
                 style={{
                   ...publicationBlockStyle(block),
+                  // While it is being carried, it is drawn where the pointer
+                  // has taken it rather than where it still is.
+                  ...draggedStyle(block),
                   /*
                    * Inherited blocks are drawn exactly as they will publish —
                    * no dimming, no transparency — because judging a page means
