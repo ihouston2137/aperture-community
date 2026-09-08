@@ -858,6 +858,15 @@ export function normalizePublicationBlock(input: unknown): PublicationBlock | nu
     rotation: num(raw.rotation, 0),
     zIndex: Math.round(num(raw.zIndex, 1)),
     clickAction: pick(raw.clickAction, ["none", "link", "page"] as const, "none"),
+    /*
+     * Whether a link opens in a new tab, alongside the action it belongs to.
+     *
+     * Every block carries a click action, so every block carries this. Read
+     * inside the button's own case, it was kept for buttons and quietly
+     * dropped from everything else — so the box could be ticked on a picture
+     * or a heading, saved, and be gone the next time the page was opened.
+     */
+    newTab: Boolean(raw.newTab),
     clickTarget: str(raw.clickTarget),
   };
 
@@ -890,7 +899,6 @@ export function normalizePublicationBlock(input: unknown): PublicationBlock | nu
       // A button's face is a text area like any other, so it is rich too. The
       // plain `label` it used to carry is what a button saved before this says.
       block.html = richTextOf(raw, "label") || plainTextToRichText("Button");
-      block.newTab = Boolean(raw.newTab);
       /*
        * A link set on the button itself, carried over to the click action.
        *
