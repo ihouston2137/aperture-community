@@ -2511,6 +2511,12 @@ input, select, textarea {
   margin-right: 0.35rem;
 }
 
+/* Descriptions are written with line breaks; keep them, wherever a template
+   places the slot — the same promise the built-in detail panel makes. */
+.cal-slot-calDescription {
+  white-space: pre-wrap;
+}
+
 /* A slot with nothing behind it names itself on the canvas, so an author can
    see and select it. Never rendered on a published page. */
 .cal-slot.is-placeholder {
