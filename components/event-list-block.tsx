@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   eventLabel,
@@ -9,7 +9,11 @@ import {
   sanitizeLinkUrl,
   type CalendarEventRecord,
 } from "@/lib/calendar";
-import { eventListQuery, type EventListSettings } from "@/lib/event-list";
+import {
+  eventListParams,
+  eventListQuery,
+  type EventListSettings,
+} from "@/lib/event-list";
 import type { PageBlock, PageRow } from "@/lib/page-layout";
 import type { PageSources } from "@/lib/page-source-types";
 
@@ -50,16 +54,57 @@ export function EventListBlock({
   const [hasMore, setHasMore] = useState(initialHasMore);
   const [loading, setLoading] = useState(false);
 
+  // The first page's query, as the API spells it. Also this list's identity:
+  // two settings that ask the same question produce the same string.
+  const firstPage = eventListParams(eventListQuery(settings, todayKey)).toString();
+
+  /*
+   * Re-ask when the question changes.
+   *
+   * On a published page it never does — the settings are fixed, the string
+   * matches what the server already answered, and nothing is fetched. In the
+   * builder the settings are being edited, and the events handed down were
+   * loaded for the settings as *saved*: without this, narrowing to a category
+   * would only filter the events already on the canvas, which is how a
+   * category with plenty of events showed none of them.
+   */
+  const answered = useRef(firstPage);
+  useEffect(() => {
+    if (answered.current === firstPage) return;
+    answered.current = firstPage;
+
+    let current = true;
+    setLoading(true);
+
+    fetch(`/api/calendar/events?${firstPage}`)
+      .then((response) => (response.ok ? response.json() : null))
+      .then((result) => {
+        if (!current || !result) return;
+        setEvents(result.events ?? []);
+        setHasMore(Boolean(result.hasMore));
+      })
+      .catch(() => {
+        // A failed fetch leaves the list as it stands rather than emptying it.
+      })
+      .finally(() => {
+        if (current) setLoading(false);
+      });
+
+    // A later edit lands while this is in flight; only the last one may write.
+    return () => {
+      current = false;
+    };
+  }, [firstPage]);
+
   async function loadMore() {
     if (loading) return;
     setLoading(true);
 
     try {
+      // Offset by what is on screen, which is sound only because the facets go
+      // to the database with the query — every event counted here matched.
       const query = eventListQuery(settings, todayKey, events.length);
-      const response = await fetch(
-        `/api/calendar/events?start=${query.start}&end=${query.end}` +
-          `&limit=${query.limit}&offset=${query.offset}`
-      );
+      const response = await fetch(`/api/calendar/events?${eventListParams(query)}`);
       if (!response.ok) return;
 
       const result = await response.json();

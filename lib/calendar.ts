@@ -308,6 +308,30 @@ export function filterCalendarEvents<T extends FilterableEvent>(
   );
 }
 
+/**
+ * The same cut as `filterCalendarEvents`, written as a query the database runs.
+ *
+ * Narrowing in memory is only free when the query returned everything in the
+ * range. An event list does not — it asks for `limit` events — so filtering
+ * afterwards spends that limit on events the filter then throws away, and a
+ * category with plenty of events comes back empty because none of them were in
+ * the first few by date. Anything capped has to narrow here instead; the two
+ * live together so they cannot drift apart.
+ */
+export function calendarFacetQuery(
+  display: Pick<CalendarDisplay, "categories" | "who" | "tags">
+): Record<string, unknown> {
+  const query: Record<string, unknown> = {};
+
+  // An empty list means "no restriction", exactly as it does in memory — so an
+  // unfiltered block asks for no facet at all rather than for nothing.
+  if (display.categories.length > 0) query.category = { $in: display.categories };
+  if (display.who.length > 0) query.who = { $in: display.who };
+  if (display.tags.length > 0) query.tags = { $in: display.tags };
+
+  return query;
+}
+
 export const CALENDAR_TEMPLATE_KINDS = ["event", "lightbox"] as const;
 export type CalendarTemplateKind = (typeof CALENDAR_TEMPLATE_KINDS)[number];
 

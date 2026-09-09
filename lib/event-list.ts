@@ -127,17 +127,32 @@ export function eventListRange(
   };
 }
 
+export type EventListQuery = {
+  start: string;
+  end: string;
+  limit: number;
+  offset: number;
+  categories: string[];
+  who: string[];
+  tags: string[];
+};
+
 /**
  * The query a list runs, with its bounds made explicit.
  *
  * An open end becomes a far date rather than an absent one, so the API always
  * receives a range and never has to guess what "no end" should scan.
+ *
+ * The facets travel with the range rather than being applied to the result,
+ * because `limit` counts what comes back: narrowing afterwards would let a
+ * list of five ask for the next five events by date and then show only the
+ * handful of those that matched — or none at all. See `calendarFacetQuery`.
  */
 export function eventListQuery(
   settings: EventListSettings,
   todayKey: string,
   offset = 0
-): { start: string; end: string; limit: number; offset: number } {
+): EventListQuery {
   const { start, end } = eventListRange(settings, todayKey);
 
   return {
@@ -147,5 +162,26 @@ export function eventListQuery(
     end: end || shiftDateKey(todayKey, 3650),
     limit: settings.limit,
     offset,
+    categories: settings.categories,
+    who: settings.who,
+    tags: settings.tags,
   };
+}
+
+/** That query as the API's own parameters. */
+export function eventListParams(query: EventListQuery): URLSearchParams {
+  const params = new URLSearchParams({
+    start: query.start,
+    end: query.end,
+    limit: String(query.limit),
+    offset: String(query.offset),
+  });
+
+  // Repeated rather than joined: a category, group or tag is somebody's own
+  // wording and may hold a comma, which a delimited list would split.
+  for (const value of query.categories) params.append("category", value);
+  for (const value of query.who) params.append("who", value);
+  for (const value of query.tags) params.append("tag", value);
+
+  return params;
 }

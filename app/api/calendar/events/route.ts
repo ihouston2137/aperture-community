@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import {
+  calendarFacetQuery,
   normalizeDateKey,
   normalizeStatus,
   type CalendarEventRecord,
@@ -22,6 +23,12 @@ import { getSession } from "@/lib/session";
  *
  * The result count is capped, which bounds the work whatever range is asked
  * for, and `offset` lets a list page through.
+ *
+ * `category`, `who` and `tag` narrow the range, each repeatable and each
+ * meaning "any of these". They are answered here rather than by the caller
+ * because the cap counts what is returned — a list asking for five events of
+ * one category has to get five of that category, not five by date of which
+ * some might qualify.
  */
 
 const MAX_EVENTS = 500;
@@ -53,7 +60,14 @@ export async function GET(request: Request) {
   // finds nothing, and no database work at all.
   const canManage = await checkPermission(await getSession(), "calendar.manage");
 
-  const filter: Record<string, unknown> = { date: { $gte: start, $lte: end } };
+  const filter: Record<string, unknown> = {
+    date: { $gte: start, $lte: end },
+    ...calendarFacetQuery({
+      categories: facet(searchParams.getAll("category")),
+      who: facet(searchParams.getAll("who")),
+      tags: facet(searchParams.getAll("tag")),
+    }),
+  };
   if (!canManage) filter.status = "published";
 
   const [docs, total] = await Promise.all([
@@ -85,4 +99,9 @@ export async function GET(request: Request) {
   }));
 
   return NextResponse.json({ events, total, hasMore: offset + events.length < total });
+}
+
+/** One repeated parameter, tidied: blanks dropped and each value asked once. */
+function facet(values: string[]): string[] {
+  return [...new Set(values.map((value) => value.trim()).filter(Boolean))];
 }

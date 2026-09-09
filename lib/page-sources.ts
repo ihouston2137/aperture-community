@@ -35,6 +35,7 @@ import {
   type CalendarStyleRecord,
 } from "./calendar-style";
 import {
+  calendarFacetQuery,
   monthKeyFromDateKey,
   monthRange,
   normalizeCalendarDisplay,
@@ -400,6 +401,10 @@ export async function loadPageSources(layout: PageLayout): Promise<PageSources> 
     const filter = {
       status: "published",
       date: { $gte: query.start, $lte: query.end },
+      // Narrowed here rather than after the query: `limit` counts what comes
+      // back, so filtering the result would hand a category filter the first
+      // few events by date and nothing else to choose from.
+      ...calendarFacetQuery(entry.settings),
     };
 
     const [docs, total] = await Promise.all([

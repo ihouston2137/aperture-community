@@ -477,9 +477,11 @@ function BlockContent({
         <EventListBlock
           block={block}
           settings={settings}
-          // Filters run here rather than in the query: the server already sent
-          // this page, and re-querying per filter would cost a round trip to
-          // remove rows it could have skipped.
+          // The query already narrowed to these facets, so this changes
+          // nothing on a published page. It matters on the builder canvas,
+          // where the events were loaded for the settings as saved: it holds
+          // back events the author has just filtered out until the block's own
+          // re-query answers.
           initialEvents={filterCalendarEvents(loaded?.events ?? [], settings)}
           initialHasMore={Boolean(loaded?.hasMore)}
           todayKey={sources.calendarToday}
