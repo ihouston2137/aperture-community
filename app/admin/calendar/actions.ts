@@ -1,9 +1,10 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { requirePermission } from "@/lib/access";
+import { CALENDAR_EVENTS_TAG } from "@/lib/calendar-events";
 import {
   REPEAT_LIMIT,
   expandWeeklyDates,
@@ -45,6 +46,18 @@ function readChipField(formData: FormData, field: string): string[] {
         .filter(Boolean)
     ),
   ];
+}
+
+/**
+ * Say that the events have changed.
+ *
+ * Every public read of them goes through one cache, so a saved event is not on
+ * the site until this runs. `updateTag` rather than `revalidateTag`: whoever
+ * just saved is about to look at the calendar, and marking the entry stale
+ * would show them the version they have just replaced.
+ */
+function eventsChanged() {
+  updateTag(CALENDAR_EVENTS_TAG);
 }
 
 export async function saveCalendarEventAction(
@@ -95,6 +108,7 @@ export async function saveCalendarEventAction(
     await CalendarEvent.create(payload);
   }
 
+  eventsChanged();
   revalidatePath("/admin/calendar");
   return { ok: true };
 }
@@ -109,6 +123,7 @@ export async function deleteCalendarEventAction(
 
   await CalendarEvent.findByIdAndDelete(id);
 
+  eventsChanged();
   revalidatePath("/admin/calendar");
   return { ok: true };
 }
@@ -193,6 +208,7 @@ export async function repeatCalendarEventAction(
   const skipped = dates.length - fresh.length;
   const capped = dates.length >= REPEAT_LIMIT;
 
+  eventsChanged();
   revalidatePath("/admin/calendar");
   return {
     ok: true,

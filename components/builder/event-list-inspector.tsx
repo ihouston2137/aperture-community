@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  EVENT_LIST_DESCRIPTION_MAX,
   EVENT_LIST_DIRECTIONS,
   EVENT_LIST_DIRECTION_LABELS,
   EVENT_LIST_MAX,
@@ -142,6 +143,19 @@ export function EventListInspector({
         <span className="help-text">
           The same templates a calendar’s event boxes use. Build them under
           Calendar › Layout templates.
+        </span>
+        <NumField
+          label="Trim descriptions to"
+          value={settings.descriptionLimit}
+          min={0}
+          max={EVENT_LIST_DESCRIPTION_MAX}
+          step={10}
+          onChange={(value) => set({ descriptionLimit: value })}
+        />
+        <span className="help-text">
+          {settings.descriptionLimit > 0
+            ? `Longer descriptions are cut at the nearest word before ${settings.descriptionLimit} characters and end in an ellipsis. The event keeps the full text.`
+            : "0 shows each description in full."}
         </span>
       </div>
 

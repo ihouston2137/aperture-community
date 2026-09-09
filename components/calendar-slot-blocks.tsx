@@ -27,11 +27,20 @@ export function CalendarSlotBlockView({
   event,
   showPlaceholders = false,
   designTime = false,
+  signedIn = true,
 }: {
   block: CalendarSlotBlock;
   event: CalendarEventRecord | null;
   /** In the builder, an empty slot names itself rather than vanishing. */
   showPlaceholders?: boolean;
+  /**
+   * Whether whoever is reading has an account. Only the RSVP button asks.
+   *
+   * Defaults to true, so a caller that cannot say — every builder canvas,
+   * which is only ever open to somebody signed in — gets the ordinary wording
+   * rather than wording aimed at a stranger.
+   */
+  signedIn?: boolean;
   /**
    * True only on the builder canvas.
    *
@@ -77,6 +86,7 @@ export function CalendarSlotBlockView({
           className={className}
           style={style}
           designTime={designTime}
+          signedIn={signedIn}
         />
       );
     }

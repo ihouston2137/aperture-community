@@ -566,7 +566,16 @@ export function todayDateKey(timeZone?: string): string {
   }
 }
 
-function localTodayDateKey(): string {
+/**
+ * Today as the browser reckons it, in whatever zone the machine is set to.
+ *
+ * The fallback for `todayDateKey`, and the answer itself for anything that
+ * means the viewer's own today rather than the site's — an event list set to
+ * run "from today onwards" reads this once it is in the browser, so somebody
+ * a day ahead of the site's zone is not shown an event that, where they are,
+ * has already been and gone.
+ */
+export function localTodayDateKey(): string {
   const now = new Date();
   return `${pad(now.getFullYear(), 4)}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 }

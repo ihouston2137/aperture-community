@@ -4,7 +4,6 @@ import {
   listRange,
   monthRange,
   normalizeCalendarPageSettings,
-  normalizeStatus,
   todayDateKey,
   weekRange,
   type CalendarEventRecord,
@@ -16,14 +15,10 @@ import {
   normalizeCalendarStyle,
   type CalendarStyleRecord,
 } from "./calendar-style";
+import { readCalendarEvents } from "./calendar-events";
 import { normalizeCalendarTemplateLayout } from "./calendar-slot-layout";
 import { connectDB } from "./db";
-import {
-  CalendarEvent,
-  CalendarSettings,
-  CalendarStyle,
-  CalendarTemplate,
-} from "./models";
+import { CalendarSettings, CalendarStyle, CalendarTemplate } from "./models";
 import type { PageRow } from "./page-layout";
 import { emptyPageSources, type PageSources } from "./page-source-types";
 
@@ -49,26 +44,6 @@ export type CalendarPageView = {
   /** Today in the calendar's configured zone, resolved on the server. */
   todayKey: string;
 };
-
-function toEventRecord(doc: Record<string, any>): CalendarEventRecord {
-  return {
-    _id: String(doc._id),
-    date: doc.date ?? "",
-    startTime: doc.startTime ?? "",
-    endTime: doc.endTime ?? "",
-    name: doc.name ?? "",
-    description: doc.description ?? "",
-    location: doc.location ?? "",
-    linkText: doc.linkText ?? "",
-    linkUrl: doc.linkUrl ?? "",
-    status: normalizeStatus(doc.status),
-    category: doc.category ?? "",
-    who: Array.isArray(doc.who) ? doc.who.map(String) : [],
-    tags: Array.isArray(doc.tags) ? doc.tags.map(String) : [],
-    rsvpEnabled: Boolean(doc.rsvpEnabled),
-    attendanceEnabled: Boolean(doc.attendanceEnabled),
-  };
-}
 
 /** Just the settings, for callers that only need to know whether the page exists. */
 export async function getCalendarPageSettings(): Promise<CalendarPageSettings> {
@@ -132,16 +107,17 @@ export async function loadCalendarPage(canManage = false): Promise<CalendarPageV
           listRange(todayKey)
         : monthRange(monthKeyFromDateKey(todayKey));
 
-  const scope: Record<string, unknown> = { date: { $gte: start, $lte: end } };
-  if (!canManage) scope.status = "published";
-
-  const eventDocs = todayKey
-    ? await CalendarEvent.find(scope).sort({ date: 1, startTime: 1 }).lean<any[]>()
-    : [];
+  // Read through the events cache, so the page everybody lands on is not a
+  // query per visitor. Asked without the facets, which is the same question a
+  // calendar block asks for its month — so the two share one entry — and what
+  // a manager sees carries drafts and is never cached.
+  const loaded = todayKey
+    ? await readCalendarEvents({ start, end, includeDrafts: canManage })
+    : { events: [] };
 
   // The page's own category / group / tag narrowing, applied the same way a
   // block applies it — and again in the browser for ranges fetched later.
-  const events = filterCalendarEvents(eventDocs.map(toEventRecord), display);
+  const events = filterCalendarEvents(loaded.events, display);
 
   return {
     settings,

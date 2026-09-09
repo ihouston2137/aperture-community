@@ -44,6 +44,7 @@ export function CalendarRsvpButton({
   className,
   style,
   designTime,
+  signedIn = true,
 }: {
   block: CalendarSlotBlock;
   event: CalendarEventRecord;
@@ -52,6 +53,8 @@ export function CalendarRsvpButton({
   style: React.CSSProperties | undefined;
   /** True on the builder canvas, where the button previews rather than saves. */
   designTime: boolean;
+  /** Resolved on the server, so the wording is right in the first paint. */
+  signedIn?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [preview, setPreview] = useState<"yes" | "no" | null>(null);
@@ -60,12 +63,22 @@ export function CalendarRsvpButton({
 
   const answer = designTime ? preview : mine;
 
+  /*
+   * A stranger is told what the button will actually do.
+   *
+   * Only an account can answer, so "RSVP" promises something the press cannot
+   * deliver — the box behind it opens on the sign-in offer instead. Checked
+   * before the answers because somebody signed out has none, and the canvas is
+   * exempt so both answered looks can still be previewed while styling.
+   */
   const label =
-    answer === "yes"
-      ? block.rsvpGoingText || "Going"
-      : answer === "no"
-        ? block.rsvpNotGoingText || "Not going"
-        : block.rsvpText || "RSVP";
+    !signedIn && !designTime
+      ? block.rsvpSignInText || "Sign in to RSVP"
+      : answer === "yes"
+        ? block.rsvpGoingText || "Going"
+        : answer === "no"
+          ? block.rsvpNotGoingText || "Not going"
+          : block.rsvpText || "RSVP";
 
   const count = block.showCount && view ? ` · ${view.yesCount} going` : "";
 

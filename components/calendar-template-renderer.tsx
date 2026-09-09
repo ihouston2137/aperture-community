@@ -55,6 +55,10 @@ export function CalendarTemplateRenderer({
                       event={event}
                       showPlaceholders={showPlaceholders}
                       designTime={designTime}
+                      // Read from the sources rather than passed in by each
+                      // caller: an event box, a list item and the lightbox all
+                      // draw the same slots for the same viewer.
+                      signedIn={sources.viewerSignedIn}
                     />
                   ) : (
                     <BlockView

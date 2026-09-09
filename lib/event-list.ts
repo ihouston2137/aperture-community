@@ -46,6 +46,14 @@ export type EventListSettings = {
   overflow: EventListOverflow;
   /** A layout template for each item. Empty means the built-in arrangement. */
   templateId: string;
+  /**
+   * Characters of the description to show; 0 shows all of it.
+   *
+   * A list is a run of events at a glance, and one event carrying five
+   * paragraphs of description sets the height of every row beside it. The full
+   * text is still what the event holds — this trims what this list draws.
+   */
+  descriptionLimit: number;
   /** Empty means no filter — every category, group, or tag qualifies. */
   categories: string[];
   who: string[];
@@ -61,6 +69,7 @@ export const defaultEventListSettings: EventListSettings = {
   direction: "vertical",
   overflow: "wrap",
   templateId: "",
+  descriptionLimit: 0,
   categories: [],
   who: [],
   tags: [],
@@ -75,6 +84,32 @@ function stringList(value: unknown): string[] {
   return [
     ...new Set(value.map((entry) => String(entry ?? "").trim()).filter(Boolean)),
   ];
+}
+
+/** Ceiling on a trimmed description, well past the point of being a summary. */
+export const EVENT_LIST_DESCRIPTION_MAX = 2000;
+
+function clampLimit(value: unknown): number {
+  const limit = Number(value);
+  if (!Number.isFinite(limit) || limit <= 0) return 0;
+  return Math.min(Math.floor(limit), EVENT_LIST_DESCRIPTION_MAX);
+}
+
+/**
+ * A description cut to length, on a word.
+ *
+ * Cut mid-word it reads as a fault rather than as a summary, so the last space
+ * inside the limit wins — unless that would throw away most of what was
+ * allowed, which happens with one very long word and is worse than cutting it.
+ */
+export function truncateDescription(text: string, limit: number): string {
+  if (limit <= 0 || text.length <= limit) return text;
+
+  const cut = text.slice(0, limit);
+  const space = cut.search(/\s\S*$/);
+  const stem = space > limit * 0.6 ? cut.slice(0, space) : cut;
+
+  return `${stem.replace(/\s+$/, "")}…`;
 }
 
 export function normalizeEventListSettings(raw: unknown): EventListSettings {
@@ -99,6 +134,7 @@ export function normalizeEventListSettings(raw: unknown): EventListSettings {
       ? (source.overflow as EventListOverflow)
       : base.overflow,
     templateId: String(source.templateId ?? "").trim(),
+    descriptionLimit: clampLimit(source.descriptionLimit),
     categories: stringList(source.categories),
     who: stringList(source.who),
     tags: stringList(source.tags),

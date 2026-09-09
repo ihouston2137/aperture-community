@@ -1,14 +1,8 @@
 import { NextResponse } from "next/server";
 
-import {
-  calendarFacetQuery,
-  normalizeDateKey,
-  normalizeStatus,
-  type CalendarEventRecord,
-} from "@/lib/calendar";
+import { normalizeDateKey } from "@/lib/calendar";
+import { readCalendarEvents } from "@/lib/calendar-events";
 import { checkPermission } from "@/lib/access";
-import { connectDB } from "@/lib/db";
-import { CalendarEvent } from "@/lib/models";
 import { getSession } from "@/lib/session";
 
 /**
@@ -29,6 +23,10 @@ import { getSession } from "@/lib/session";
  * because the cap counts what is returned — a list asking for five events of
  * one category has to get five of that category, not five by date of which
  * some might qualify.
+ *
+ * The published cut is read through the events cache, so a page whose list
+ * re-asks in the browser is not a database query per visitor. What a manager
+ * sees includes drafts and is read directly — see `readCalendarEvents`.
  */
 
 const MAX_EVENTS = 500;
@@ -54,49 +52,20 @@ export async function GET(request: Request) {
   const offset =
     Number.isFinite(offsetParam) && offsetParam > 0 ? Math.floor(offsetParam) : 0;
 
-  await connectDB();
-
   // Asked once per request. A signed-out visitor costs one cookie read that
   // finds nothing, and no database work at all.
   const canManage = await checkPermission(await getSession(), "calendar.manage");
 
-  const filter: Record<string, unknown> = {
-    date: { $gte: start, $lte: end },
-    ...calendarFacetQuery({
-      categories: facet(searchParams.getAll("category")),
-      who: facet(searchParams.getAll("who")),
-      tags: facet(searchParams.getAll("tag")),
-    }),
-  };
-  if (!canManage) filter.status = "published";
-
-  const [docs, total] = await Promise.all([
-    CalendarEvent.find(filter)
-      .sort({ date: 1, startTime: 1 })
-      .skip(offset)
-      .limit(limit)
-      .lean<any[]>(),
-    // So a list knows whether "load more" has anything left to load.
-    CalendarEvent.countDocuments(filter),
-  ]);
-
-  const events: CalendarEventRecord[] = docs.map((doc) => ({
-    _id: String(doc._id),
-    date: doc.date ?? "",
-    startTime: doc.startTime ?? "",
-    endTime: doc.endTime ?? "",
-    name: doc.name ?? "",
-    description: doc.description ?? "",
-    location: doc.location ?? "",
-    linkText: doc.linkText ?? "",
-    linkUrl: doc.linkUrl ?? "",
-    status: normalizeStatus(doc.status),
-    category: doc.category ?? "",
-    who: Array.isArray(doc.who) ? doc.who.map(String) : [],
-    tags: Array.isArray(doc.tags) ? doc.tags.map(String) : [],
-    rsvpEnabled: Boolean(doc.rsvpEnabled),
-    attendanceEnabled: Boolean(doc.attendanceEnabled),
-  }));
+  const { events, total } = await readCalendarEvents({
+    start,
+    end,
+    limit,
+    offset,
+    categories: facet(searchParams.getAll("category")),
+    who: facet(searchParams.getAll("who")),
+    tags: facet(searchParams.getAll("tag")),
+    includeDrafts: canManage,
+  });
 
   return NextResponse.json({ events, total, hasMore: offset + events.length < total });
 }

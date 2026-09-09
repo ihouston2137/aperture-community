@@ -1,8 +1,8 @@
 import { connectDB } from "./db";
+import { getSession } from "./session";
 import { getMenuById, getMenuViewer, loadMenuFor, type MenuItem } from "./menus";
 import {
   Bio,
-  CalendarEvent,
   CalendarSettings,
   CalendarStyle,
   CalendarTemplate,
@@ -35,15 +35,14 @@ import {
   type CalendarStyleRecord,
 } from "./calendar-style";
 import {
-  calendarFacetQuery,
   monthKeyFromDateKey,
   monthRange,
   normalizeCalendarDisplay,
-  normalizeStatus,
   todayDateKey,
   weekRange,
   type CalendarEventRecord,
 } from "./calendar";
+import { readCalendarEvents } from "./calendar-events";
 import {
   getCollectionById,
   resolveCollection,
@@ -88,26 +87,6 @@ function bioSummary(doc: Record<string, any>): BioSummary {
 export { walkBlocks };
 
 /** One stored event as the renderers consume it. */
-function toEventRecord(doc: Record<string, any>): CalendarEventRecord {
-  return {
-    _id: String(doc._id),
-    date: doc.date ?? "",
-    startTime: doc.startTime ?? "",
-    endTime: doc.endTime ?? "",
-    name: doc.name ?? "",
-    description: doc.description ?? "",
-    location: doc.location ?? "",
-    linkText: doc.linkText ?? "",
-    linkUrl: doc.linkUrl ?? "",
-    status: normalizeStatus(doc.status),
-    category: doc.category ?? "",
-    who: Array.isArray(doc.who) ? doc.who.map(String) : [],
-    tags: Array.isArray(doc.tags) ? doc.tags.map(String) : [],
-    rsvpEnabled: Boolean(doc.rsvpEnabled),
-    attendanceEnabled: Boolean(doc.attendanceEnabled),
-  };
-}
-
 /**
  * Load every record a layout references in one pass, so the renderer stays a
  * pure function of `(layout, sources)` and never queries per block.
@@ -374,14 +353,8 @@ export async function loadPageSources(layout: PageLayout): Promise<PageSources> 
     const byRange = new Map<string, CalendarEventRecord[]>();
     for (const key of new Set(calendarBlocks.map((entry) => entry.view))) {
       const { start, end } = rangeFor(key);
-      const docs = await CalendarEvent.find({
-        status: "published",
-        date: { $gte: start, $lte: end },
-      })
-        .sort({ date: 1, startTime: 1 })
-        .lean<any[]>();
-
-      byRange.set(key, docs.map(toEventRecord));
+      const { events } = await readCalendarEvents({ start, end });
+      byRange.set(key, events);
     }
 
     for (const entry of calendarBlocks) {
@@ -397,28 +370,16 @@ export async function loadPageSources(layout: PageLayout): Promise<PageSources> 
   > = {};
 
   for (const entry of eventListBlocks) {
-    const query = eventListQuery(entry.settings, calendarToday);
-    const filter = {
-      status: "published",
-      date: { $gte: query.start, $lte: query.end },
-      // Narrowed here rather than after the query: `limit` counts what comes
-      // back, so filtering the result would hand a category filter the first
-      // few events by date and nothing else to choose from.
-      ...calendarFacetQuery(entry.settings),
-    };
+    // The facets go with the query rather than being applied to its result:
+    // `limit` counts what comes back, so narrowing afterwards would hand a
+    // category filter the first few events by date and nothing else to choose
+    // from. Read through the cache, so a page everybody sees is not a query
+    // per visitor.
+    const { events, total } = await readCalendarEvents(
+      eventListQuery(entry.settings, calendarToday)
+    );
 
-    const [docs, total] = await Promise.all([
-      CalendarEvent.find(filter)
-        .sort({ date: 1, startTime: 1 })
-        .limit(query.limit)
-        .lean<any[]>(),
-      CalendarEvent.countDocuments(filter),
-    ]);
-
-    eventLists[entry.id] = {
-      events: docs.map(toEventRecord),
-      hasMore: docs.length < total,
-    };
+    eventLists[entry.id] = { events, hasMore: events.length < total };
   }
 
   /*
@@ -603,6 +564,9 @@ export async function loadPageSources(layout: PageLayout): Promise<PageSources> 
     eventLists,
     shapes,
     linkHrefs,
+    // One cookie read, which a stranger's request answers without touching the
+    // database. Only the wording of things that need an account depends on it.
+    viewerSignedIn: Boolean(await getSession()),
     safeMode: await getSafeMode(siteContent.safeModeDefault),
   };
 }

@@ -124,6 +124,15 @@ export type PageSources = {
    * every link that points at it.
    */
   linkHrefs: Record<string, string>;
+  /**
+   * Whether whoever is looking at this page is signed in.
+   *
+   * Only used to word things that an account is a precondition for — the RSVP
+   * button says so rather than asking a question a stranger cannot answer.
+   * Resolved on the server so the button is right in the first paint rather
+   * than correcting itself once something has been fetched.
+   */
+  viewerSignedIn: boolean;
   safeMode: boolean;
 };
 
@@ -146,5 +155,9 @@ export const emptyPageSources: PageSources = {
   eventLists: {},
   shapes: {},
   linkHrefs: {},
+  // True, not false: this stands in wherever nothing has been loaded, which is
+  // every builder canvas — and those are only ever open to somebody signed in.
+  // Wording aimed at a stranger belongs where a stranger has been identified.
+  viewerSignedIn: true,
   safeMode: true,
 };

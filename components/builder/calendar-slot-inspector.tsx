@@ -109,13 +109,22 @@ export function CalendarSlotInspector({
                 update({ rsvpNotGoingText: value } as Partial<PageBlock>)
               }
             />
+            <TextField
+              label="When signed out"
+              value={block.rsvpSignInText ?? "Sign in to RSVP"}
+              onChange={(value) =>
+                update({ rsvpSignInText: value } as Partial<PageBlock>)
+              }
+            />
             <CheckField
               label="Show the going count"
               value={block.showCount ?? false}
               onChange={(value) => update({ showCount: value } as Partial<PageBlock>)}
             />
             <span className="help-text">
-              The button only appears on events that have RSVPs switched on.
+              The button only appears on events that have RSVPs switched on. A
+              visitor who is not signed in sees the signed-out wording, and
+              pressing it opens the same box, which offers them sign-in.
             </span>
           </>
         ) : null}

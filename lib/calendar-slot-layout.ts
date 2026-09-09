@@ -128,6 +128,14 @@ export type CalendarSlotBlock = ResponsiveStyleFields & {
   rsvpGoingText?: string;
   rsvpNotGoingText?: string;
   /**
+   * What it says to somebody who is not signed in.
+   *
+   * Only they can be told this, and only an account can answer — so the button
+   * names the step that is actually in front of them rather than asking a
+   * question they cannot answer yet.
+   */
+  rsvpSignInText?: string;
+  /**
    * The two answered looks. The block’s own style is the resting one; these
    * layer over it, so a state need only say what differs.
    */
@@ -210,6 +218,7 @@ export function createCalendarSlotBlock(
     block.rsvpText = "RSVP";
     block.rsvpGoingText = "Going";
     block.rsvpNotGoingText = "Not going";
+    block.rsvpSignInText = "Sign in to RSVP";
     block.showCount = false;
   }
   if (type === "calRsvpList") {
@@ -285,6 +294,9 @@ export function normalizeCalendarSlotBlock(input: unknown): CalendarSlotBlock | 
     block.rsvpText = str(raw.rsvpText, "RSVP");
     block.rsvpGoingText = str(raw.rsvpGoingText, "Going");
     block.rsvpNotGoingText = str(raw.rsvpNotGoingText, "Not going");
+    // Templates saved before this get the default, so an existing button
+    // starts saying it without anybody having to open the template.
+    block.rsvpSignInText = str(raw.rsvpSignInText, "Sign in to RSVP");
     block.showCount = Boolean(raw.showCount);
 
     // The two answered looks, each with its own named-style slot and its own
