@@ -4,6 +4,7 @@ import { sendRegistrationNotification, sendVerificationCodeEmail } from "./email
 import { outstandingMetadataCount } from "./metadata";
 import { fullName } from "./members";
 import { Role, User } from "./models";
+import { allCommunityPermissions } from "./permissions";
 import { getUserAccess } from "./access";
 import { createPendingAuth } from "./session";
 import { issueCode, type VerificationPurpose } from "./verification";
@@ -152,5 +153,18 @@ export async function postLoginPath(userId: string): Promise<string> {
   }
 
   if (isAdministrator) return "/admin";
-  return permissions.some((permission) => !permission.startsWith("community.")) ? "/admin" : "/";
+
+  /*
+   * Anything outside the membership vocabulary means there is an admin to land
+   * in. Tested against the vocabulary rather than against the `community.`
+   * prefix: several permissions are offered to both kinds of role under the
+   * same key — attendance, RSVP notes, test results, the sponsorship jobs — and
+   * a member who holds one of those keeps the prefix test sending them to an
+   * admin whose every section they would then be refused.
+   */
+  return permissions.some(
+    (permission) => !allCommunityPermissions.includes(permission)
+  )
+    ? "/admin"
+    : "/";
 }

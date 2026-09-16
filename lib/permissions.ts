@@ -234,6 +234,25 @@ export const communityPermissionGroups: PermissionGroup[] = [
       { key: "community.events.rsvp", label: "RSVP to events" },
       { key: "community.events.host", label: "Propose events" },
       {
+        /*
+         * The same keys the management group offers, and for the same reason
+         * the RSVP notes below are shared: taking a register is a job done in
+         * the room, and whoever is standing in it is usually a member — an
+         * instructor, a group leader, whoever unlocked the hall — rather than
+         * an administrator with the admin open.
+         *
+         * Two grants, not one. A level can be given the register to read
+         * without being given the pencil: knowing who came to the last six
+         * evenings is useful to a committee that has no business changing the
+         * record. The other way round needs no second grant — recording
+         * implies seeing, so a level given only the second is not left with a
+         * sheet it cannot read.
+         */
+        key: "attendance.view",
+        label: "See who attended events",
+      },
+      { key: "attendance.record", label: "Record event attendance" },
+      {
         // The same key the management group offers: whoever organises an
         // evening needs to read why somebody cannot make it, and an organiser
         // is usually a member rather than an administrator.
