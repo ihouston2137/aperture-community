@@ -49,6 +49,7 @@ export function toMetadataGroup(record: any): MetadataGroupSummary {
     editUserIds: ids(record.editUserIds),
     reportRoleIds: ids(record.reportRoleIds),
     reportUserIds: ids(record.reportUserIds),
+    isReportEditable: Boolean(record.isReportEditable),
   };
 }
 

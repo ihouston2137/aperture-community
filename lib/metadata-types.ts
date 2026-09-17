@@ -141,6 +141,14 @@ export type MetadataGroupSummary = {
   /** The report is its own grant: reading everybody at once is not reading one. */
   reportRoleIds: string[];
   reportUserIds: string[];
+  /**
+   * Its choice answers may be changed straight from the report.
+   *
+   * Only on a manager-managed group, and only for somebody who may already
+   * change its answers: it is a quicker way to do what they could do a row at
+   * a time, not a grant of its own.
+   */
+  isReportEditable: boolean;
 };
 
 /* --------------------------------------------------------------- Answers */

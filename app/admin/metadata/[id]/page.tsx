@@ -14,7 +14,6 @@ import {
   type MetadataViewer,
 } from "@/lib/metadata";
 import {
-  answerText,
   isAnswered,
   METADATA_PERMISSIONS,
   unanswered,
@@ -22,12 +21,9 @@ import {
 import { fullName } from "@/lib/member-types";
 import { requireSession } from "@/lib/session";
 
-import { AnswerButton } from "./answer-button";
+import { ReportTable } from "./report-table";
 
 export const metadata = { title: "Metadata report" };
-
-/** Stands in for a member who has answered nothing, so they still get a line. */
-const EMPTY_ENTRY = { id: "none", values: [] };
 
 /**
  * Everybody a group is asked of, and what each of them has answered.
@@ -135,86 +131,13 @@ export default async function MetadataReportPage({
           Nobody holds the membership levels this group is asked of.
         </p>
       ) : (
-        <div className="import-preview">
-          <table className="admin-table">
-            <thead>
-              <tr>
-                <th>Member</th>
-                {group.isRepeatable ? <th className="is-narrow">#</th> : null}
-                {group.questions.map((question) => (
-                  <th key={question.id}>
-                    {question.label}
-                    {question.isRequired ? " *" : ""}
-                  </th>
-                ))}
-                {canEdit ? <th /> : null}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => {
-                /*
-                 * One row per entry, so a member with three emergency contacts
-                 * reads as three lines of a table rather than as three answers
-                 * crammed into every cell. A member with none still gets a row:
-                 * an empty line is the point of the report.
-                 */
-                const lines = row.entries.length > 0 ? row.entries : [EMPTY_ENTRY];
-
-                return lines.map((entry, index) => (
-                  <tr
-                    key={`${row._id}-${entry.id}`}
-                    className={index === 0 ? "is-entry-start" : undefined}
-                  >
-                    {/* Spanning, so the name is said once however many entries
-                        sit under it. */}
-                    {index === 0 ? (
-                      <td rowSpan={lines.length}>
-                        {row.name}
-                        {row.isInactive ? (
-                          <span className="badge" style={{ marginLeft: "0.4rem" }}>
-                            inactive
-                          </span>
-                        ) : null}
-                        {row.outstanding > 0 ? (
-                          <span className="help-text">
-                            {row.outstanding} required unanswered
-                          </span>
-                        ) : null}
-                      </td>
-                    ) : null}
-
-                    {group.isRepeatable ? (
-                      <td className="is-narrow">
-                        {row.entries.length > 0 ? index + 1 : "—"}
-                      </td>
-                    ) : null}
-
-                    {group.questions.map((question) => (
-                      <td key={question.id}>
-                        {showAnswers
-                          ? answerText(question, entry.values) || "—"
-                          : isAnswered(question, entry.values)
-                            ? "answered"
-                            : "—"}
-                      </td>
-                    ))}
-
-                    {canEdit && index === 0 ? (
-                      <td rowSpan={lines.length}>
-                        <AnswerButton
-                          group={group}
-                          userId={row._id}
-                          userName={row.name}
-                          entries={row.entries}
-                        />
-                      </td>
-                    ) : null}
-                  </tr>
-                ));
-              })}
-            </tbody>
-          </table>
-        </div>
+        <ReportTable
+          group={group}
+          rows={rows}
+          showAnswers={showAnswers}
+          canEdit={canEdit}
+          canEditInPlace={canEdit && group.isReportEditable}
+        />
       )}
 
       {!showAnswers ? (

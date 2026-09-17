@@ -789,6 +789,8 @@ const MetadataGroupSchema = new Schema<any>(
     editUserIds: [{ type: String }],
     reportRoleIds: [{ type: String }],
     reportUserIds: [{ type: String }],
+    /** Choice answers may be changed in place, from the report's edit mode. */
+    isReportEditable: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

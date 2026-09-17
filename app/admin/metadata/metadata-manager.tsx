@@ -674,6 +674,21 @@ function GroupDialog({
                     chosenRoles={group?.editRoleIds ?? []}
                     chosenUsers={group?.editUserIds ?? []}
                   />
+
+                  <label className="checkbox-row" style={{ marginTop: "0.75rem" }}>
+                    <input
+                      type="checkbox"
+                      name="isReportEditable"
+                      defaultChecked={group?.isReportEditable ?? false}
+                      disabled={pending}
+                    />
+                    Choice answers can be changed from the report
+                  </label>
+                  <span className="help-text">
+                    Puts an edit mode on the report, where the choose-one and
+                    choose-any answers become controls for every member at
+                    once. Only for somebody who may change it.
+                  </span>
                 </>
               ) : null}
 
