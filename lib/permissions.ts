@@ -85,6 +85,7 @@ export const permissionGroups: PermissionGroup[] = [
     permissions: [
       { key: "design.library", label: "Manage design library" },
       { key: "design.site", label: "Manage site design" },
+      { key: "design.pwa", label: "Manage the app manifest and icons" },
       { key: "siteContent.manage", label: "Manage site content" },
       { key: "appearance.manage", label: "Manage appearance" },
     ],

@@ -19,7 +19,7 @@ export const CATEGORY_KINDS: Record<Exclude<UsageCategory, "unused">, string[]> 
   publication: ["publication"],
   documentation: ["doc-page", "doc-template"],
   sponsorship: ["sponsor-logo"],
-  other: ["bio-headshot", "form-content", "form-upload", "site-logo"],
+  other: ["bio-headshot", "form-content", "form-upload", "site-logo", "app-icon"],
 };
 
 export const MEDIA_PAGE_SIZE = 60;

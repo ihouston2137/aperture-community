@@ -8,6 +8,7 @@ import {
   Documentation,
   FormDefinition,
   MediaAsset,
+  PwaSettings,
   SiteContent,
   SitePage,
   Sponsor,
@@ -117,6 +118,7 @@ export async function buildMediaUsageIndex(): Promise<MediaUsageIndex> {
     sponsors,
     forms,
     siteContent,
+    pwa,
   ] = await Promise.all([
       MediaAsset.find().select("url").lean<any[]>(),
       SitePage.find().select("title layout").lean<any[]>(),
@@ -142,6 +144,7 @@ export async function buildMediaUsageIndex(): Promise<MediaUsageIndex> {
       Sponsor.find().select("name logos").lean<any[]>(),
       FormDefinition.find().select("title layout").lean<any[]>(),
       SiteContent.findOne().select("logoUrl metaImageUrl").lean<any>(),
+      PwaSettings.findOne().select("icons").lean<any>(),
     ]);
 
   // Assets are addressed either by id or by url, so both need a lookup.
@@ -252,6 +255,9 @@ export async function buildMediaUsageIndex(): Promise<MediaUsageIndex> {
   }
   if (siteContent) {
     record(siteContent, "other", "site-logo", "site-content", "Site content");
+  }
+  if (pwa) {
+    record(pwa, "other", "app-icon", "pwa", "App & icons");
   }
 
   return index;

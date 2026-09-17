@@ -1,9 +1,10 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 
 import "./globals.css";
 import { AnalyticsBeacon } from "@/components/analytics-beacon";
 import { customStyleCss, fontImportCss } from "@/lib/custom-style-css";
 import { protectedMediaUrl } from "@/lib/protected-media-url";
+import { appleTouchIcon, getPwaSettings } from "@/lib/pwa";
 import {
   appearanceCssVariables,
   getAppearance,
@@ -32,7 +33,18 @@ function siteUrl(): URL {
 
 export async function generateMetadata(): Promise<Metadata> {
   try {
-    const [content, appearance] = await Promise.all([getSiteContent(), getAppearance()]);
+    const [content, appearance, pwa] = await Promise.all([
+      getSiteContent(),
+      getAppearance(),
+      getPwaSettings(),
+    ]);
+    /*
+     * iOS does not read the manifest for either of these: the home screen icon
+     * comes from a `link` tag, and whether the app opens in its own window
+     * comes from a `meta` tag. So the settings are said twice — once in the
+     * manifest for everybody else, once here for Apple.
+     */
+    const apple = pwa.isEnabled ? appleTouchIcon(pwa.icons) : null;
     return {
       // Social cards need absolute URLs. Without this every image in a shared
       // preview resolves against localhost and nothing renders for the reader.
@@ -42,9 +54,23 @@ export async function generateMetadata(): Promise<Metadata> {
       // Through the media route like every other local asset. `public/uploads`
       // is snapshotted at build time, so a file uploaded afterwards is not
       // served from its raw path at all.
-      icons: appearance.faviconUrl
-        ? { icon: protectedMediaUrl(appearance.faviconUrl) }
-        : undefined,
+      icons:
+        appearance.faviconUrl || apple
+          ? {
+              icon: appearance.faviconUrl
+                ? protectedMediaUrl(appearance.faviconUrl)
+                : undefined,
+              apple: apple ? protectedMediaUrl(apple.url) : undefined,
+            }
+          : undefined,
+      appleWebApp:
+        pwa.isEnabled && pwa.display !== "browser"
+          ? {
+              capable: true,
+              title: pwa.shortName || pwa.name || content.metaTitle,
+              statusBarStyle: pwa.appleStatusBarStyle,
+            }
+          : undefined,
       openGraph: content.metaImageUrl
         ? { images: [protectedMediaUrl(content.metaImageUrl)] }
         : undefined,
@@ -52,6 +78,23 @@ export async function generateMetadata(): Promise<Metadata> {
   } catch {
     // The database may not be reachable during a cold build.
     return { title: "Aperture" };
+  }
+}
+
+/**
+ * The colour the device paints its own furniture with — the title bar of an
+ * installed app, the tab strip of a browser that follows it.
+ *
+ * Its own export because that is where Next reads it from; `themeColor` in the
+ * metadata is ignored. Only stated when the app is turned on, so a site that
+ * is not offering itself as an app leaves the browser's own colours alone.
+ */
+export async function generateViewport(): Promise<Viewport> {
+  try {
+    const pwa = await getPwaSettings();
+    return pwa.isEnabled ? { themeColor: pwa.themeColor } : {};
+  } catch {
+    return {};
   }
 }
 

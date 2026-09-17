@@ -395,6 +395,37 @@ const SiteContentSchema = new Schema<any>(
 
 export const SiteContent = model("SiteContent", SiteContentSchema);
 
+/**
+ * The web app manifest, as settings.
+ *
+ * One document, like appearance and site content: a site has one manifest, and
+ * `/manifest.webmanifest` reads whichever one is there. The icons are Mixed and
+ * normalized in `lib/pwa-types.ts` — the list grows sizes and purposes, and a
+ * normalizer keeps older documents readable better than a schema does.
+ */
+const PwaSettingsSchema = new Schema<any>(
+  {
+    isEnabled: { type: Boolean, default: false },
+    name: { type: String, default: "" },
+    shortName: { type: String, default: "" },
+    description: { type: String, default: "" },
+    startUrl: { type: String, default: "/" },
+    scope: { type: String, default: "/" },
+    backgroundColor: { type: String, default: "#ffffff" },
+    themeColor: { type: String, default: "#000000" },
+    display: { type: String, default: "standalone" },
+    orientation: { type: String, default: "any" },
+    lang: { type: String, default: "en" },
+    categories: [{ type: String }],
+    /** iOS reads its own tags rather than the manifest. */
+    appleStatusBarStyle: { type: String, default: "default" },
+    icons: { type: [Mixed], default: [] },
+  },
+  { timestamps: true }
+);
+
+export const PwaSettings = model("PwaSettings", PwaSettingsSchema);
+
 /* ------------------------------------------------------------------- Email */
 
 const EmailSettingsSchema = new Schema<any>(
@@ -1102,6 +1133,8 @@ export const MEDIA_USAGE_KINDS = [
   "form-content",
   "form-upload",
   "site-logo",
+  /** An icon the site is installed with — see `lib/pwa-types.ts`. */
+  "app-icon",
   "doc-page",
   "doc-template",
 ] as const;

@@ -143,6 +143,11 @@ export const adminNavGroups: NavGroup[] = [
         permission: "design.library",
       },
       {
+        href: "/admin/pwa",
+        label: "App & icons",
+        permission: "design.pwa",
+      },
+      {
         href: "/admin/site-design",
         label: "Other Settings",
         permission: "design.site",
