@@ -6,9 +6,13 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "migrate:publications": "tsx scripts/migrate-publications.ts",
+    "test:presentations": "tsx --test tests/presentation-migration.test.ts",
+    "test:presentations:browser": "tsx tests/presentation-browser.ts"
   },
   "dependencies": {
+    "@napi-rs/canvas": "^1.0.9",
     "bcrypt-ts": "^8.0.1",
     "html-to-image": "^1.11.13",
     "jose": "^6.2.2",
@@ -17,6 +21,7 @@
     "mongoose": "^9.7.3",
     "next": "16.2.10",
     "nodemailer": "^9.0.0",
+    "pdfjs-dist": "^6.3.289",
     "qrcode": "^1.5.4",
     "quill": "^2.0.3",
     "react": "19.2.4",
@@ -25,6 +30,7 @@
     "three": "^0.185.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/nodemailer": "^8.0.1",
@@ -35,6 +41,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.10",
     "tailwindcss": "^4",
+    "tsx": "^4.23.15",
     "typescript": "^5"
   },
   "allowScripts": {

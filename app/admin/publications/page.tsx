@@ -5,12 +5,11 @@ import { checkPermission, requirePermission } from "@/lib/access";
 import { connectDB } from "@/lib/db";
 import { Zine } from "@/lib/models";
 import { getSession } from "@/lib/session";
-import { publicationHref, PUBLICATION_KINDS } from "@/lib/publication-layout";
+import { publicationHref } from "@/lib/publication-layout";
 import { IN_BIN, NOT_DELETED } from "@/lib/soft-delete";
 
 import {
   createFromTemplateAction,
-  createPublicationAction,
   deletePublicationAction,
   publishPublicationAction,
   purgePublicationAction,
@@ -18,7 +17,7 @@ import {
   toggleTemplateAction,
 } from "./actions";
 
-export const metadata = { title: "Publications" };
+export const metadata = { title: "Presentations" };
 
 export default async function PublicationsPage({
   searchParams,
@@ -47,32 +46,13 @@ export default async function PublicationsPage({
   return (
     <>
       <AdminHeader
-        title="Publications"
-        subtitle="Zines, presentations and social posts built on a fixed canvas."
+        title="Presentations"
+        subtitle="Create, edit and present slides. Existing publication links remain available."
       />
 
-      <Panel title="Create a publication">
-        <form action={createPublicationAction}>
-          <div className="field-grid">
-            <div className="field">
-              <label>Title</label>
-              <input type="text" name="title" required />
-            </div>
-            <div className="field">
-              <label>Kind</label>
-              <select name="kind" defaultValue="zine">
-                {PUBLICATION_KINDS.map((kind) => (
-                  <option key={kind} value={kind}>
-                    {kind}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-          <button type="submit" className="btn btn-primary" style={{ marginTop: "0.75rem" }}>
-            Create
-          </button>
-        </form>
+      <Panel title="Create a presentation">
+        <Link href="/admin/presentations/new" className="btn btn-primary">New presentation</Link>{" "}
+        <Link href="/admin/presentations/import" className="btn">Import PDF</Link>
       </Panel>
 
       {templates.length > 0 ? (

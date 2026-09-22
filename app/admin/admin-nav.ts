@@ -28,8 +28,8 @@ export const adminNavGroups: NavGroup[] = [
         permission: "collections.manage",
       },
       {
-        href: "/admin/publications",
-        label: "Publications",
+        href: "/admin/presentations",
+        label: "Presentations",
         permission: "publications.manage",
       },
       { href: "/admin/profiles", label: "Profiles", permission: "profiles.manage" },

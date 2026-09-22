@@ -25,7 +25,7 @@ const CARDS = [
   { href: "/admin/stories", label: "Stories", permission: "stories.manage" },
   { href: "/admin/collections", label: "Collections", permission: "collections.manage" },
   { href: "/admin/media", label: "Media", permission: "media.view" },
-  { href: "/admin/publications", label: "Publications", permission: "publications.manage" },
+  { href: "/admin/presentations", label: "Presentations", permission: "publications.manage" },
   { href: "/admin/forms/submissions", label: "Submissions", permission: "forms.submissions" },
   { href: "/admin/members", label: "Awaiting approval", permission: "members.approve" },
 ];
@@ -63,7 +63,7 @@ export default async function AdminDashboard({
     "/admin/stories": stories,
     "/admin/collections": collections,
     "/admin/media": media,
-    "/admin/publications": publications,
+    "/admin/presentations": publications,
     "/admin/forms/submissions": submissions,
     "/admin/members": pendingMembers,
   };

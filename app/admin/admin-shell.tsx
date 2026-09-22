@@ -14,6 +14,7 @@ const FULL_SCREEN_ROUTES = [
   /^\/admin\/story-templates\/(new|[^/]+\/edit)$/,
   /^\/admin\/collections\/(new|[^/]+\/edit)$/,
   /^\/admin\/publications\/[^/]+\/(edit|preview)$/,
+  /^\/admin\/presentations\/(new|[^/]+\/(edit|preview))$/,
 ];
 
 export function isFullScreenRoute(pathname: string): boolean {

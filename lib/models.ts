@@ -1588,6 +1588,20 @@ ZineSchema.index({ deletedAt: 1, updatedAt: -1 });
 
 export const Zine = model("Zine", ZineSchema);
 
+// Publication identity, URLs and access remain on Zine. Slide documents are
+// separate so the source publication survives conversion and can be restored.
+export const Presentation = model("Presentation", new Schema<any>({
+  deck: { type: Mixed, required: true },
+  published: { type: Mixed, default: null },
+  variants: { type: Mixed, default: {} },
+  publishedVariants: { type: Mixed, default: {} },
+  defaultView: { type: String, default: "" },
+  version: { type: Number, default: 1 },
+  migration: { type: Mixed, default: null },
+  active: { type: Boolean, default: true },
+}, { timestamps: true }));
+
+
 /* ---------------------------------------------------------- Design library */
 
 const FontFamilySchema = new Schema<any>(

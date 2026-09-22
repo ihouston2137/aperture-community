@@ -7,7 +7,7 @@ import { requirePermission } from "@/lib/access";
 import { getSession } from "@/lib/session";
 import { connectDB } from "@/lib/db";
 import { clearMediaUsage, syncMediaUsage } from "@/lib/media-usage-sync";
-import { Zine } from "@/lib/models";
+import { Presentation, Zine } from "@/lib/models";
 import { sanitizeMediaPath } from "@/lib/protected-media-url";
 import {
   normalizeAudio,
@@ -23,6 +23,8 @@ import {
   type Transition,
 } from "@/lib/publication-layout";
 import { slugify, uniqueSlug } from "@/lib/slug";
+import { syncPresentationMedia } from "@/lib/presentation-storage";
+import { convertPublication } from "@/lib/publication-migration";
 
 async function guard() {
   await requirePermission("publications.manage");
@@ -52,6 +54,7 @@ export async function createPublicationAction(formData: FormData) {
   const created = await Zine.create({ title, slug, kind, status: "draft", pages: [] });
 
   revalidatePath("/admin/publications");
+  revalidatePath("/admin/presentations");
   redirect(`/admin/publications/${created._id}/edit`);
 }
 
@@ -92,7 +95,19 @@ export async function createFromTemplateAction(formData: FormData) {
     coverMediaId: template.coverMediaId ?? "",
   });
 
+  const originalSlides = await Presentation.findById(templateId).lean<any>();
+  if (originalSlides && originalSlides.active !== false) {
+    const variants = Object.fromEntries(Object.entries(originalSlides.variants || {}).map(([key, value]) => [key, { ...(value as Record<string, unknown>), title }]));
+    await Presentation.create({ _id: created._id, deck: { ...originalSlides.deck, title }, variants, defaultView: originalSlides.defaultView, version: 1 });
+  } else {
+    try {
+      const converted = convertPublication({ ...template, title });
+      await Presentation.create({ _id: created._id, deck: converted.deck, variants: converted.variants, defaultView: converted.defaultView, version: 1 });
+    } catch { /* Unsupported source remains editable in its original format. */ }
+  }
+  await syncPresentationMedia(String(created._id));
   revalidatePath("/admin/publications");
+  revalidatePath("/admin/presentations");
   redirect(`/admin/publications/${created._id}/edit`);
 }
 
@@ -110,6 +125,7 @@ export async function toggleTemplateAction(formData: FormData) {
   await publication.save();
 
   revalidatePath("/admin/publications");
+  revalidatePath("/admin/presentations");
 }
 
 /** What the editor is told, so it can report back without leaving the page. */
@@ -133,6 +149,7 @@ export async function savePublicationAction(
     return { ok: false, error: "That publication is in the bin. Put it back first." };
   }
 
+  if (await Presentation.exists({ _id: id, active: { $ne: false } })) return { ok: false, error: "Open this item in the presentation editor to save it." };
   const title = String(formData.get("title") ?? "").trim();
   if (!title) return { ok: false, error: "Give the publication a title." };
 
@@ -194,6 +211,7 @@ export async function savePublicationAction(
   ]);
 
   revalidatePath("/admin/publications");
+  revalidatePath("/admin/presentations");
   revalidatePath(publicationHref(kind, slug));
 
   /*
@@ -237,6 +255,7 @@ export async function deletePublicationAction(formData: FormData) {
   }).lean<any>();
 
   revalidatePath("/admin/publications");
+  revalidatePath("/admin/presentations");
   if (publication?.slug) {
     revalidatePath(publicationHref(publication.kind ?? "zine", publication.slug));
   }
@@ -255,6 +274,7 @@ export async function restorePublicationAction(formData: FormData) {
   }).lean<any>();
 
   revalidatePath("/admin/publications");
+  revalidatePath("/admin/presentations");
   if (publication?.slug) {
     revalidatePath(publicationHref(publication.kind ?? "zine", publication.slug));
   }
@@ -292,10 +312,12 @@ export async function purgePublicationAction(formData: FormData) {
     redirect(`/admin/publications?purge=mismatch&id=${id}`);
   }
 
+  await Presentation.deleteOne({ _id: id });
   await clearMediaUsage(id);
   await Zine.findByIdAndDelete(id);
 
   revalidatePath("/admin/publications");
+  revalidatePath("/admin/presentations");
   if (publication.slug) {
     revalidatePath(publicationHref(publication.kind ?? "zine", publication.slug));
   }
@@ -314,10 +336,16 @@ export async function publishPublicationAction(formData: FormData) {
   if (!publication || publication.deletedAt) return;
 
   const next = publication.status === "published" ? "draft" : "published";
+  const slides = await Presentation.findById(id).lean<any>();
+  if (slides?.active !== false && slides) {
+    const changed = await Presentation.updateOne({ _id: id, version: slides.version }, { $set: { published: next === "published" ? slides.deck : null, publishedVariants: next === "published" ? slides.variants : {} }, $inc: { version: 1 } });
+    if (!changed.matchedCount) return;
+  }
   publication.status = next;
   publication.publishedAt = next === "published" ? new Date() : null;
   await publication.save();
 
   revalidatePath("/admin/publications");
+  revalidatePath("/admin/presentations");
   revalidatePath(publicationHref(publication.kind ?? "zine", publication.slug));
 }

@@ -1,3 +1,4 @@
+import { PresentationScreen } from "./presentation-screen";
 import {
   normalizeAudio,
   normalizePageTemplates,
@@ -22,12 +23,18 @@ export async function PublicationScreen({
   doc,
   view,
   showControls = true,
+  preview = false,
 }: {
   doc: Record<string, any>;
   /** Social posts only: which named view to render. */
   view?: string;
   showControls?: boolean;
+  preview?: boolean;
 }) {
+  if (doc._id) {
+    const presentation = await PresentationScreen({ id: String(doc._id), view, preview });
+    if (presentation) return presentation;
+  }
   const pages = normalizePublicationPages(doc.pages);
   const repeatedBlocks = normalizeRepeatedBlocks(doc.repeatedBlocks);
   const pageTemplates = normalizePageTemplates(doc.pageTemplates);

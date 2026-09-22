@@ -14,6 +14,7 @@ import {
   Sponsor,
   Story,
   Zine,
+  Presentation,
 } from "./models";
 import {
   usageCategoriesFor,
@@ -33,7 +34,7 @@ export type { MediaUsageIndex, UsageCategory, UsageRef };
  * legacy layout shapes, with no migration step.
  */
 
-const MEDIA_ID_KEYS = /(^|[a-z])mediaId$|^sourceId$/i;
+const MEDIA_ID_KEYS = /(^|[a-z])mediaId$|^sourceId$|^audioId$/i;
 const MEDIA_PATH = /^\/(uploads|images)\//;
 
 /**
@@ -58,7 +59,8 @@ export function collectMediaRefs(
   ids: Set<string>,
   depth = 0
 ) {
-  if (depth > 12 || value == null) return;
+  // Variants and compatibility table cells add several levels around media.
+  if (depth > 24 || value == null) return;
 
   if (typeof value === "string") {
     const path = sanitizeMediaPath(value);
@@ -111,6 +113,7 @@ export async function buildMediaUsageIndex(): Promise<MediaUsageIndex> {
     stories,
     collections,
     publications,
+    presentations,
     docSets,
     docPages,
     docTemplates,
@@ -135,8 +138,9 @@ export async function buildMediaUsageIndex(): Promise<MediaUsageIndex> {
        * good, which is the point at which nothing can come back for it.
        */
       Zine.find()
-        .select("title pages repeatedBlocks coverMediaId coverUrl audio")
+        .select("title pages repeatedBlocks pageTemplates coverMediaId coverUrl audio")
         .lean<any[]>(),
+      Presentation.find().lean<any[]>(),
       Documentation.find().select("title").lean<any[]>(),
       DocPage.find().select("title documentationId content").lean<any[]>(),
       DocTemplate.find().select("name layout").lean<any[]>(),
@@ -203,6 +207,8 @@ export async function buildMediaUsageIndex(): Promise<MediaUsageIndex> {
       publication.title || "Untitled publication"
     );
   }
+
+  for (const presentation of presentations) record(presentation, "publication", "publication", String(presentation._id), presentation.deck?.title || "Presentation");
 
   // A document's pictures belong to the set a reader finds them in, so the
   // label carries it: two sets can each hold an "Overview", and "Overview" on

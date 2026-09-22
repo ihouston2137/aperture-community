@@ -292,6 +292,7 @@ export function RichTextEditor({
   placeholder,
   fonts = [],
   minHeight = 12,
+  baseSize = BASE_SIZE,
   toolbarHost: externalToolbarHost = undefined,
   bare = false,
   autoFocus = false,
@@ -306,6 +307,8 @@ export function RichTextEditor({
   fonts?: string[];
   /** rem */
   minHeight?: number;
+  /** Inherited canvas font size, in rem, used by the toolbar for unstyled text. */
+  baseSize?: number;
   /**
    * Where the toolbar is put, when it belongs somewhere other than above the
    * writing area — a bar over a canvas, say, shared by whatever is being
@@ -386,7 +389,7 @@ export function RichTextEditor({
   const [seenSize, setSeenSize] = useState<number | null>(null);
   if (size !== seenSize) {
     setSeenSize(size);
-    setSizeDraft(String(size ?? BASE_SIZE));
+    setSizeDraft(String(size ?? baseSize));
   }
   /**
    * The colour at the caret, for the custom control.
@@ -600,14 +603,14 @@ export function RichTextEditor({
   };
 
   const stepSize = (direction: 1 | -1) => {
-    setSizeTo((size ?? BASE_SIZE) + direction * SIZE_STEP);
+    setSizeTo((size ?? baseSize) + direction * SIZE_STEP);
   };
 
   /** Commits what was typed, or puts back what was there if it was not a size. */
   const commitSize = () => {
     const typed = Number(sizeDraft.trim());
     if (sizeDraft.trim() !== "" && Number.isFinite(typed)) setSizeTo(typed);
-    else setSizeDraft(String(size ?? BASE_SIZE));
+    else setSizeDraft(String(size ?? baseSize));
   };
 
   const changeFont = (next: string) => {
@@ -662,7 +665,7 @@ export function RichTextEditor({
             type="button"
             className="rte-size-step"
             aria-label="Decrease font size"
-            disabled={!ready || (size ?? BASE_SIZE) <= MIN_SIZE}
+            disabled={!ready || (size ?? baseSize) <= MIN_SIZE}
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => stepSize(-1)}
           >
@@ -692,7 +695,7 @@ export function RichTextEditor({
                   commitSize();
                 }
                 if (event.key === "Escape") {
-                  setSizeDraft(String(size ?? BASE_SIZE));
+                  setSizeDraft(String(size ?? baseSize));
                   (event.target as HTMLInputElement).blur();
                 }
               }}

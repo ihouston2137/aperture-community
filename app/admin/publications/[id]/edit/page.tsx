@@ -4,7 +4,7 @@ import { requirePermission } from "@/lib/access";
 import { adminExit } from "@/lib/admin-exit";
 import { loadBuilderSources } from "@/lib/builder-sources";
 import { connectDB } from "@/lib/db";
-import { Zine } from "@/lib/models";
+import { Presentation, Zine } from "@/lib/models";
 import {
   normalizeAudio,
   normalizeCanvasSize,
@@ -28,11 +28,11 @@ export default async function EditPublicationPage({
 }: {
   params: Promise<{ id: string }>;
   /** `view` carries the post view being edited back across a save. */
-  searchParams: Promise<{ view?: string; from?: string }>;
+  searchParams: Promise<{ view?: string; from?: string; legacy?: string }>;
 }) {
   await requirePermission("publications.manage");
   const { id } = await params;
-  const { view, from } = await searchParams;
+  const { view, from, legacy } = await searchParams;
 
   await connectDB();
   const doc = await Zine.findById(id).lean<any>();
@@ -41,6 +41,7 @@ export default async function EditPublicationPage({
   // whole point of it being there rather than gone.
   if (doc.deletedAt) redirect("/admin/publications#bin");
 
+  if (legacy !== "1" && await Presentation.exists({ _id: id, active: { $ne: false } })) redirect(`/admin/presentations/${id}/edit${view ? `?view=${encodeURIComponent(view)}` : ""}`);
   const pages = normalizePublicationPages(doc.pages);
   const repeatedBlocks = normalizeRepeatedBlocks(doc.repeatedBlocks);
   const pageTemplates = normalizePageTemplates(doc.pageTemplates);

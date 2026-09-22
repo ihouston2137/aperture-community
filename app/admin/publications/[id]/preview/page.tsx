@@ -41,7 +41,7 @@ export default async function PublicationPreviewPage({
   return (
     <>
       <PublicationExport audioUrl={doc.audio?.url} fileName={doc.slug ?? "publication"} />
-      <PublicationScreen doc={doc} view={view} />
+      <PublicationScreen preview doc={doc} view={view} />
     </>
   );
 }
