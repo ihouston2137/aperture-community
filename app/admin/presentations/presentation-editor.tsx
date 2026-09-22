@@ -67,6 +67,7 @@ import { PresentationPlayer } from "./presentation-player";
 import { CanvasViewport } from "./canvas-viewport";
 import { savePresentation } from "./actions";
 import { SlideShadowFields } from "./slide-shadow-fields";
+import { copyBlockStyles, pasteBlockStyles } from "@/lib/presentation-styles";
 
 export function PresentationEditor({
   initial,
@@ -125,6 +126,8 @@ export function PresentationEditor({
     id: string;
   } | null>(null);
   const draggedLayer = useRef<string | null>(null);
+  const contextMenuRef = useRef<HTMLDivElement>(null);
+  const [styleClipboard, setStyleClipboard] = useState<SlideObject | null>(null);
   const [layoutId, setLayoutId] = useState("");
   const [editingLayout, setEditingLayout] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -538,12 +541,23 @@ export function PresentationEditor({
   }
 
   useEffect(() => {
-    if (menu)
-      document
-        .querySelector<HTMLButtonElement>(
-          ".deck-context-menu button:not(:disabled)",
-        )
-        ?.focus();
+    if (!menu) return;
+    const element = contextMenuRef.current;
+    element?.querySelector<HTMLButtonElement>("button:not(:disabled)")?.focus();
+    if (element) {
+      const bounds = element.getBoundingClientRect();
+      element.style.left = `${Math.max(8, Math.min(menu.x, window.innerWidth - bounds.width - 8))}px`;
+      element.style.top = `${Math.max(8, Math.min(menu.y, window.innerHeight - bounds.height - 8))}px`;
+    }
+    const dismiss = (event: Event) => {
+      if (!contextMenuRef.current?.contains(event.target as Node)) setMenu(null);
+    };
+    document.addEventListener("pointerdown", dismiss, true);
+    document.addEventListener("click", dismiss, true);
+    return () => {
+      document.removeEventListener("pointerdown", dismiss, true);
+      document.removeEventListener("click", dismiss, true);
+    };
   }, [menu]);
   function changeLayer(action: string) {
     const ids = selection.filter(
@@ -2131,6 +2145,7 @@ export function PresentationEditor({
         </div>
         {menu && (
           <div
+            ref={contextMenuRef}
             className="deck-context-menu"
             role="menu"
             style={{
@@ -2262,6 +2277,16 @@ export function PresentationEditor({
               </div>
             ) : (
               <div>
+                <button role="menuitem" onClick={() => {
+                  const source = slide.objects.find(item => item.id === menu.id);
+                  if (source) setStyleClipboard(copyBlockStyles(source));
+                }}>Copy styles</button>
+                <button role="menuitem" disabled={!styleClipboard || !canEdit || !slide.objects.some(item => selection.includes(item.id) && !locked(item))}
+                  onClick={() => {
+                    if (styleClipboard) patchSlide({ objects: slide.objects.map(item =>
+                      selection.includes(item.id) && !locked(item) ? pasteBlockStyles(item, styleClipboard) : item
+                    ) });
+                  }}>Paste styles</button>
                 <button
                   role="menuitem"
                   disabled={selection.length < 2}

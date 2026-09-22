@@ -166,7 +166,29 @@ async function main() {
       const height = Number(await page.getByLabel("Shape height", { exact: true }).inputValue());
       assert.ok(Math.abs(width / height - 2) < 0.001);
       await page.getByLabel("Shape transparency", { exact: true }).fill("40");
+      await page.getByRole("tab", { name: "Effects", exact: true }).click();
+      await page.getByLabel("Enable drop shadow", { exact: true }).check();
+      await page.locator(".deck-object").click({ button: "right" });
+      assert.equal(await page.getByRole("menuitem", { name: "Paste styles", exact: true }).isDisabled(), true);
+      await page.getByRole("menuitem", { name: "Copy styles", exact: true }).click();
+      await page.getByLabel("Enable drop shadow", { exact: true }).uncheck();
+      await page.getByLabel("Shape transparency", { exact: true }).fill("0");
+      await page.locator(".deck-object").click({ button: "right" });
+      await page.getByRole("menuitem", { name: "Paste styles", exact: true }).click();
+      assert.equal(await page.getByLabel("Enable drop shadow", { exact: true }).isChecked(), true);
+      assert.equal(await page.getByLabel("Shape transparency", { exact: true }).inputValue(), "40");
+      await page.getByRole("button", { name: "Undo", exact: true }).click();
+      await page.locator(".deck-object").click();
+      await page.getByRole("tab", { name: "Effects", exact: true }).click();
+      assert.equal(await page.getByLabel("Enable drop shadow", { exact: true }).isChecked(), false);
+      await page.getByRole("button", { name: "Redo", exact: true }).click();
+      await page.locator(".deck-object").click({ button: "right" });
+      await page.getByRole("tab", { name: "Block properties", exact: true }).click();
+      assert.equal(await page.getByRole("menu").count(), 0);
       await page.getByRole("button", { name: "Lock block", exact: true }).click();
+      await page.locator(".deck-object").click({ button: "right" });
+      assert.equal(await page.getByRole("menuitem", { name: "Paste styles", exact: true }).isDisabled(), true);
+      await page.getByRole("tab", { name: "Block properties", exact: true }).click();
       assert.equal(await page.getByLabel("Shape width", { exact: true }).isDisabled(), true);
       assert.equal(await page.getByRole("button", { name: "Unlock block", exact: true }).locator("svg.lucide-lock-open").count(), 1);
       await page.getByRole("button", { name: "Unlock block", exact: true }).click();
@@ -178,6 +200,19 @@ async function main() {
       const shapeDeck = await Presentation.findById(page.url().split("/").at(-2)!).lean<any>();
       assert.equal(shapeDeck.deck.slides[0].objects[0].aspectLocked, true);
       assert.match(shapeDeck.deck.slides[0].objects[0].block.color, /0\.6\)/);
+      if (type === "Shape") {
+        await page.locator(".deck-object").click();
+        await page.getByLabel("Toolbar shape", { exact: true }).selectOption("rectangle");
+        await page.getByLabel("Border size", { exact: true }).fill("1");
+        await page.getByLabel("Border rounding", { exact: true }).fill("2");
+        const shape = page.locator(".deck-object .pb-shape");
+        assert.equal(await shape.locator('path[fill-rule="evenodd"]').count(), 1);
+        assert.equal(await shape.evaluate(element => getComputedStyle(element.parentElement!).borderWidth), "0px");
+        await shape.screenshot({ path: "backups/test-artifacts/rounded-shape-border.png" });
+        // A radius smaller than the outline must still have smooth outer corners.
+        await page.getByLabel("Border rounding", { exact: true }).fill("0.5");
+        await shape.screenshot({ path: "backups/test-artifacts/rounded-shape-thick-border.png" });
+      }
     }
     assert.deepEqual(errors, []);
     console.log("Browser checks passed: legacy URL, converted editor, draft snapshot, hidden-page navigation, access restrictions, deleted content, native text editing, PNG/PDF export, PDF import, create, publish and unpublish.");

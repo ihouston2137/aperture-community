@@ -87,6 +87,7 @@ export function Surface({
   );
 }
 export function objectStyle(object: SlideObject): React.CSSProperties {
+  const hasShapeOutline = object.block?.type === "shape" || object.block?.type === "customShape";
   return {
     position: "absolute",
     left: object.x,
@@ -98,15 +99,15 @@ export function objectStyle(object: SlideObject): React.CSSProperties {
     background: ["rectangle", "ellipse", "text"].includes(object.type)
       ? object.fill
       : undefined,
-    borderRadius: object.type === "ellipse" ? "50%" : object.borderRadius,
-    border: object.type !== "line" && object.borderWidth
+    borderRadius: hasShapeOutline ? undefined : object.type === "ellipse" ? "50%" : object.borderRadius,
+    border: !hasShapeOutline && object.type !== "line" && object.borderWidth
       ? `${object.borderWidth}px solid ${object.borderColor || "#16181d"}`
       : undefined,
     boxSizing: "border-box",
     color: object.color,
     fontSize: object.fontSize,
     fontFamily: object.fontFamily || undefined,
-    overflow: object.type === "line" ? "visible" : "hidden",
+    overflow: object.type === "line" || hasShapeOutline ? "visible" : "hidden",
   };
 }
 export function shapeHtml(object: SlideObject) {

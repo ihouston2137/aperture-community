@@ -1,4 +1,5 @@
 import test from "node:test";
+import { copyBlockStyles, pasteBlockStyles } from "../lib/presentation-styles";
 import assert from "node:assert/strict";
 import { convertPublication } from "../lib/publication-migration";
 import { createPublicationPage, createPublicationBlock, createTable, emptyBackground } from "../lib/publication-layout";
@@ -8,6 +9,33 @@ import { jsPDF } from "jspdf";
 import { collectMediaRefs } from "../lib/media-usage";
 
 const source = () => ({ title: "Fixture", status: "draft", kind: "zine", presentationSize: { width: 1440, height: 1080 }, pages: [{ ...createPublicationPage(), id: "first" }] });
+
+test("style clipboard transfers appearance and effects without content or geometry", () => {
+  const source = newSlideBlock("shape");
+  source.block = { ...source.block!, color: "rgba(255,0,0,0.5)", borderWidth: 0.5, borderColor: "#00ff00", radius: 1 };
+  source.shadow = { enabled: true, x: 8, y: -12, blur: 16, color: "#123456" };
+  const clipboard = copyBlockStyles(source);
+  source.shadow.blur = 99;
+  const target = { ...newSlideBlock("customShape"), x: 321, width: 456, html: "Keep me", aspectLocked: true };
+  target.block!.shapeSlug = "keep-shape";
+  const pasted = pasteBlockStyles(target, clipboard);
+  assert.equal(pasted.block!.color, "rgba(255,0,0,0.5)");
+  assert.equal(pasted.block!.borderWidth, 0.5);
+  assert.equal(pasted.block!.shapeSlug, "keep-shape");
+  assert.equal(pasted.id, target.id);
+  assert.equal(pasted.x, 321);
+  assert.equal(pasted.width, 456);
+  assert.equal(pasted.html, "Keep me");
+  assert.equal(pasted.aspectLocked, true);
+  assert.equal(pasted.shadow!.blur, 16);
+  const text = pasteBlockStyles(newObject("text"), clipboard);
+  assert.equal(text.borderWidth, 8);
+  assert.equal(pasteBlockStyles(pasted, newObject("text")).shadow!.enabled, false);
+  const legacy = { ...newObject("publication"), publication: createPublicationBlock("shape") };
+  const converted = pasteBlockStyles(legacy, clipboard);
+  assert.equal(converted.publication!.shapeStyle!.backgroundColor, clipboard.block!.color);
+  assert.equal(pasteBlockStyles(target, converted).block!.borderWidth, 0.5);
+});
 
 test("shape aspect locks preserve proportions for fields, dragging, limits, and saving", () => {
   for (const type of ["shape", "customShape"] as const) {
