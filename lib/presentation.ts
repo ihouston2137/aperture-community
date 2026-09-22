@@ -22,6 +22,7 @@ export type SlideObject = {
   };
   block?: PageBlock;
   locked?: boolean;
+  aspectLocked?: boolean;
   groupId?: string;
   imageFit?: "contain" | "cover";
   imageRatio?: number;
@@ -411,6 +412,7 @@ export function normalizeDeck(input: unknown): Deck {
             block,
             ...(o.type === "line" ? { line: normalizeLine(o.line) } : {}),
             locked: o.locked === true,
+            aspectLocked: o.aspectLocked === true,
             groupId: string(o.groupId, 80) || undefined,
             imageFit: o.imageFit === "cover" ? "cover" : "contain",
             imageRatio: o.imageRatio ? number(o.imageRatio, 0.001, 1000, 0) : 0,
@@ -492,6 +494,20 @@ export function newSlideBlock(type: PageBlockType, defaults?: Partial<Presentati
 }
 
 /** Maintain a contain image's actual bounds whenever either dimension changes. */
+export function fitObject(object: SlideObject, patch: Partial<SlideObject>): SlideObject {
+  const next = { ...object, ...patch };
+  const type = next.publication?.type || next.block?.type;
+  if (next.aspectLocked && (type === "shape" || type === "customShape") && (patch.width !== undefined || patch.height !== undefined)) {
+    const width = Math.max(1, object.width), height = Math.max(1, object.height);
+    const widthScale = (patch.width ?? width) / width;
+    const heightScale = (patch.height ?? height) / height;
+    const requested = patch.width === undefined ? heightScale : patch.height === undefined ? widthScale : Math.abs(heightScale - 1) > Math.abs(widthScale - 1) ? heightScale : widthScale;
+    const scale = Math.max(1 / width, 1 / height, Math.min(32000 / width, 32000 / height, requested));
+    return { ...next, width: width * scale, height: height * scale };
+  }
+  return fitImage(object, patch);
+}
+
 export function fitImage(
   object: SlideObject,
   patch: Partial<SlideObject>,

@@ -19,8 +19,9 @@ async function main() {
   const port = 3187;
   const baseURL = `http://localhost:${port}`;
   process.env.MONGODB_URI = uri;
-  const { Zine, Presentation, Role, User, MediaAsset } = await import("../lib/models");
+  const { Zine, Presentation, Role, User, MediaAsset, CustomShape } = await import("../lib/models");
   await mongoose.connect(uri);
+  await CustomShape.create({ name: "Test triangle", slug: "test-triangle", viewBox: "0 0 100 100", paths: ["M50 0 L100 100 L0 100 Z"] });
   const role = await Role.create({ name: "Test administrator", slug: "administrator", kind: "management", permissions: allPermissions });
   const user = await User.create({ email: "presentation-test@example.invalid", name: "Presentation test", passwordHash: "unused", roleIds: [role._id], membershipStatus: "active", emailVerifiedAt: new Date() });
   const block = { ...createPublicationBlock("richText"), id: "intro", html: "<p>Converted publication</p>", x: 100, y: 100, clickAction: "page" as const, clickTarget: "appendix" };
@@ -97,6 +98,7 @@ async function main() {
     await page.getByRole("button", { name: "Rich text", exact: true }).click();
     await page.locator(".deck-object .ql-editor").fill("Native slide text");
     assert.equal(await page.locator(".deck-object .ql-editor").evaluate(element => getComputedStyle(element).fontSize), "32px");
+    await page.getByRole("tab", { name: "Effects", exact: true }).click();
     await page.getByLabel("Enable drop shadow", { exact: true }).check();
     await page.getByLabel("Shadow horizontal offset", { exact: true }).fill("0.5");
     await page.getByLabel("Shadow vertical offset", { exact: true }).fill("0.75");
@@ -140,6 +142,43 @@ async function main() {
     assert.equal(imported.deck.slides.length, 1);
     assert.equal(imported.deck.slides[0].objects[0].type, "image");
     assert.equal(imported.published, null);
+    for (const type of ["Shape", "Custom shape"]) {
+      await page.goto(`${baseURL}/admin/presentations/new`);
+      await page.getByRole("button", { name: type, exact: true }).click();
+      await page.getByLabel(type === "Shape" ? "Toolbar shape" : "Toolbar custom shape", { exact: true }).selectOption(type === "Shape" ? "ellipse" : "test-triangle");
+      assert.equal(await page.getByRole("tab", { name: "Block properties", exact: true }).getAttribute("aria-selected"), "true");
+      assert.equal(await page.getByLabel("Object width", { exact: true }).isVisible(), false);
+      await page.getByLabel("Shape width", { exact: true }).fill("20");
+      await page.getByLabel("Shape height", { exact: true }).fill("10");
+      await page.getByRole("button", { name: "Lock shape aspect ratio", exact: true }).click();
+      await page.getByLabel("Shape width", { exact: true }).fill("30");
+      assert.equal(await page.getByLabel("Shape height", { exact: true }).inputValue(), "15");
+      await page.getByRole("tab", { name: "Size and position", exact: true }).click();
+      await page.getByLabel("Object height", { exact: true }).fill("20");
+      assert.equal(await page.getByLabel("Shape width", { exact: true }).inputValue(), "40");
+      const handle = await page.getByRole("button", { name: "Resize object", exact: true }).boundingBox();
+      assert.ok(handle);
+      await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(handle.x + 25, handle.y + 35, { steps: 4 });
+      await page.mouse.up();
+      const width = Number(await page.getByLabel("Shape width", { exact: true }).inputValue());
+      const height = Number(await page.getByLabel("Shape height", { exact: true }).inputValue());
+      assert.ok(Math.abs(width / height - 2) < 0.001);
+      await page.getByLabel("Shape transparency", { exact: true }).fill("40");
+      await page.getByRole("button", { name: "Lock block", exact: true }).click();
+      assert.equal(await page.getByLabel("Shape width", { exact: true }).isDisabled(), true);
+      assert.equal(await page.getByRole("button", { name: "Unlock block", exact: true }).locator("svg.lucide-lock-open").count(), 1);
+      await page.getByRole("button", { name: "Unlock block", exact: true }).click();
+      await page.getByRole("button", { name: "Shape settings", exact: true }).click();
+      assert.equal(await page.getByRole("tab", { name: "Block properties", exact: true }).getAttribute("aria-selected"), "true");
+      await page.screenshot({ path: `backups/test-artifacts/${type === "Shape" ? "shape" : "custom-shape"}-toolbar.png`, fullPage: true });
+      await page.getByRole("button", { name: "Save", exact: true }).click();
+      await page.waitForURL("**/admin/presentations/*/edit");
+      const shapeDeck = await Presentation.findById(page.url().split("/").at(-2)!).lean<any>();
+      assert.equal(shapeDeck.deck.slides[0].objects[0].aspectLocked, true);
+      assert.match(shapeDeck.deck.slides[0].objects[0].block.color, /0\.6\)/);
+    }
     assert.deepEqual(errors, []);
     console.log("Browser checks passed: legacy URL, converted editor, draft snapshot, hidden-page navigation, access restrictions, deleted content, native text editing, PNG/PDF export, PDF import, create, publish and unpublish.");
   } catch (error) {

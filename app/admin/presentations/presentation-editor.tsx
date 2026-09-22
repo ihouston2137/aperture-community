@@ -2,6 +2,9 @@
 
 
 import Link from "next/link";
+import { Lock, LockOpen } from "lucide-react";
+import { BlockSettingsTabs, type BlockSettingsTab } from "./block-settings-tabs";
+import { ShapeToolbar } from "./shape-toolbar";
 import { PublicationFields } from "./publication-fields";
 import { PresentationSources } from "./slide-surface";
 import { emptyPublicationSources, type PublicationSources } from "@/components/publication-blocks";
@@ -35,7 +38,7 @@ import {
   lineFromPoints,
   type LinePoint,
   arrangeObjects,
-  fitImage,
+  fitObject,
   duplicateSlide,
   newSlideBlock,
   PRESENTATION_BLOCK_TYPES,
@@ -127,6 +130,7 @@ export function PresentationEditor({
   const [exporting, setExporting] = useState(false);
   const exportHost = useRef<HTMLDivElement>(null);
   function setSelected(id: string | null) {
+    if (id !== selected) setBlockTab("content");
     if (id !== selected) setEditing(null);
     setPrimary(id);
     setSelection(id ? groupMembers(id) : []);
@@ -142,6 +146,7 @@ export function PresentationEditor({
   const [media, setMedia] = useState(false);
   const [audioPicker, setAudioPicker] = useState<"deck" | "page" | null>(null);
   const [presentationSettings, setPresentationSettings] = useState(false);
+  const [blockTab, setBlockTab] = useState<BlockSettingsTab>("content");
   const [dropActive, setDropActive] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [presentIndex, setPresentIndex] = useState(0);
@@ -291,7 +296,7 @@ export function PresentationEditor({
             ? {
                 ...s,
                 objects: s.objects.map((o) =>
-                  o.id === selected ? fitImage(o, patch) : o,
+                  o.id === selected ? fitObject(o, patch) : o,
                 ),
               }
             : s,
@@ -455,7 +460,7 @@ export function PresentationEditor({
                     item.imageRatio &&
                     Math.abs(localY / item.height) >
                       Math.abs(localX / item.width)
-                    ? fitImage(item, { height: item.height + localY }).width
+                    ? fitObject(item, { height: item.height + localY }).width
                     : item.width + localX,
                 ),
               ),
@@ -481,7 +486,7 @@ export function PresentationEditor({
                         y: o.y + (patch.y! - item.y),
                       }
                     : o.id === item.id
-                      ? fitImage(o, patch)
+                      ? fitObject(o, patch)
                       : o,
                 ),
               }
@@ -696,7 +701,7 @@ export function PresentationEditor({
                 },
                 i: number,
               ) =>
-                fitImage(newSlideBlock("image", deckRef.current.defaults), {
+                fitObject(newSlideBlock("image", deckRef.current.defaults), {
                   mediaId: asset._id,
                   mediaUrl: asset.url,
                   imageRatio: asset.width / asset.height || 1,
@@ -1066,12 +1071,13 @@ export function PresentationEditor({
               )}
               <div ref={setToolbar} />
               {object && (selection.length > 1 ? <>
-                <button type="button" className="btn btn-sm" disabled={!canEdit || selection.every((id) => slide.objects.find((o) => o.id === id)?.locked)} onClick={() => lockSelection(true)}>Lock all</button>
-                <button type="button" className="btn btn-sm" disabled={!canEdit || !selection.some((id) => slide.objects.find((o) => o.id === id)?.locked)} onClick={() => lockSelection(false)}>Unlock all</button>
-              </> : <button type="button" className="btn btn-sm" disabled={!canEdit} onClick={() => lockSelection(!object.locked)}>
-                <IconView name={object.locked ? "LockOpen" : "Lock"} width={16} height={16} /> {object.locked ? "Unlock block" : "Lock block"}
+                <button type="button" className="btn btn-sm" disabled={!canEdit || selection.every((id) => slide.objects.find((o) => o.id === id)?.locked)} aria-label="Lock blocks" title="Lock blocks" onClick={() => lockSelection(true)}><Lock size={18} aria-hidden="true" /></button>
+                <button type="button" className="btn btn-sm" disabled={!canEdit || !selection.some((id) => slide.objects.find((o) => o.id === id)?.locked)} aria-label="Unlock blocks" title="Unlock blocks" onClick={() => lockSelection(false)}><LockOpen size={18} aria-hidden="true" /></button>
+              </> : <button type="button" className="btn btn-sm" disabled={!canEdit} aria-label={object.locked ? "Unlock block" : "Lock block"} title={object.locked ? "Unlock block" : "Lock block"} onClick={() => lockSelection(!object.locked)}>
+                {object.locked ? <LockOpen size={18} aria-hidden="true" /> : <Lock size={18} aria-hidden="true" />}
               </button>)}
 
+              {object && selection.length === 1 && <ShapeToolbar object={object} shapes={shapes} disabled={Boolean(locked(object)) || !canEdit} update={patchObject} onSettings={() => { setInspector(true); setPresentationSettings(false); setBlockTab("content"); }} />}
               {object?.type === "line" && selection.length === 1 && (
                 <fieldset className="deck-line-toolbar" aria-label="Line settings" disabled={Boolean(locked(object))}>
                   <SlideLineControls object={object} update={patchObject} />
@@ -1347,7 +1353,7 @@ export function PresentationEditor({
                                             ...s,
                                             objects: s.objects.map((o) =>
                                               o.id === item.id
-                                                ? fitImage(o, {
+                                                ? fitObject(o, {
                                                     imageRatio: ratio,
                                                   })
                                                 : o,
@@ -1630,12 +1636,14 @@ export function PresentationEditor({
                         : "Page settings"}
                   </h3>
                   {object ? (
+                    <>
+                    <BlockSettingsTabs value={blockTab} onChange={setBlockTab} />
                     <fieldset
                       className="deck-object-fields"
                       disabled={Boolean(locked(object))}
                     >
+                      <div role="tabpanel" id="block-panel-content" aria-labelledby="block-tab-content" hidden={blockTab !== "content"}>
                       {object.type === "line" && <SlideLineFields object={object} update={patchObject} />}
-                      <SlideShadowFields object={object} update={patchObject} />
                       {object.publication && <PublicationFields pages={deck.slides} block={object.publication} update={patch => patchObject({ publication: { ...object.publication!, ...patch } })} />}
                       {object.block && (
                         <SlideBlockFields
@@ -1735,43 +1743,6 @@ export function PresentationEditor({
                           />
                         </label>
                       </section>}
-                      {(["x", "y", "width", "height", "rotation"] as const).map(
-                        (key) => (
-                          <label className="field" key={key}>
-                            {key === "rotation"
-                              ? "Rotation (degrees)"
-                              : `${key === "x" ? "Horizontal position" : key === "y" ? "Vertical position" : key === "width" ? "Width" : "Height"} (rem)`}
-                            <input
-                              aria-label={`Object ${key}`}
-                              type="number"
-                              step={key === "rotation" ? 1 : 0.125}
-                              value={
-                                key === "rotation"
-                                  ? object[key]
-                                  : Math.round((object[key] / 16) * 10000) /
-                                    10000
-                              }
-                              onChange={(e) => {
-                                const n =
-                                  Number(e.target.value) *
-                                  (key === "rotation" ? 1 : 16);
-                                if (Number.isFinite(n))
-                                  patchObject({
-                                    [key]:
-                                      key === "rotation"
-                                        ? Math.max(-360, Math.min(360, n))
-                                        : key === "width" || key === "height"
-                                          ? Math.max(1, Math.min(32000, n))
-                                          : Math.max(
-                                              -32000,
-                                              Math.min(32000, n),
-                                            ),
-                                  });
-                              }}
-                            />
-                          </label>
-                        ),
-                      )}
                       {(object.type === "text" ||
                         object.block?.type === "shape" ||
                         object.block?.type === "customShape") && (
@@ -1881,7 +1852,51 @@ export function PresentationEditor({
                       >
                         Send to back
                       </button>
+                      </div>
+                      <div role="tabpanel" id="block-panel-position" aria-labelledby="block-tab-position" hidden={blockTab !== "position"}>
+                      {(["x", "y", "width", "height", "rotation"] as const).map(
+                        (key) => (
+                          <label className="field" key={key}>
+                            {key === "rotation"
+                              ? "Rotation (degrees)"
+                              : `${key === "x" ? "Horizontal position" : key === "y" ? "Vertical position" : key === "width" ? "Width" : "Height"} (rem)`}
+                            <input
+                              aria-label={`Object ${key}`}
+                              type="number"
+                              step={key === "rotation" ? 1 : 0.125}
+                              value={
+                                key === "rotation"
+                                  ? object[key]
+                                  : Math.round((object[key] / 16) * 10000) /
+                                    10000
+                              }
+                              onChange={(e) => {
+                                const n =
+                                  Number(e.target.value) *
+                                  (key === "rotation" ? 1 : 16);
+                                if (Number.isFinite(n))
+                                  patchObject({
+                                    [key]:
+                                      key === "rotation"
+                                        ? Math.max(-360, Math.min(360, n))
+                                        : key === "width" || key === "height"
+                                          ? Math.max(1, Math.min(32000, n))
+                                          : Math.max(
+                                              -32000,
+                                              Math.min(32000, n),
+                                            ),
+                                  });
+                              }}
+                            />
+                          </label>
+                        ),
+                      )}
+                      </div>
+                      <div role="tabpanel" id="block-panel-effects" aria-labelledby="block-tab-effects" hidden={blockTab !== "effects"}>
+                        <SlideShadowFields object={object} update={patchObject} />
+                      </div>
                     </fieldset>
+                    </>
                   ) : (
                     <>
                       <label className="field">

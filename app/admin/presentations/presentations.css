@@ -206,3 +206,21 @@
 .deck-object .rich-text-editor.is-bare, .deck-object .rte-editor-host, .deck-object .ql-container.ql-snow {width:100%;height:100%;border:0;border-radius:0;background:none;}
 .deck-object .ql-container, .deck-object .ql-editor {font:inherit;letter-spacing:inherit;text-align:inherit;text-transform:inherit;color:inherit;}
 .deck-object .ql-editor {min-height:0;height:100%;padding:0;overflow:visible;}
+
+/* Compact block inspector tabs and shape controls. */
+.deck-settings-tabs {display:flex;gap:.35rem;margin:.65rem 0;}
+.deck-settings-tabs [role=tab] {display:grid;place-items:center;flex:1;min-width:0;height:2.5rem;border:1px solid var(--admin-border);border-radius:.4rem;background:var(--admin-panel);color:var(--admin-text);cursor:pointer;}
+.deck-settings-tabs [aria-selected=true] {color:var(--admin-accent);border-color:var(--admin-accent);background:var(--admin-bg);}
+.deck-settings-tabs button:focus-visible {outline:2px solid var(--admin-accent);outline-offset:2px;}
+.deck-object-fields [hidden] {display:none!important;}
+.deck-shape-tools,.deck-shape-toolbar {display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;}
+.deck-shape-toolbar {margin:0;padding:0;border:0;min-width:0;}
+.deck-shape-toolbar label {display:flex;flex-direction:column;gap:.15rem;font-size:.7rem;}
+.deck-shape-toolbar input,.deck-shape-toolbar select {height:1.8rem;padding:.2rem .3rem;border:1px solid var(--admin-border);border-radius:.3rem;background:var(--admin-panel);color:var(--admin-text);font:inherit;}
+.deck-shape-toolbar select {max-width:9rem;}
+.deck-shape-toolbar input[type=number] {width:4.6rem;}
+.deck-shape-toolbar input[type=color] {width:2.6rem;padding:.15rem;}
+.deck-shape-alpha {display:flex;align-items:center;gap:.2rem;}
+.deck-shape-alpha input[type=range] {width:4.2rem;padding:0;}
+.deck-shape-alpha output {min-width:2.1rem;}
+.deck-shape-toolbar [aria-pressed=true] {border-color:var(--admin-accent);color:var(--admin-accent);}

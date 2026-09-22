@@ -2,12 +2,30 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { convertPublication } from "../lib/publication-migration";
 import { createPublicationPage, createPublicationBlock, createTable, emptyBackground } from "../lib/publication-layout";
-import { normalizeDeck, slideDimensions, newObject, newSlideBlock, normalizeSlideShadow, slideShadowFilter, duplicateSlide } from "../lib/presentation";
+import { normalizeDeck, slideDimensions, newObject, newSlideBlock, normalizeSlideShadow, slideShadowFilter, duplicateSlide, fitObject } from "../lib/presentation";
 import { renderPdfSlides, PdfImportError } from "../lib/pdf-presentation";
 import { jsPDF } from "jspdf";
 import { collectMediaRefs } from "../lib/media-usage";
 
 const source = () => ({ title: "Fixture", status: "draft", kind: "zine", presentationSize: { width: 1440, height: 1080 }, pages: [{ ...createPublicationPage(), id: "first" }] });
+
+test("shape aspect locks preserve proportions for fields, dragging, limits, and saving", () => {
+  for (const type of ["shape", "customShape"] as const) {
+    const object = { ...newSlideBlock(type), width: 400, height: 200, aspectLocked: true };
+    assert.equal(fitObject(object, { width: 600 }).height, 300);
+    assert.equal(fitObject(object, { height: 300 }).width, 600);
+    const dragged = fitObject(object, { width: 410, height: 300 });
+    assert.equal(dragged.width / dragged.height, 2);
+    const bounded = fitObject(object, { height: 32000 });
+    assert.equal(bounded.width, 32000);
+    assert.equal(bounded.height, 16000);
+    assert.equal(fitObject(object, { aspectLocked: false, width: 600 }).height, 200);
+    const { deck } = convertPublication(source());
+    deck.slides[0].objects = [object];
+    assert.equal(normalizeDeck(deck).slides[0].objects[0].aspectLocked, true);
+    assert.equal(duplicateSlide(deck.slides[0]).objects[0].aspectLocked, true);
+  }
+});
 
 test("drop shadows persist for every object type and survive slide duplication", () => {
   const original = source();
