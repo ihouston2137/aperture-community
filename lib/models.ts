@@ -1535,6 +1535,21 @@ FormSubmissionSchema.index(
 
 export const FormSubmission = model("FormSubmission", FormSubmissionSchema);
 
+// Individual test sittings; FormSubmission remains the attempt counter/best result.
+const TestAttemptSchema = FormSubmissionSchema.clone();
+TestAttemptSchema.clearIndexes();
+TestAttemptSchema.add({
+  sourceSubmissionId: { type: String, required: true },
+  gradingStatus: { type: String, enum: ["pending", "graded"], default: "graded" },
+  gradedAt: Date,
+  gradedBy: String,
+  userEmail: String,
+  resultSettings: Mixed,
+});
+TestAttemptSchema.index({ userId: 1, createdAt: -1 });
+TestAttemptSchema.index({ formId: 1, gradingStatus: 1 });
+export const TestAttempt = model("TestAttempt", TestAttemptSchema);
+
 export const ZINE_KINDS = ["zine", "presentation", "post"] as const;
 
 const ZineSchema = new Schema<any>(

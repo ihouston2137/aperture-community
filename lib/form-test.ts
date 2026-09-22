@@ -120,6 +120,7 @@ export const emptyAnswerKey: AnswerKey = {
  * is fastest" with different lists do not share a right answer.
  */
 export type TestVariant = {
+  instructorGraded?: boolean;
   id: string;
   block: FormBlock;
   key: AnswerKey;
@@ -134,6 +135,7 @@ export type TestQuestion = {
 };
 
 export type TestSettings = {
+  requireReview: boolean;
   questions: TestQuestion[];
   /**
    * What to do before starting, said at the top of the paper.
@@ -199,6 +201,7 @@ export type TestSettings = {
 };
 
 export const defaultTestSettings: TestSettings = {
+  requireReview: false,
   questions: [],
   instructions: "",
   attemptLimit: 0,
@@ -268,6 +271,7 @@ export function normalizeTestVariant(input: unknown): TestVariant | null {
   return {
     id: str(raw.id) || makeId("variant"),
     block,
+    instructorGraded: ["shortText", "longText"].includes(block.type) && raw.instructorGraded === true,
     key: normalizeAnswerKey(raw.key),
   };
 }
@@ -303,6 +307,7 @@ export function normalizeTestSettings(input: unknown): TestSettings {
   }
 
   return {
+    requireReview: raw.requireReview === true,
     questions,
     instructions: str(raw.instructions).slice(0, 4000),
     // Bounded: a limit of a thousand is not a limit, and a negative one is a
@@ -350,6 +355,11 @@ export type ServedQuestion = {
 
 /** What the submission sends back so the marking knows which paper it was. */
 export type SittingRef = { questionId: string; variantId: string };
+
+export function sittingNeedsReview(test: TestSettings, sitting: SittingRef[]): boolean {
+  return test.requireReview || sitting.some(ref => test.questions.find(q => q.id === ref.questionId)
+    ?.variants.some(v => v.id === ref.variantId && v.instructorGraded && ["shortText", "longText"].includes(v.block.type)));
+}
 
 function shuffled<T>(list: T[], random: () => number): T[] {
   const next = [...list];
@@ -476,6 +486,8 @@ function optionsAreRight(block: FormBlock, answer: unknown, key: AnswerKey): boo
 }
 
 export type MarkedQuestion = {
+  type?: FormBlockType;
+  awarded?: number;
   questionId: string;
   /** The question as it was asked, so a review reads back the paper given. */
   label: string;
@@ -540,13 +552,14 @@ export function gradeSitting(
     if (!question || !variant) continue;
 
     const { block, key } = variant;
-    if (!isGradable(block, key)) continue;
+    const instructorGraded = variant.instructorGraded && ["shortText", "longText"].includes(block.type);
+    if (!isGradable(block, key) && !test.requireReview && !instructorGraded) continue;
 
     const answer = answers[block.id];
-    const isRight =
+    const isRight = !instructorGraded && isGradable(block, key) && (
       keyKindFor(block.type) === "options"
         ? optionsAreRight(block, answer, key)
-        : textIsRight(answer, key);
+        : textIsRight(answer, key));
 
     available += question.points;
     marked += 1;
@@ -556,13 +569,15 @@ export function gradeSitting(
     }
 
     questions.push({
+      type: block.type,
+      awarded: isRight ? question.points : 0,
       questionId: question.id,
       label: block.label || block.name || "",
       points: question.points,
       correct: isRight,
       given: readable(answer),
       expected:
-        keyKindFor(block.type) === "options"
+        instructorGraded ? "Instructor assessment" : keyKindFor(block.type) === "options"
           ? block.type === "checkbox"
             ? key.correctOptions.includes("yes")
               ? "ticked"
@@ -616,4 +631,19 @@ export function gradeForTaker(grade: TestGrade, mode: TestResultMode): TestGrade
   }
 
   return grade;
+}
+
+export function reviewedGrade(grade: TestGrade, awards: unknown): TestGrade {
+  if (!Array.isArray(awards) || awards.length !== grade.questions.length) throw new Error("Enter points for every question.");
+  const questions = grade.questions.map((question, index) => {
+    const awarded = awards[index];
+    if (typeof awarded !== "number" || !Number.isFinite(awarded) || awarded < 0 || awarded > question.points)
+      throw new Error(`Points for question ${index + 1} must be between 0 and ${question.points}.`);
+    return { ...question, awarded, correct: awarded === question.points };
+  });
+  const scored = questions.reduce((sum, question) => sum + question.awarded, 0);
+  const available = questions.reduce((sum, question) => sum + question.points, 0);
+  const percent = available ? Math.round(scored / available * 100) : 0;
+  return { ...grade, questions, scored, available, percent, right: questions.filter(q => q.correct).length,
+    marked: questions.length, passed: grade.passMark > 0 ? percent >= grade.passMark : null };
 }

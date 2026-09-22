@@ -8,10 +8,12 @@ import { collectFormFields, normalizeFormLayout, normalizeFormSettings } from "@
 import {
   gradeForTaker,
   gradeSitting,
+  sittingNeedsReview,
   normalizeTestSettings,
   type SittingRef,
 } from "@/lib/form-test";
-import { FormDefinition, FormSubmission, User } from "@/lib/models";
+import { FormDefinition, FormSubmission, TestAttempt, User } from "@/lib/models";
+import { REVIEW_MESSAGE } from "@/lib/test-results";
 
 const MAX_VALUE_LENGTH = 20_000;
 
@@ -159,6 +161,7 @@ export async function POST(request: NextRequest) {
    * afterwards, and a grade that silently changes when somebody fixes a typo
    * in an answer is not a record of anything.
    */
+  const needsReview = isTest && sittingNeedsReview(test, sitting);
   const grade = isTest
     ? gradeSitting(
         test,
@@ -199,12 +202,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const better =
+    const better = !needsReview && (
       !previous?.grade ||
-      (grade?.percent ?? 0) >= (previous.grade.percent ?? 0);
+      (grade?.percent ?? 0) >= (previous.grade.percent ?? 0));
     keptThis = better;
 
-    await FormSubmission.findOneAndUpdate(
+    if (previous?.grade && !(await TestAttempt.exists({ sourceSubmissionId: String(previous._id) }))) {
+      const { _id, ...snapshot } = previous;
+      await TestAttempt.create({ ...snapshot, sourceSubmissionId: String(_id), gradingStatus: "graded" });
+    }
+    const summary = await FormSubmission.findOneAndUpdate(
       { formId: String(form._id), userId: taker.id },
       {
         $set: {
@@ -218,8 +225,14 @@ export async function POST(request: NextRequest) {
             : {}),
         },
       },
-      { upsert: true }
+      { upsert: true, new: true }
     );
+    await TestAttempt.create({
+      sourceSubmissionId: String(summary!._id), formId: String(form._id), formTitle: form.title,
+      userId: taker.id, userName: taker.name, userEmail: taker.email, attempts,
+      data, fields, grade, sitting, gradingStatus: needsReview ? "pending" : "graded",
+      resultSettings: { resultMode: test.resultMode, emailTaker: test.emailTaker, resultEmails: test.resultEmails },
+    });
   } else {
     await FormSubmission.create({
       formId: String(form._id),
@@ -239,7 +252,7 @@ export async function POST(request: NextRequest) {
    * result of the send is not reported back to the page either — the candidate
    * has no use for whether an administrator's inbox accepted it.
    */
-  if (isTest && grade && taker) {
+  if (isTest && grade && taker && !needsReview) {
     const posted = await sendTestResultEmail({
       testTitle: form.title ?? "",
       takerName: taker.name,
@@ -273,15 +286,16 @@ export async function POST(request: NextRequest) {
     formTitle: form.title ?? "",
     fields,
     extraRecipients: settings.notifyEmails,
-    grade,
+    grade: isTest && needsReview ? null : grade,
   });
 
   return Response.json({
     ok: true,
-    message: settings.successMessage,
+    pendingReview: isTest && needsReview,
+    message: isTest && needsReview ? REVIEW_MESSAGE : settings.successMessage,
     notified: notification.sent,
     // Shaped by the test's own setting: the whole marking, the percentage
     // alone, or nothing at all.
-    grade: grade ? gradeForTaker(grade, test.resultMode) : undefined,
+    grade: grade && !needsReview ? gradeForTaker(grade, test.resultMode) : undefined,
   });
 }

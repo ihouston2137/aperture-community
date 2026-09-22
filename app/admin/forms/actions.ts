@@ -93,7 +93,7 @@ export async function saveTestAction(formData: FormData) {
 
   const id = String(formData.get("id") ?? "");
   const title = String(formData.get("title") ?? "").trim();
-  if (!title) return;
+  if (!title) return { error: "Enter a title before saving." };
 
   const slug = await uniqueSlug(
     FormDefinition,
@@ -129,7 +129,9 @@ export async function saveTestAction(formData: FormData) {
   revalidatePath("/admin/forms");
   // A test lives at its own address, so that is the one to rebuild.
   revalidatePath(`/test/${slug}`);
-  redirect(`/admin/forms/${formId}/test`);
+  revalidatePath(`/admin/forms/${formId}/test`);
+  if (!id) redirect(`/admin/forms/${formId}/test?saved=1`);
+  return { saved: true };
 }
 
 export async function saveSubmissionLayoutAction(formData: FormData) {

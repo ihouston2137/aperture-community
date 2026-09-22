@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useActionState, useState } from "react";
+import { useSearchParams } from "next/navigation";
 
 import { MediaField } from "@/app/admin/media/media-picker";
 import { AdminHeader, Panel } from "@/components/admin-ui";
@@ -123,11 +124,24 @@ export function TestBuilder({
    */
   emailReady: boolean;
 }) {
+  const tabs = ["What it says", "How it is given", "Who is sent the result", "How it looks", "Questions", "Answer key"];
+  const [tab, setTab] = useState("What it says");
   const [title, setTitle] = useState(initial.title);
   const [slug, setSlug] = useState(initial.slug);
   const [status, setStatus] = useState(initial.status);
   const [settings, setSettings] = useState<FormSettings>(initial.settings);
   const [test, setTest] = useState<TestSettings>(initial.test);
+  const searchParams = useSearchParams();
+  const snapshot = JSON.stringify({ title, slug, status, settings, test });
+  const [saveState, saveAction, saving] = useActionState(
+    async (_previous: { snapshot: string; error: string }, formData: FormData) => {
+      const result = await saveTestAction(formData);
+      return result?.saved
+        ? { snapshot: String(formData.get("editorSnapshot")), error: "" }
+        : { snapshot: "", error: result?.error || "The test could not be saved." };
+    },
+    { snapshot: searchParams.get("saved") === "1" ? snapshot : "", error: "" },
+  );
 
   /*
    * The address box, held as typed and committed as it is typed.
@@ -190,12 +204,13 @@ export function TestBuilder({
 
   const askable = test.questions.length;
   const ungraded = test.questions.filter((question) =>
-    question.variants.every((variant) => !isGradable(variant.block, variant.key))
+    question.variants.every((variant) => !variant.instructorGraded && !isGradable(variant.block, variant.key))
   ).length;
 
   return (
     <>
-      <form action={saveTestAction} id="test-form">
+      <form action={saveAction} id="test-form">
+        <input type="hidden" name="editorSnapshot" value={snapshot} />
         {initial._id ? <input type="hidden" name="id" value={initial._id} /> : null}
         <input type="hidden" name="title" value={title} />
         <input type="hidden" name="slug" value={slug} />
@@ -208,9 +223,14 @@ export function TestBuilder({
         title={initial._id ? "Edit test" : "New test"}
         subtitle="Questions are asked one to a row, in this order."
         actions={
-          <button type="submit" form="test-form" className="btn btn-primary">
+          <>
+          <span role="status" aria-live="polite" className="help-text">
+            {saving ? "Saving…" : saveState.error || (saveState.snapshot === snapshot ? "Saved" : "")}
+          </span>
+          <button type="submit" form="test-form" className="btn btn-primary" disabled={saving}>
             Save
           </button>
+          </>
         }
       />
 
@@ -247,7 +267,15 @@ export function TestBuilder({
         </div>
       </Panel>
 
-      <Panel title="What it says">
+      <div role="tablist" aria-label="Test settings" style={{ display: "flex", flexWrap: "wrap", gap: ".4rem", marginBottom: "1rem" }}>
+        {tabs.map((label, index) => <button key={label} type="button" role="tab" tabIndex={tab === label ? 0 : -1} id={`test-tab-${label.replaceAll(" ", "-")}`} aria-controls={`test-panel-${label.replaceAll(" ", "-")}`} aria-selected={tab === label} className={`btn${tab === label ? " btn-primary" : ""}`} onClick={() => setTab(label)} onKeyDown={event => {
+          const next = event.key === "ArrowRight" ? (index + 1) % tabs.length : event.key === "ArrowLeft" ? (index + tabs.length - 1) % tabs.length : event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : -1;
+          if (next < 0) return;
+          event.preventDefault(); setTab(tabs[next]);
+          document.getElementById(`test-tab-${tabs[next].replaceAll(" ", "-")}`)?.focus();
+        }}>{label}</button>)}
+      </div>
+      <div role="tabpanel" id="test-panel-What-it-says" aria-labelledby="test-tab-What-it-says" hidden={tab !== "What it says"}><Panel title="What it says">
         <div className="field">
           <label htmlFor="test-instructions">Instructions</label>
           <textarea
@@ -262,9 +290,11 @@ export function TestBuilder({
             so a list of rules reads as a list.
           </span>
         </div>
-      </Panel>
+      </Panel></div>
 
-      <Panel title="How it is given">
+      <div role="tabpanel" id="test-panel-How-it-is-given" aria-labelledby="test-tab-How-it-is-given" hidden={tab !== "How it is given"}><Panel title="How it is given">
+        <label className="checkbox-row"><input type="checkbox" checked={test.requireReview} onChange={event => patchTest({ requireReview: event.target.checked })} />Hold results for instructor review</label>
+        {test.requireReview && <p className="help-text">Results will be shared on your dashboard after it is graded. Instructors review points and release results from Test results. Result emails are sent after grading.</p>}
         <div className="inspector-grid">
           <div className="field">
             <label htmlFor="test-ask">Questions asked</label>
@@ -325,7 +355,7 @@ export function TestBuilder({
           <span className="help-text">
             {test.attemptLimit === 0
               ? "Zero is as often as they like."
-              : `Their best result is the one kept, whichever of the ${test.attemptLimit} attempts it came from.`}{" "}
+              : `Up to ${test.attemptLimit} attempts. Each attempt is recorded.`}{" "}
             Counted per person, which is why a test asks somebody to sign in.
           </span>
         </div>
@@ -375,9 +405,9 @@ export function TestBuilder({
           variant is picked for each question drawn, then the order is shuffled.
           Using none of them gives the same paper every time.
         </p>
-      </Panel>
+      </Panel></div>
 
-      <Panel title="Who is sent the result">
+      <div role="tabpanel" id="test-panel-Who-is-sent-the-result" aria-labelledby="test-tab-Who-is-sent-the-result" hidden={tab !== "Who is sent the result"}><Panel title="Who is sent the result">
         {!emailReady ? (
           <p className="admin-notice is-error">
             The site is not sending email, so nothing here will be posted. Turn
@@ -397,8 +427,8 @@ export function TestBuilder({
             }
           />
           <span className="help-text">
-            Separated by commas. Each is posted the marked paper as soon as a
-            test is handed in &mdash; who took it, what they scored, and which
+            Separated by commas. Each is posted the marked paper after grading
+            &mdash; who took it, what they scored, and which
             questions they got wrong. This is the test&rsquo;s own list, not
             the form-notification one, and the site setting for notifying on
             form submissions does not switch it off.
@@ -426,9 +456,9 @@ export function TestBuilder({
               ].toLowerCase()}.`}{" "}
           Sent to the address on their account.
         </span>
-      </Panel>
+      </Panel></div>
 
-      <Panel title="How it looks">
+      <div role="tabpanel" id="test-panel-How-it-looks" aria-labelledby="test-tab-How-it-looks" hidden={tab !== "How it looks"}><Panel title="How it looks">
         <p className="help-text" style={{ marginBottom: "0.75rem" }}>
           The first two dress the top of the page; the rest dress the paper and
           the fields on it, exactly as they do on a form. Typed-in answers are
@@ -475,10 +505,10 @@ export function TestBuilder({
             </details>
           );
         })}
-      </Panel>
+      </Panel></div>
 
-      <Panel title={`Questions (${askable})`}>
-        {ungraded > 0 ? (
+      <div role="tabpanel" id="test-panel-Questions" aria-labelledby="test-tab-Questions" hidden={tab !== "Questions"}><Panel title={`Questions (${askable})`}>
+        {ungraded > 0 && !test.requireReview ? (
           <p className="help-text">
             {ungraded} {ungraded === 1 ? "question has" : "questions have"} no
             answer key and {ungraded === 1 ? "counts" : "count"} towards
@@ -526,7 +556,20 @@ export function TestBuilder({
             )
           )}
         </div>
-      </Panel>
+      </Panel></div>
+      <div role="tabpanel" id="test-panel-Answer-key" aria-labelledby="test-tab-Answer-key" hidden={tab !== "Answer key"}>
+        <Panel title="Answer key">
+          {test.questions.length === 0 ? <p>No questions yet.</p> : <table className="admin-table">
+            <thead><tr><th>Question</th><th>Type</th><th>Points</th><th>Answer key</th></tr></thead>
+            <tbody>{test.questions.flatMap((question, index) => question.variants.map((variant, vi) => <tr key={variant.id}>
+              <th scope="row">{index + 1}. {variant.block.label || "Untitled question"}{question.variants.length > 1 ? ` (variant ${vi + 1})` : ""}</th>
+              <td>{TYPE_LABELS[variant.block.type] || variant.block.type}</td><td>{question.points}</td>
+              <td>{variant.instructorGraded ? "Instructor graded" : !isGradable(variant.block, variant.key) ? "No automatic answer key" : variant.block.type === "checkbox" ? (variant.key.correctOptions.includes("yes") ? "Ticked" : "Not ticked") : keyKindFor(variant.block.type) === "options" ? variant.key.correctOptions.join(", ") : <>{variant.key.acceptedAnswers.join(" / ")}<span className="help-text">{variant.key.matchMode === "contains" ? "Contains" : "Exact match"}{variant.key.caseSensitive ? "; case sensitive" : "; ignores case"}</span></>}</td>
+            </tr>))}</tbody>
+          </table>}
+          <button type="button" className="btn" onClick={() => setTab("Questions")}>Edit questions and answers</button>
+        </Panel>
+      </div>
     </>
   );
 }
@@ -683,6 +726,7 @@ function VariantCard({
                  * other would leave a key that marks nothing correctly.
                  */
                 onPatch({
+                  instructorGraded: false,
                   block: { ...block, type: event.target.value as FormBlockType },
                   key: {
                     correctOptions: [],
@@ -739,22 +783,23 @@ function VariantCard({
             </div>
 
             <div className="field">
-              <label>Width</label>
+              <label htmlFor={`image-width-${variant.id}`}>Maximum image width (pixels)</label>
               <input
+                id={`image-width-${variant.id}`}
                 type="number"
                 min={0}
-                max={80}
+                max={8000}
                 step={1}
-                value={block.width ?? 0}
+                value={block.imageMaxWidth ?? (block.width ?? 0) * 16}
                 onChange={(event) =>
                   patchBlock({
-                    width: Math.max(0, Math.min(80, Number(event.target.value) || 0)),
+                    imageMaxWidth: Math.max(0, Math.min(8000, Math.round(Number(event.target.value) || 0))),
                   })
                 }
               />
               <span className="help-text">
-                In rem. 0 fills the width it is given. Never wider than that
-                whatever is set here, and it keeps its shape either way.
+                0 uses the available width. The image keeps its proportions and
+                shrinks to fit smaller screens.
               </span>
             </div>
           </div>
@@ -815,6 +860,10 @@ function VariantCard({
         ) : null}
 
         <h4 className="inspector-title">The answer</h4>
+        {["shortText", "longText"].includes(block.type) && <>
+          <label className="checkbox-row"><input type="checkbox" checked={!!variant.instructorGraded} onChange={event => onPatch({ instructorGraded: event.target.checked })} />Instructor graded</label>
+          {variant.instructorGraded && <p className="help-text">No accepted answers are needed. Attempts containing this question are held for instructor grading before results are released.</p>}
+        </>}
 
         {kind === "none" ? (
           <p className="help-text">
@@ -873,7 +922,7 @@ function VariantCard({
           </>
         ) : null}
 
-        {kind === "text" ? (
+        {kind === "text" && !variant.instructorGraded ? (
           <>
             <div className="field">
               <label>Accepted answers (one per line)</label>

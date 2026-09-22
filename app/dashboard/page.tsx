@@ -9,6 +9,7 @@ import { memberMetadataTasks } from "@/lib/metadata";
 import { fullName } from "@/lib/members";
 import { User } from "@/lib/models";
 import { getSession } from "@/lib/session";
+import { testResults } from "@/lib/test-results";
 
 import { AccountCard } from "./account-card";
 
@@ -60,6 +61,7 @@ export default async function DashboardPage() {
   // What the community has asked of them, and how much of it is still owed.
   const tasks = await memberMetadataTasks(session.userId, roleIds);
   const outstanding = tasks.reduce((total, task) => total + task.outstanding, 0);
+  const results = await testResults({ userId: session.userId });
 
   return (
     <SiteChrome>
@@ -91,6 +93,15 @@ export default async function DashboardPage() {
           </section>
         ) : null}
 
+        {results.length > 0 && <section className="member-card" style={{ marginBottom: "1.25rem", overflowX: "auto" }}>
+          <h2 className="member-card-title">Test results</h2>
+          <table className="admin-table"><thead><tr><th>Test</th><th>Taken</th><th>Result</th></tr></thead>
+            <tbody>{results.map(result => <tr key={String(result._id)}><th scope="row">{result.formTitle || "Untitled test"}</th>
+              <td>{new Date(result.createdAt).toLocaleDateString()}</td>
+              <td>{result.gradingStatus === "pending" ? "Pending" : `${result.grade?.percent ?? 0}% — ${result.grade?.passed === true ? "Pass" : result.grade?.passed === false ? "Fail" : "No pass mark set"}`}</td>
+            </tr>)}</tbody>
+          </table>
+        </section>}
         <AccountCard
           member={{
             firstName: record.firstName ?? "",

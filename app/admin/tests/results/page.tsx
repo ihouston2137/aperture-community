@@ -3,7 +3,9 @@ import Link from "next/link";
 import { AdminHeader, EmptyState } from "@/components/admin-ui";
 import { requirePermission } from "@/lib/access";
 import { connectDB } from "@/lib/db";
-import { FormDefinition, FormSubmission } from "@/lib/models";
+import { FormDefinition } from "@/lib/models";
+
+import { testResults } from "@/lib/test-results";
 
 export const metadata = { title: "Test results" };
 
@@ -23,39 +25,27 @@ export default async function TestResultsPage() {
   await requirePermission("tests.results");
   await connectDB();
 
-  const [tests, grouped] = await Promise.all([
+  const [tests, results] = await Promise.all([
     FormDefinition.find({ kind: "test" })
       .select("title status")
       .sort({ title: 1 })
       .lean<any[]>(),
-    FormSubmission.aggregate([
-      { $match: { grade: { $exists: true } } },
-      {
-        $group: {
-          _id: "$formId",
-          takers: { $sum: 1 },
-          attempts: { $sum: { $ifNull: ["$attempts", 1] } },
-          average: { $avg: "$grade.percent" },
-          latest: { $max: "$createdAt" },
-        },
-      },
-    ]),
+    testResults(),
   ]);
 
-  const counts = new Map<string, any>(
-    grouped.map((entry: any) => [String(entry._id), entry])
-  );
-
   const cards = tests.map((test) => {
-    const found = counts.get(String(test._id));
+    const rows = results.filter(row => row.formId === String(test._id));
+    const graded = rows.filter(row => row.gradingStatus !== "pending");
     return {
       testId: String(test._id),
       title: test.title ?? "",
       status: test.status ?? "draft",
-      takers: found?.takers ?? 0,
-      attempts: found?.attempts ?? 0,
-      average: found?.average ? Math.round(found.average) : 0,
-      latest: found?.latest ? new Date(found.latest).toISOString() : "",
+      takers: rows.length,
+      attempts: rows.length,
+      average: graded.length ? Math.round(graded.reduce((sum, row) => sum + row.grade.percent, 0) / graded.length) : 0,
+      pending: rows.length - graded.length,
+      graded: graded.length,
+      latest: rows[0] ? new Date(rows[0].createdAt).toISOString() : "",
     };
   });
 
@@ -66,7 +56,7 @@ export default async function TestResultsPage() {
     <>
       <AdminHeader
         title="Test results"
-        subtitle="One card per test. Each person's best result is the one kept."
+        subtitle="Review pending attempts and release grades to participants."
       />
 
       {cards.length === 0 ? (
@@ -85,18 +75,19 @@ export default async function TestResultsPage() {
               >
                 <span className="inbox-card-title">
                   {card.title}
+                  {card.pending > 0 && <span className="badge">{card.pending} pending</span>}
                   {card.status !== "published" ? (
                     <span className="badge">{card.status}</span>
                   ) : null}
                 </span>
 
                 <span className="inbox-card-figure">
-                  <strong>{card.takers === 0 ? "—" : `${card.average}%`}</strong>
+                  <strong>{card.graded === 0 ? "—" : `${card.average}%`}</strong>
                   <span className="help-text">
                     {card.takers === 0
                       ? "nobody has taken it yet"
-                      : `average of ${card.takers} ${
-                          card.takers === 1 ? "person" : "people"
+                      : `average of ${card.graded} graded ${
+                          card.graded === 1 ? "attempt" : "attempts"
                         }`}
                   </span>
                 </span>

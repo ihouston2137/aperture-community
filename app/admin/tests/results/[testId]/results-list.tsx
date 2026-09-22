@@ -1,10 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { ModalPortal } from "@/components/modal-portal";
 
 export type ResultRecord = {
+  gradingStatus: "pending" | "graded";
+  version: string;
+  legacy: boolean;
   _id: string;
   /** `Last, First`, which is what the list is ordered and read by. */
   name: string;
@@ -23,6 +27,8 @@ export type ResultRecord = {
     label: string;
     points: number;
     correct: boolean;
+    type?: string;
+    awarded?: number;
     given?: string;
     expected?: string;
   }[];
@@ -44,6 +50,7 @@ export function TestResultsList({
   /** Whoever may read results may also remove one — see the note on `remove`. */
   canDelete: boolean;
 }) {
+  const router = useRouter();
   const [rows, setRows] = useState(records);
   const [openId, setOpenId] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<string | null>(null);
@@ -60,7 +67,7 @@ export function TestResultsList({
    */
   async function remove(id: string) {
     setError("");
-    const response = await fetch(`/api/admin/forms/submissions/${id}`, {
+    const response = await fetch(rows.find(row => row._id === id)?.legacy ? `/api/admin/forms/submissions/${id}` : `/api/admin/tests/results/${id}`, {
       method: "DELETE",
     });
 
@@ -73,6 +80,7 @@ export function TestResultsList({
     setRows((current) => current.filter((row) => row._id !== id));
     setConfirming(null);
     setOpenId((current) => (current === id ? null : current));
+    router.refresh();
   }
 
   useEffect(() => {
@@ -129,14 +137,15 @@ export function TestResultsList({
                 </th>
 
                 <td className="is-figure">
-                  <strong>{row.percent}%</strong>
+                  <strong>{row.gradingStatus === "pending" ? "Pending" : `${row.percent}%`}</strong>
+                  {row.gradingStatus !== "pending" &&
                   <span className="help-text">
                     {row.right} of {row.marked}
-                  </span>
+                  </span>}
                 </td>
 
                 <td>
-                  {row.passed === null ? (
+                  {row.gradingStatus === "pending" ? <button className="btn btn-sm" onClick={() => setOpenId(row._id)}>Grade</button> : row.passed === null ? (
                     <span className="help-text">not judged</span>
                   ) : (
                     <span
@@ -196,7 +205,9 @@ export function TestResultsList({
 
       {open ? (
         <ResultDialog
+          key={open._id}
           record={open}
+          onGraded={record => { setRows(current => current.map(row => row._id === record._id ? record : row)); router.refresh(); }}
           onClose={() => setOpenId(null)}
           onDelete={canDelete ? () => remove(open._id) : undefined}
         />
@@ -208,15 +219,31 @@ export function TestResultsList({
 /** One person's paper, marked. */
 function ResultDialog({
   record,
+  onGraded,
   onClose,
   onDelete,
 }: {
   record: ResultRecord;
+  onGraded: (record: ResultRecord) => void;
   onClose: () => void;
   /** Absent where the reader may not remove one. */
   onDelete?: () => void;
 }) {
   const [confirming, setConfirming] = useState(false);
+  const [awards, setAwards] = useState(record.questions.map(q => String(q.awarded ?? (q.correct ? q.points : 0))));
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const pending = record.gradingStatus === "pending";
+  async function release() {
+    setSaving(true); setError("");
+    try {
+      const response = await fetch(`/api/admin/tests/results/${record._id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ version: record.version, awards: awards.map(value => value.trim() === "" ? null : Number(value)) }) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Could not release the grade.");
+      onGraded({ ...record, ...result.grade, version: result.version, gradingStatus: "graded" });
+    } catch (error) { setError((error as Error).message); }
+    finally { setSaving(false); }
+  }
 
   return (
     <ModalPortal>
@@ -241,14 +268,17 @@ function ResultDialog({
           </div>
 
           <div className="style-modal-body">
+            {error && <p role="alert" className="admin-notice is-error">{error}</p>}
+            {pending && <p>Review the answers and points below, then release the grade to the test taker&rsquo;s dashboard.</p>}
             <p className="test-result-figure">
-              <strong>{record.percent}%</strong>
+              <strong>{pending ? "Pending instructor review" : `${record.percent}%`}</strong>
               <span>
+                {pending ? "Suggested automatic score: " : ""}
                 {record.scored} of {record.available} points &middot; {record.right}{" "}
                 of {record.marked} questions
               </span>
 
-              {record.passed !== null ? (
+              {!pending && record.passed !== null ? (
                 <span
                   className="test-result-verdict"
                   data-passed={record.passed ? "true" : "false"}
@@ -268,7 +298,7 @@ function ResultDialog({
               </p>
             ) : (
               <ul className="test-result-list">
-                {record.questions.map((question) => (
+                {record.questions.map((question, index) => (
                   <li
                     key={question.questionId}
                     className={question.correct ? "is-right" : "is-wrong"}
@@ -278,14 +308,18 @@ function ResultDialog({
                     </span>
                     <span className="test-result-question">
                       <strong>{question.label}</strong>
+                      <span className="help-text">{question.type || "Question"} · {pending ? question.points : `${question.awarded ?? (question.correct ? question.points : 0)} / ${question.points}`} points</span>
                       <span className="help-text">
                         Answered: {question.given || "nothing"}
                       </span>
-                      {question.correct ? null : (
+                      {question.correct && !pending ? null : (
                         <span className="help-text">
-                          Correct: {question.expected}
+                          Answer key: {question.expected || "Instructor assessment"}
                         </span>
                       )}
+                      {pending && <label className="field">Points awarded
+                        <input aria-label={`Points for question ${index + 1}`} type="number" min={0} max={question.points} step="any" value={awards[index]} disabled={saving} onChange={event => setAwards(values => values.map((value, i) => i === index ? event.target.value : value))} />
+                      </label>}
                     </span>
                   </li>
                 ))}
@@ -294,6 +328,7 @@ function ResultDialog({
           </div>
 
           <div className="style-modal-footer">
+            {pending && <button type="button" className="btn btn-primary" disabled={saving} onClick={release}>{saving ? "Releasing…" : "Release grade"}</button>}
             {onDelete ? (
               confirming ? (
                 <>
@@ -327,8 +362,7 @@ function ResultDialog({
                 somebody who used up their attempts is let back in. */}
             {onDelete && !confirming ? (
               <span className="help-text" style={{ maxWidth: "20rem" }}>
-                Deleting this returns them to no attempts, so they may take the
-                test again.
+                Deleting removes this result from the test taker&rsquo;s dashboard.
               </span>
             ) : null}
 

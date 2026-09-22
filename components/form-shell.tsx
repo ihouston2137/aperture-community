@@ -290,7 +290,9 @@ export function FormFieldView({
       src={protectedMediaUrl(block.mediaUrl)}
       alt={block.alt ?? ""}
       className="form-question-image"
-      style={block.width ? { width: `${block.width}rem` } : undefined}
+      style={block.imageMaxWidth !== undefined
+        ? { maxWidth: block.imageMaxWidth > 0 ? `min(100%, ${block.imageMaxWidth}px)` : "100%" }
+        : block.width ? { width: `${block.width}rem` } : undefined}
     />
   ) : null;
 
@@ -618,9 +620,9 @@ export function FormShell({
       }
 
       setStatus("sent");
-      setMessage(settings.successMessage);
+      setMessage(result.message || settings.successMessage);
       setGrade((result.grade as TestGrade | undefined) ?? null);
-      if (settings.redirectUrl) window.location.href = settings.redirectUrl;
+      if (settings.redirectUrl && !result.pendingReview) window.location.href = settings.redirectUrl;
     } catch {
       setStatus("error");
       setMessage("Something went wrong. Please try again.");

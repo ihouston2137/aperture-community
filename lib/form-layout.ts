@@ -71,6 +71,8 @@ export type FormBlock = {
   alt?: string;
   caption?: string;
   width?: number;
+  /** Maximum question-image width in CSS pixels; zero uses the available width. */
+  imageMaxWidth?: number;
   radius?: number;
   controls?: boolean;
 
@@ -293,6 +295,8 @@ export function normalizeFormBlock(input: unknown): FormBlock | null {
       block.mediaUrl = sanitizeMediaPath(str(raw.mediaUrl));
       block.alt = str(raw.alt);
       block.width = num(raw.width, 0);
+
+      if (raw.imageMaxWidth !== undefined) block.imageMaxWidth = Math.max(0, Math.min(8000, Math.round(num(raw.imageMaxWidth, 0))));
 
       if (type === "select" || type === "radio" || type === "checkboxGroup") {
         block.options = Array.isArray(raw.options)

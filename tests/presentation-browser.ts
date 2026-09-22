@@ -235,6 +235,39 @@ async function main() {
     assert.equal(grouped[2].groupId, grouped[3].groupId);
     assert.notEqual(grouped[0].groupId, grouped[2].groupId);
     assert.equal(grouped[2].x, grouped[0].x + 20);
+    await page.locator(".deck-object").last().click({ button: "right" });
+    await page.getByRole("menuitem", { name: "Copy blocks", exact: true }).click();
+    await page.getByRole("button", { name: "New page", exact: true }).click();
+    await page.locator(".deck-surface.is-editing").click({ button: "right", position: { x: 5, y: 5 } });
+    await page.getByRole("menuitem", { name: "Paste blocks", exact: true }).click();
+    assert.equal(await page.locator(".deck-object").count(), 2);
+    assert.equal(await page.locator(".deck-object.selected").count(), 2);
+    // Toolbar focus leaves text editing, allowing native clipboard shortcuts.
+    await page.getByRole("button", { name: "Copy blocks", exact: true }).focus();
+    await page.keyboard.press("Control+c");
+    await page.keyboard.press("Control+v");
+    await page.waitForFunction(() => document.querySelectorAll(".deck-object").length === 4);
+    await page.getByRole("button", { name: "Undo", exact: true }).click();
+    assert.equal(await page.locator(".deck-object").count(), 2);
+    await page.getByRole("button", { name: "Redo", exact: true }).click();
+    assert.equal(await page.locator(".deck-object").count(), 4);
+    // An external text paste must not reuse the stored block clipboard.
+    await page.evaluate(() => {
+      const data = new DataTransfer();
+      data.setData("text/plain", "External clipboard text");
+      document.body.dispatchEvent(new ClipboardEvent("paste", { bubbles: true, cancelable: true, clipboardData: data }));
+    });
+    assert.equal(await page.locator(".deck-object").count(), 5);
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+    await page.getByRole("status").filter({ hasText: "Presentation saved." }).waitFor();
+    const pastedDeck = (await Presentation.findById(page.url().split("/").at(-2)!).lean<any>()).deck;
+    const pasted = pastedDeck.slides[1].objects;
+    assert.equal(pasted[0].groupId, pasted[1].groupId);
+    assert.notEqual(pasted[0].groupId, grouped[2].groupId);
+    assert.notEqual(pasted[0].groupId, pasted[2].groupId);
+    assert.equal(pasted[0].x, grouped[2].x);
+    assert.equal(pasted[2].x, pasted[0].x + 20);
+    assert.match(pasted[4].html, /External clipboard text/);
     assert.deepEqual(errors, []);
     console.log("Browser checks passed: legacy URL, converted editor, draft snapshot, hidden-page navigation, access restrictions, deleted content, native text editing, PNG/PDF export, PDF import, create, publish and unpublish.");
   } catch (error) {

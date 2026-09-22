@@ -129,6 +129,7 @@ export function PresentationEditor({
   const draggedLayer = useRef<string | null>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
   const [styleClipboard, setStyleClipboard] = useState<SlideObject | null>(null);
+  const [blockClipboard, setBlockClipboard] = useState<{ objects: SlideObject[]; token: string; slideId: string; pastes: number } | null>(null);
   const [layoutId, setLayoutId] = useState("");
   const [editingLayout, setEditingLayout] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -269,13 +270,35 @@ export function PresentationEditor({
     : "Duplicate block";
   function duplicateSelection() {
     if (!canDuplicate) return;
-    const copies = duplicateObjects(slide.objects.filter(o => selection.includes(o.id)));
+    insertCopies(duplicateObjects(slide.objects.filter(o => selection.includes(o.id))));
+  }
+  function insertCopies(copies: SlideObject[]) {
     if (!copies.length) return;
     patchSlide({ objects: [...slide.objects, ...copies] });
     setPrimary(copies.at(-1)!.id);
     setSelection(copies.map(o => o.id));
     setEditing(null);
     setBlockTab("content");
+  }
+  function copySelection(event?: ClipboardEvent) {
+    const objects = slide.objects.filter(o => selection.includes(o.id));
+    if (!objects.length) return;
+    const token = `Aperture presentation blocks: ${slideId()}`;
+    setBlockClipboard({ objects: structuredClone(objects), token, slideId: slide.id, pastes: 0 });
+    if (event?.clipboardData) {
+      event.preventDefault();
+      event.clipboardData.setData("text/plain", token);
+    } else {
+      navigator.clipboard?.writeText(token).catch(() => {});
+    }
+    setMessage(objects.length === 1 ? "Block copied." : `${objects.length} blocks copied.`);
+  }
+  function pasteBlocks() {
+    if (!blockClipboard || !canEdit || pending) return;
+    const offset = (blockClipboard.pastes + (blockClipboard.slideId === slide.id ? 1 : 0)) * 20;
+    insertCopies(duplicateObjects(blockClipboard.objects, offset));
+    setBlockClipboard({ ...blockClipboard, pastes: blockClipboard.pastes + 1 });
+    setMenu(null);
   }
   const dirty = JSON.stringify(deck) !== saved || slug !== savedSlug;
   const allowNavigation = useUnsavedChanges(dirty || pending);
@@ -695,6 +718,10 @@ export function PresentationEditor({
     }
   }
   useEffect(() => {
+    function copy(e: ClipboardEvent) {
+      if (pending || playing || (e.target instanceof Element && e.target.closest("input,textarea,select,[contenteditable=true]"))) return;
+      copySelection(e);
+    }
     function paste(e: ClipboardEvent) {
       if (pending || playing) return;
       const files = Array.from(e.clipboardData?.files || []).filter((f) =>
@@ -706,6 +733,11 @@ export function PresentationEditor({
       );
       if (!files.length && inText) return;
       const text = e.clipboardData?.getData("text/plain") || "";
+      if (!inText && !files.length && blockClipboard && (text === blockClipboard.token || !text)) {
+        e.preventDefault();
+        pasteBlocks();
+        return;
+      }
       if (!files.length && !text) return;
       e.preventDefault();
       if (files.length) {
@@ -786,7 +818,11 @@ export function PresentationEditor({
       }
     }
     window.addEventListener("paste", paste, true);
-    return () => window.removeEventListener("paste", paste, true);
+    window.addEventListener("copy", copy, true);
+    return () => {
+      window.removeEventListener("paste", paste, true);
+      window.removeEventListener("copy", copy, true);
+    };
   });
   function save(intent: "draft" | "publish" | "unpublish" = "draft") {
     if (pending) return;
@@ -1099,6 +1135,8 @@ export function PresentationEditor({
                 </div>
               )}
               <div ref={setToolbar} />
+              {selection.length > 0 && <button className="btn btn-sm" onClick={() => copySelection()}>Copy blocks</button>}
+              {blockClipboard && <button className="btn btn-sm" disabled={!canEdit || pending} onClick={pasteBlocks}>Paste blocks</button>}
               {object && (selection.length > 1 ? <>
                 <button type="button" className="btn btn-sm" disabled={!canEdit || selection.every((id) => slide.objects.find((o) => o.id === id)?.locked)} aria-label="Lock blocks" title="Lock blocks" onClick={() => lockSelection(true)}><Lock size={18} aria-hidden="true" /></button>
                 <button type="button" className="btn btn-sm" disabled={!canEdit || !selection.some((id) => slide.objects.find((o) => o.id === id)?.locked)} aria-label="Unlock blocks" title="Unlock blocks" onClick={() => lockSelection(false)}><LockOpen size={18} aria-hidden="true" /></button>
@@ -2182,6 +2220,7 @@ export function PresentationEditor({
               }
             }}
           >
+            <div><button role="menuitem" disabled={!blockClipboard || !canEdit || pending} onClick={pasteBlocks}>Paste blocks</button></div>
             {menu.kind === "canvas" ? (
               <div>
                 <button role="menuitem" onClick={() => addSlide()}>
@@ -2285,6 +2324,7 @@ export function PresentationEditor({
               </div>
             ) : (
               <div>
+                <button role="menuitem" onClick={() => copySelection()}>Copy blocks</button>
                 <button role="menuitem" disabled={!canDuplicate} onClick={duplicateSelection}>{duplicateLabel}</button>
                 <button role="menuitem" onClick={() => {
                   const source = slide.objects.find(item => item.id === menu.id);

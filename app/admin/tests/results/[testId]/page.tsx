@@ -4,7 +4,8 @@ import { notFound } from "next/navigation";
 import { AdminHeader } from "@/components/admin-ui";
 import { requirePermission } from "@/lib/access";
 import { connectDB } from "@/lib/db";
-import { FormDefinition, FormSubmission } from "@/lib/models";
+import { FormDefinition } from "@/lib/models";
+import { testResults } from "@/lib/test-results";
 
 import { TestResultsList, type ResultRecord } from "./results-list";
 
@@ -39,9 +40,7 @@ export default async function TestResultPage({
       .select("title kind test submissionLayout")
       .lean<any>()
       .catch(() => null),
-    FormSubmission.find({ formId: testId, grade: { $exists: true } })
-      .limit(1000)
-      .lean<any[]>(),
+    testResults({ formId: testId }),
   ]);
 
   if (!test && submissions.length === 0) notFound();
@@ -50,6 +49,9 @@ export default async function TestResultPage({
     const name = String(submission.userName ?? "").trim();
     return {
       _id: String(submission._id),
+      gradingStatus: submission.gradingStatus,
+      version: new Date(submission.updatedAt).toISOString(),
+      legacy: !!submission.legacy,
       // A result from before takers were recorded has no name to show, and
       // saying so is better than showing an empty cell.
       name: name ? surnameFirst(name) : "Not recorded",
@@ -74,17 +76,18 @@ export default async function TestResultPage({
   // Down the surnames, which is how a register of results is read.
   records.sort((a, b) => a.name.localeCompare(b.name));
 
+  const graded = records.filter(row => row.gradingStatus !== "pending");
   const average =
-    records.length === 0
+    graded.length === 0
       ? 0
       : Math.round(
-          records.reduce((total, row) => total + row.percent, 0) / records.length
+          graded.reduce((total, row) => total + row.percent, 0) / graded.length
         );
 
   // Only those actually judged: a result from before the threshold was set is
   // neither a pass nor a fail, and counting it as either would be a made-up
   // number in the one place the figures have to be trusted.
-  const judged = records.filter((row) => row.passed !== null);
+  const judged = graded.filter((row) => row.passed !== null);
   const passes = judged.filter((row) => row.passed).length;
 
   return (
@@ -101,10 +104,10 @@ export default async function TestResultPage({
           records.length === 0
             ? "Nobody has taken this yet."
             : `${records.length} ${
-                records.length === 1 ? "person" : "people"
+                records.length === 1 ? "attempt" : "attempts"
               } · ${average}% average${
                 judged.length > 0 ? ` · ${passes} of ${judged.length} passed` : ""
-              } · each person's best result is the one kept`
+              } · ${records.length - graded.length} pending review`
         }
         actions={
           test ? (
