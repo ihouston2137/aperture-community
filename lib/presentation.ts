@@ -9,6 +9,7 @@ import { normalizeRichText } from "./rich-text";
 import { sanitizeMediaPath } from "./protected-media-url";
 export type SlideObject = {
   id: string;
+  shadow?: SlideShadow;
   publication?: PublicationBlock;
   type: "publication" | "text" | "image" | "video" | "rectangle" | "ellipse" | "block" | "line";
   line?: {
@@ -41,6 +42,31 @@ export type SlideObject = {
   rotation: number;
   alt: string;
 };
+
+export type SlideShadow = {
+  enabled: boolean;
+  x: number;
+  y: number;
+  blur: number;
+  color: string;
+};
+
+export function normalizeSlideShadow(input?: Partial<SlideShadow>): SlideShadow {
+  return {
+    enabled: input?.enabled === true,
+    x: number(input?.x, -1600, 1600, 0),
+    y: number(input?.y, -1600, 1600, 4),
+    blur: number(input?.blur, 0, 800, 12),
+    color: string(input?.color, 100) || "rgba(0,0,0,0.3)",
+  };
+}
+
+/** Pixel values scale with the slide, including previews and exports. */
+export function slideShadowFilter(input?: SlideShadow): string | undefined {
+  if (!input?.enabled) return undefined;
+  const shadow = normalizeSlideShadow(input);
+  return `drop-shadow(${shadow.x}px ${shadow.y}px ${shadow.blur}px ${shadow.color})`;
+}
 export type Slide = {
   publicationBackground?: PublicationBackground;
   hidden?: boolean;
@@ -380,6 +406,7 @@ export function normalizeDeck(input: unknown): Deck {
               block.href = "";
           }
           return {
+            shadow: o.shadow ? normalizeSlideShadow(o.shadow) : undefined,
             publication: publication || undefined,
             block,
             ...(o.type === "line" ? { line: normalizeLine(o.line) } : {}),

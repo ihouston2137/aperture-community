@@ -63,9 +63,11 @@ import {
 import { PresentationPlayer } from "./presentation-player";
 import { CanvasViewport } from "./canvas-viewport";
 import { savePresentation } from "./actions";
+import { SlideShadowFields } from "./slide-shadow-fields";
 
 export function PresentationEditor({
   initial,
+  initialSlug = "",
   view,
   sources = emptyPublicationSources,
   id,
@@ -77,6 +79,7 @@ export function PresentationEditor({
   published = null,
 }: {
   initial: Deck;
+  initialSlug?: string;
   view?: string;
   sources?: PublicationSources;
   id?: string;
@@ -88,6 +91,8 @@ export function PresentationEditor({
   published?: Deck | null;
 }) {
   const router = useRouter();
+  const [slug, setSlug] = useState(initialSlug);
+  const [savedSlug, setSavedSlug] = useState(initialSlug);
 
 
   const [deck, setDeck] = useState(() => migratePageSize(initial));
@@ -249,7 +254,7 @@ export function PresentationEditor({
   }
   const dimensions = slideDimensions(deck);
   const object = slide.objects.find((o) => o.id === selected);
-  const dirty = JSON.stringify(deck) !== saved;
+  const dirty = JSON.stringify(deck) !== saved || slug !== savedSlug;
   const allowNavigation = useUnsavedChanges(dirty || pending);
   useEffect(() => {
     deckRef.current = deck;
@@ -714,12 +719,14 @@ export function PresentationEditor({
             commit(next);
             setSelected(additions.at(-1)!.id);
             setEditing(null);
-            const saved = await savePresentation({ ...identity, view, deck: next });
+            const saved = await savePresentation({ ...identity, view, slug, deck: next });
             if (saved.error)
               throw new Error(
                 `Images are in the media library. ${saved.error}`,
               );
             setIdentity({ id: saved.id!, version: saved.version! });
+            setSlug(saved.slug!);
+            setSavedSlug(saved.slug!);
             setSaved(JSON.stringify(next));
             setMessage(
               "Images pasted, stored in the media library, and linked to this presentation.",
@@ -752,7 +759,7 @@ export function PresentationEditor({
     setMessage("");
     startTransition(async () => {
       try {
-        const result = await savePresentation({ ...identity, view, deck, intent });
+        const result = await savePresentation({ ...identity, view, slug, deck, intent });
         if (result.error) {
           setMessage(result.error);
           return;
@@ -762,6 +769,8 @@ export function PresentationEditor({
         if (intent === "publish") setPublishedSnapshot(structuredClone(deck));
         if (intent === "unpublish") setPublishedSnapshot(null);
         setIdentity({ id: result.id!, version: result.version! });
+        setSlug(result.slug!);
+        setSavedSlug(result.slug!);
         setSaved(JSON.stringify(deck));
         setMessage(result.message!);
         if (!identity.id) {
@@ -1437,6 +1446,19 @@ export function PresentationEditor({
                 <section className="deck-presentation-settings">
                   <h3>Presentation settings</h3>{" "}
                   <label>
+                    Slug
+                    <input
+                      aria-label="Slug"
+                      type="text"
+                      value={slug}
+                      placeholder="Generated from title"
+                      onChange={(event) => setSlug(event.target.value)}
+                      autoCapitalize="none"
+                      spellCheck={false}
+                    />
+                    <small>Used in the public URL. Changes take effect when saved.</small>
+                  </label>
+                  <label>
                     Page size{" "}
                     <select
                       aria-label="Page size"
@@ -1613,6 +1635,7 @@ export function PresentationEditor({
                       disabled={Boolean(locked(object))}
                     >
                       {object.type === "line" && <SlideLineFields object={object} update={patchObject} />}
+                      <SlideShadowFields object={object} update={patchObject} />
                       {object.publication && <PublicationFields pages={deck.slides} block={object.publication} update={patch => patchObject({ publication: { ...object.publication!, ...patch } })} />}
                       {object.block && (
                         <SlideBlockFields

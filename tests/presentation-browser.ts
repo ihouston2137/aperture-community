@@ -97,10 +97,24 @@ async function main() {
     await page.getByRole("button", { name: "Rich text", exact: true }).click();
     await page.locator(".deck-object .ql-editor").fill("Native slide text");
     assert.equal(await page.locator(".deck-object .ql-editor").evaluate(element => getComputedStyle(element).fontSize), "32px");
+    await page.getByLabel("Enable drop shadow", { exact: true }).check();
+    await page.getByLabel("Shadow horizontal offset", { exact: true }).fill("0.5");
+    await page.getByLabel("Shadow vertical offset", { exact: true }).fill("0.75");
+    await page.getByLabel("Shadow blur", { exact: true }).fill("1");
+    assert.match(await page.locator(".deck-object").evaluate(element => getComputedStyle(element).filter), /drop-shadow/);
+    await page.getByRole("button", { name: "Presentation settings", exact: true }).click();
+    await page.getByLabel("Slug", { exact: true }).fill("Custom Presentation URL");
     await page.getByRole("button", { name: "Save", exact: true }).click();
     await page.waitForURL("**/admin/presentations/*/edit");
     const createdId = page.url().split("/").at(-2)!;
+    assert.equal((await Zine.findById(createdId).lean<any>()).slug, "custom-presentation-url");
+    await page.reload();
+    await page.getByRole("button", { name: "Presentation settings", exact: true }).click();
+    assert.equal(await page.getByLabel("Slug", { exact: true }).inputValue(), "custom-presentation-url");
+    await page.getByLabel("Slug", { exact: true }).fill("Renamed Presentation URL");
     assert.match((await Presentation.findById(createdId).lean<any>()).deck.slides[0].objects[0].html, /Native slide text/);
+    assert.deepEqual((await Presentation.findById(createdId).lean<any>()).deck.slides[0].objects[0].shadow,
+      { enabled: true, x: 8, y: 12, blur: 16, color: "rgba(0,0,0,0.3)" });
     const downloadPNG = page.waitForEvent("download");
     await page.getByRole("button", { name: "Page PNG", exact: true }).click();
     assert.match((await downloadPNG).suggestedFilename(), /\.png$/);
@@ -109,6 +123,11 @@ async function main() {
     assert.match((await downloadPDF).suggestedFilename(), /\.pdf$/);
     await page.getByRole("button", { name: "Publish", exact: true }).click();
     await page.getByRole("button", { name: "Unpublish", exact: true }).waitFor();
+    assert.equal(await page.getByLabel("Slug", { exact: true }).inputValue(), "renamed-presentation-url");
+    const renamed = await publicPage.goto(`${baseURL}/present/renamed-presentation-url`);
+    assert.equal(renamed?.status(), 200);
+    await publicPage.locator('[data-active="true"]').getByText("Native slide text").waitFor();
+    assert.match(await publicPage.locator('[data-active="true"] .deck-text').evaluate(element => getComputedStyle(element.parentElement!).filter), /drop-shadow/);
     await page.getByRole("button", { name: "Unpublish", exact: true }).click();
     await page.getByRole("button", { name: "Publish", exact: true }).waitFor();
     const pdf = new jsPDF(); pdf.text("Imported page", 10, 10);

@@ -26,7 +26,7 @@ export default async function Edit({ params, searchParams }: {
   return <>
     {Object.keys(record.variants || {}).length > 1 && <nav aria-label="Presentation sizes">{Object.keys(record.variants).map(key =>
       <Link className="btn btn-sm" key={key} href={`/admin/presentations/${id}/edit?view=${encodeURIComponent(key)}`} aria-current={key === view ? "page" : undefined}>{key}</Link>)}</nav>}
-    <PresentationEditor key={`${id}-${view}`} initial={deck} id={id} version={record.version}
+    <PresentationEditor key={`${id}-${view}`} initial={deck} initialSlug={identity.slug} id={id} version={record.version}
       view={view} sources={sources} shapes={shapes} fonts={fonts} status={identity.status}
       published={published ? normalizeDeck(published) : null} />
   </>;

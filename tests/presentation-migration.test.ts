@@ -2,12 +2,37 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { convertPublication } from "../lib/publication-migration";
 import { createPublicationPage, createPublicationBlock, createTable, emptyBackground } from "../lib/publication-layout";
-import { normalizeDeck, slideDimensions } from "../lib/presentation";
+import { normalizeDeck, slideDimensions, newObject, newSlideBlock, normalizeSlideShadow, slideShadowFilter, duplicateSlide } from "../lib/presentation";
 import { renderPdfSlides, PdfImportError } from "../lib/pdf-presentation";
 import { jsPDF } from "jspdf";
 import { collectMediaRefs } from "../lib/media-usage";
 
 const source = () => ({ title: "Fixture", status: "draft", kind: "zine", presentationSize: { width: 1440, height: 1080 }, pages: [{ ...createPublicationPage(), id: "first" }] });
+
+test("drop shadows persist for every object type and survive slide duplication", () => {
+  const original = source();
+  original.pages[0].blocks = [createPublicationBlock("table")];
+  const { deck } = convertPublication(original);
+  const objects = [
+    ...deck.slides[0].objects,
+    ...(["text", "image", "video", "rectangle", "ellipse", "line"] as const).map(type => newObject(type)),
+    ...(["icon", "shape", "customShape", "button", "qrCode", "videoEmbed"] as const).map(type => newSlideBlock(type)),
+  ];
+  const shadow = { enabled: true, x: -8, y: 16, blur: 24, color: "rgba(20,30,40,0.5)" };
+  deck.slides[0].objects = objects.map(object => ({ ...object, shadow }));
+  const normalized = normalizeDeck(deck);
+  for (const object of normalized.slides[0].objects) {
+    assert.deepEqual(object.shadow, shadow);
+    assert.equal(slideShadowFilter(object.shadow), "drop-shadow(-8px 16px 24px rgba(20,30,40,0.5))");
+  }
+  for (const object of duplicateSlide(normalized.slides[0]).objects) assert.deepEqual(object.shadow, shadow);
+  const disabled = normalizeSlideShadow({ ...shadow, enabled: false });
+  assert.equal(slideShadowFilter(disabled), undefined);
+  assert.equal(disabled.blur, shadow.blur);
+  assert.equal(slideShadowFilter(undefined), undefined);
+  assert.equal(normalizeSlideShadow({ blur: -5 }).blur, 0);
+  assert.equal(normalizeSlideShadow({ x: Infinity }).x, 0);
+});
 
 test("preserves canvas dimensions, geometry, rich text, links, tables and stacking", () => {
   const original = source();

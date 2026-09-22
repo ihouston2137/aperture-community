@@ -17,7 +17,7 @@ import { styleValuesToCss } from "@/lib/style-values";
 import { BlockView } from "@/components/page-blocks";
 import { emptyPageSources } from "@/lib/page-source-types";
 import { protectedMediaUrl } from "@/lib/protected-media-url";
-import { defaultLine, lineGeometry, type Slide, type SlideObject } from "@/lib/presentation";
+import { defaultLine, lineGeometry, slideShadowFilter, type Slide, type SlideObject } from "@/lib/presentation";
 export type PresentationShape = {
   name: string;
   slug: string;
@@ -94,6 +94,7 @@ export function objectStyle(object: SlideObject): React.CSSProperties {
     width: object.width,
     height: object.height,
     transform: `rotate(${object.rotation}deg)`,
+    filter: slideShadowFilter(object.shadow),
     background: ["rectangle", "ellipse", "text"].includes(object.type)
       ? object.fill
       : undefined,
