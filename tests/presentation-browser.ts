@@ -214,6 +214,27 @@ async function main() {
         await shape.screenshot({ path: "backups/test-artifacts/rounded-shape-thick-border.png" });
       }
     }
+    await page.goto(`${baseURL}/admin/presentations/new`);
+    await page.getByRole("button", { name: "Shape", exact: true }).click();
+    await page.getByRole("button", { name: "Duplicate block", exact: true }).click();
+    await page.locator(".deck-surface.is-editing").click({ button: "right", position: { x: 5, y: 5 } });
+    await page.getByRole("menuitem", { name: "Select all blocks", exact: true }).click();
+    await page.getByRole("button", { name: "Group", exact: true }).click();
+    await page.getByRole("button", { name: "Duplicate group", exact: true }).click();
+    assert.equal(await page.locator(".deck-object").count(), 4);
+    assert.equal(await page.locator(".deck-object.selected").count(), 2);
+    await page.locator(".deck-object.selected").last().click({ button: "right" });
+    await page.getByRole("menuitem", { name: "Duplicate group", exact: true }).click();
+    assert.equal(await page.locator(".deck-object").count(), 6);
+    await page.getByRole("button", { name: "Undo", exact: true }).click();
+    assert.equal(await page.locator(".deck-object").count(), 4);
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+    await page.waitForURL("**/admin/presentations/*/edit");
+    const grouped = (await Presentation.findById(page.url().split("/").at(-2)!).lean<any>()).deck.slides[0].objects;
+    assert.equal(grouped[0].groupId, grouped[1].groupId);
+    assert.equal(grouped[2].groupId, grouped[3].groupId);
+    assert.notEqual(grouped[0].groupId, grouped[2].groupId);
+    assert.equal(grouped[2].x, grouped[0].x + 20);
     assert.deepEqual(errors, []);
     console.log("Browser checks passed: legacy URL, converted editor, draft snapshot, hidden-page navigation, access restrictions, deleted content, native text editing, PNG/PDF export, PDF import, create, publish and unpublish.");
   } catch (error) {

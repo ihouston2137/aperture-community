@@ -40,6 +40,7 @@ import {
   arrangeObjects,
   fitObject,
   duplicateSlide,
+  duplicateObjects,
   newSlideBlock,
   PRESENTATION_BLOCK_TYPES,
   newSlide,
@@ -262,6 +263,20 @@ export function PresentationEditor({
   }
   const dimensions = slideDimensions(deck);
   const object = slide.objects.find((o) => o.id === selected);
+  const canDuplicate = canEdit && selection.length > 0 && !slide.objects.some(o => selection.includes(o.id) && locked(o));
+  const duplicateLabel = selection.length > 1
+    ? (object?.groupId && slide.objects.filter(o => selection.includes(o.id)).every(o => o.groupId === object.groupId) ? "Duplicate group" : "Duplicate blocks")
+    : "Duplicate block";
+  function duplicateSelection() {
+    if (!canDuplicate) return;
+    const copies = duplicateObjects(slide.objects.filter(o => selection.includes(o.id)));
+    if (!copies.length) return;
+    patchSlide({ objects: [...slide.objects, ...copies] });
+    setPrimary(copies.at(-1)!.id);
+    setSelection(copies.map(o => o.id));
+    setEditing(null);
+    setBlockTab("content");
+  }
   const dirty = JSON.stringify(deck) !== saved || slug !== savedSlug;
   const allowNavigation = useUnsavedChanges(dirty || pending);
   useEffect(() => {
@@ -1099,6 +1114,9 @@ export function PresentationEditor({
               )}
               {selection.length > 1 && (
                 <>
+                  <button className="btn btn-sm" disabled={!canDuplicate} onClick={duplicateSelection}>
+                    {duplicateLabel}
+                  </button>
                   <button
                     className="btn btn-sm"
                     onClick={() => groupSelection()}
@@ -1155,17 +1173,7 @@ export function PresentationEditor({
                 <>
                   <button
                     className="btn btn-sm"
-                    onClick={() => {
-                      const copy = {
-                        ...object,
-                        id: slideId(),
-                        x: object.x + 20,
-                        y: object.y + 20,
-                      };
-                      patchSlide({ objects: [...slide.objects, copy] });
-                      setSelected(copy.id);
-                      setEditing(null);
-                    }}
+                    onClick={duplicateSelection}
                   >
                     Duplicate block
                   </button>
@@ -2277,6 +2285,7 @@ export function PresentationEditor({
               </div>
             ) : (
               <div>
+                <button role="menuitem" disabled={!canDuplicate} onClick={duplicateSelection}>{duplicateLabel}</button>
                 <button role="menuitem" onClick={() => {
                   const source = slide.objects.find(item => item.id === menu.id);
                   if (source) setStyleClipboard(copyBlockStyles(source));

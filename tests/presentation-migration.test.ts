@@ -3,12 +3,34 @@ import { copyBlockStyles, pasteBlockStyles } from "../lib/presentation-styles";
 import assert from "node:assert/strict";
 import { convertPublication } from "../lib/publication-migration";
 import { createPublicationPage, createPublicationBlock, createTable, emptyBackground } from "../lib/publication-layout";
-import { normalizeDeck, slideDimensions, newObject, newSlideBlock, normalizeSlideShadow, slideShadowFilter, duplicateSlide, fitObject } from "../lib/presentation";
+import { normalizeDeck, slideDimensions, newObject, newSlideBlock, normalizeSlideShadow, slideShadowFilter, duplicateSlide, duplicateObjects, fitObject } from "../lib/presentation";
 import { renderPdfSlides, PdfImportError } from "../lib/pdf-presentation";
 import { jsPDF } from "jspdf";
 import { collectMediaRefs } from "../lib/media-usage";
 
 const source = () => ({ title: "Fixture", status: "draft", kind: "zine", presentationSize: { width: 1440, height: 1080 }, pages: [{ ...createPublicationPage(), id: "first" }] });
+
+test("duplicating selections preserves independent groups, content, effects and relative positions", () => {
+  const originals = [newSlideBlock("shape"), newObject("line"), newObject("text")];
+  originals[0].groupId = originals[1].groupId = "original-group";
+  originals[1].x = 430;
+  originals[0].shadow = { enabled: true, x: 4, y: 8, blur: 12, color: "#000000" };
+  const copies = duplicateObjects(originals);
+  assert.equal(copies[0].groupId, copies[1].groupId);
+  assert.notEqual(copies[0].groupId, originals[0].groupId);
+  assert.equal(copies[2].groupId, undefined);
+  copies.forEach((copy, index) => {
+    assert.notEqual(copy.id, originals[index].id);
+    assert.equal(copy.x, originals[index].x + 20);
+    assert.equal(copy.y, originals[index].y + 20);
+    assert.equal(copy.width, originals[index].width);
+  });
+  assert.deepEqual(copies[0].shadow, originals[0].shadow);
+  copies[0].shadow!.blur = 50;
+  copies[0].block!.color = "#ffffff";
+  assert.equal(originals[0].shadow.blur, 12);
+  assert.notEqual(originals[0].block!.color, copies[0].block!.color);
+});
 
 test("style clipboard transfers appearance and effects without content or geometry", () => {
   const source = newSlideBlock("shape");

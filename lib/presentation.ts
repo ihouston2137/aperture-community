@@ -182,22 +182,30 @@ export function newObject(type: SlideObject["type"], defaults?: Partial<Presenta
     alt: "",
   };
 }
-export function duplicateSlide(slide: Slide): Slide {
+export function duplicateObjects(objects: SlideObject[], offset = 20): SlideObject[] {
   const groups = new Map<string, string>();
-  for (const o of slide.objects)
+  for (const o of objects)
     if (o.groupId && !groups.has(o.groupId)) groups.set(o.groupId, slideId());
+  return objects.map((o) => ({
+      ...structuredClone(o),
+      groupId: o.groupId ? groups.get(o.groupId) : undefined,
+      id: slideId(),
+      x: o.x + offset,
+      y: o.y + offset,
+      block: o.block
+        ? { ...structuredClone(o.block), id: slideId() }
+        : undefined,
+      publication: o.publication
+        ? { ...structuredClone(o.publication), id: slideId() }
+        : undefined,
+    }));
+}
+export function duplicateSlide(slide: Slide): Slide {
   return {
     ...structuredClone(slide),
     id: slideId(),
     name: slide.name ? `${slide.name} copy` : "",
-    objects: slide.objects.map((o) => ({
-      ...structuredClone(o),
-      groupId: o.groupId ? groups.get(o.groupId) : undefined,
-      id: slideId(),
-      block: o.block
-        ? { ...structuredClone(o.block), id: slideId() }
-        : undefined,
-    })),
+    objects: duplicateObjects(slide.objects, 0),
   };
 }
 
