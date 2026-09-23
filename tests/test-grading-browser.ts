@@ -196,6 +196,36 @@ async function main() {
     const checkResponse = page.waitForResponse(response => response.url().endsWith("/api/forms/submit") && response.request().method() === "POST");
     await page.getByRole("button", { name: "Submit", exact: true }).click();
     assert.equal((await (await checkResponse).json()).grade.percent, 100);
+    await editor.goto(`${baseURL}/admin/tests/results/${checkboxTest._id}`);
+    await editor.locator(".submission-rows .link-button").click();
+    await editor.getByRole("dialog").getByText("No pass mark was set for this attempt.", { exact: true }).waitFor();
+    await editor.getByRole("button", { name: "Reopen for grading", exact: true }).click();
+    await editor.getByLabel("Grading pass mark", { exact: true }).waitFor();
+    const reopened = await TestAttempt.findOne({ formId: String(checkboxTest._id) }).lean<any>();
+    assert.equal(reopened.gradingStatus, "pending");
+    assert.equal((await FormSubmission.findOne({ formId: String(checkboxTest._id) }).lean<any>()).grade, undefined);
+    await page.goto(`${baseURL}/dashboard`);
+    await page.getByRole("row").filter({ hasText: "Checkbox regression" }).getByRole("cell", { name: "Pending", exact: true }).waitFor();
+    const invalidPass = await staff.request.patch(`${baseURL}/api/admin/tests/results/${reopened._id}`, { data: { awards: [1], passMark: 101, version: new Date(reopened.updatedAt).toISOString() } });
+    assert.equal(invalidPass.status(), 400);
+    await editor.getByLabel("Grading pass mark", { exact: true }).fill("75");
+    await editor.getByLabel("Points for question 1", { exact: true }).fill("0");
+    await editor.getByRole("button", { name: "Release grade", exact: true }).click();
+    await editor.getByRole("dialog").locator(".test-result-verdict").filter({ hasText: "Not passed" }).waitFor();
+    const revised = await TestAttempt.findById(reopened._id).lean<any>();
+    assert.equal(revised.gradingStatus, "graded");
+    assert.equal(revised.grade.passMark, 75);
+    assert.equal(revised.grade.percent, 0);
+    assert.equal(revised.grade.passed, false);
+    await page.reload();
+    await page.getByRole("row").filter({ hasText: "Checkbox regression" }).getByRole("cell", { name: "0% — Fail", exact: true }).waitFor();
+    const oldResult = await FormSubmission.create({ formId: String(checkboxTest._id), formTitle: "Older result", userId: "older-result-user", grade: reopened.grade, fields: reopened.fields, sitting: reopened.sitting });
+    const oldReopen = await staff.request.patch(`${baseURL}/api/admin/tests/results/${oldResult._id}`, { data: { action: "reopen", version: oldResult.updatedAt.toISOString() } });
+    assert.equal(oldReopen.status(), 200);
+    const migrated = await oldReopen.json();
+    const oldRelease = await staff.request.patch(`${baseURL}/api/admin/tests/results/${oldResult._id}`, { data: { awards: [1], passMark: 50, version: migrated.version } });
+    assert.equal(oldRelease.status(), 200);
+    assert.equal((await oldRelease.json()).grade.passed, true);
     console.log("Grading browser checks passed: tabs, answer key, held submission, dashboard privacy, grading permissions, invalid points, release, stale grading, and retakes.");
   } catch (error) { console.error(logs.slice(-5000)); throw error; }
   finally { await browser?.close(); child.kill(); if (mongoose.connection.name === database && database.startsWith("aperture_grading_test_")) await mongoose.connection.dropDatabase(); await mongoose.disconnect(); }

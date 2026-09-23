@@ -126,7 +126,7 @@ export default async function TestResultPage({
           trusted to see a mark is the person who has to take a mistaken one
           away, and there is nobody else the job could fall to. */}
       {test?.kind === "test" && <RegradeSubmissions testId={testId} />}
-      <TestResultsList key={records.map(row => `${row._id}:${row.version}`).join(",")} records={records} canDelete />
+      <TestResultsList records={records} canDelete />
     </>
   );
 }

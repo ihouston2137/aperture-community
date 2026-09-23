@@ -53,6 +53,11 @@ export function TestResultsList({
 }) {
   const router = useRouter();
   const [rows, setRows] = useState(records);
+  const [previousRecords, setPreviousRecords] = useState(records);
+  if (previousRecords !== records) {
+    setPreviousRecords(records);
+    setRows(records);
+  }
   const [openId, setOpenId] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -147,7 +152,10 @@ export function TestResultsList({
 
                 <td>
                   {row.gradingStatus === "pending" ? <button className="btn btn-sm" onClick={() => setOpenId(row._id)}>Grade</button> : row.passed === null ? (
-                    <span className="help-text">not judged</span>
+                    <span>
+                      Graded
+                      <span className="help-text">No pass mark was set for this attempt.</span>
+                    </span>
                   ) : (
                     <span
                       className="test-result-verdict"
@@ -206,7 +214,7 @@ export function TestResultsList({
 
       {open ? (
         <ResultDialog
-          key={open._id}
+          key={`${open._id}:${open.version}`}
           record={open}
           onGraded={record => { setRows(current => current.map(row => row._id === record._id ? record : row)); router.refresh(); }}
           onClose={() => setOpenId(null)}
@@ -232,16 +240,17 @@ function ResultDialog({
 }) {
   const [confirming, setConfirming] = useState(false);
   const [awards, setAwards] = useState(record.questions.map(q => String(q.awarded ?? (q.correct ? q.points : 0))));
+  const [passMark, setPassMark] = useState(String(record.passMark));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const pending = record.gradingStatus === "pending";
-  async function release() {
+  async function release(action: "release" | "reopen" = "release") {
     setSaving(true); setError("");
     try {
-      const response = await fetch(`/api/admin/tests/results/${record._id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ version: record.version, awards: awards.map(value => value.trim() === "" ? null : Number(value)) }) });
+      const response = await fetch(`/api/admin/tests/results/${record._id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, version: record.version, passMark: passMark.trim() === "" ? null : Number(passMark), awards: awards.map(value => value.trim() === "" ? null : Number(value)) }) });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Could not release the grade.");
-      onGraded({ ...record, ...result.grade, version: result.version, gradingStatus: "graded" });
+      onGraded({ ...record, ...result.grade, version: result.version, gradingStatus: result.gradingStatus, legacy: false });
     } catch (error) { setError((error as Error).message); }
     finally { setSaving(false); }
   }
@@ -269,6 +278,10 @@ function ResultDialog({
           </div>
 
           <div className="style-modal-body">
+            {pending && <label className="field">Pass mark (%)
+              <input aria-label="Grading pass mark" type="number" min={0} max={100} step="any" value={passMark} disabled={saving} onChange={event => setPassMark(event.target.value)} />
+              <span className="help-text">Set a value above zero to record Pass or Fail for this attempt. Zero records a percentage only.</span>
+            </label>}
             {error && <p role="alert" className="admin-notice is-error">{error}</p>}
             {pending && <p>Review the answers and points below, then release the grade to the test taker&rsquo;s dashboard.</p>}
             <p className="test-result-figure">
@@ -289,6 +302,8 @@ function ResultDialog({
                     {record.passMark}% needed at the time
                   </span>
                 </span>
+              ) : !pending && record.passed === null ? (
+                <span>Graded<span className="help-text">No pass mark was set for this attempt.</span></span>
               ) : null}
             </p>
 
@@ -332,7 +347,9 @@ function ResultDialog({
           </div>
 
           <div className="style-modal-footer">
-            {pending && <button type="button" className="btn btn-primary" disabled={saving} onClick={release}>{saving ? "Releasing…" : "Release grade"}</button>}
+            {pending ? <button type="button" className="btn btn-primary" disabled={saving} onClick={() => release()}>{saving ? "Releasing…" : "Release grade"}</button>
+              : <button type="button" className="btn btn-primary" disabled={saving || !record.questions.length} onClick={() => release("reopen")}>{saving ? "Reopening…" : "Reopen for grading"}</button>}
+            {!pending && <span className="help-text">{record.questions.length ? "Reopening marks this attempt Pending until you release its updated grade." : "This older result has no saved question details to grade."}</span>}
             {onDelete ? (
               confirming ? (
                 <>
