@@ -55,6 +55,12 @@ export type FileUploadKind = (typeof FILE_UPLOAD_KINDS)[number];
 export const OPTION_LAYOUTS = ["column", "row"] as const;
 export type OptionLayout = (typeof OPTION_LAYOUTS)[number];
 
+export function normalizeChoiceOptions(input: unknown): string[] {
+  return Array.isArray(input)
+    ? [...new Set(input.filter((value): value is string => typeof value === "string").map(value => value.trim()).filter(Boolean))].slice(0, 100)
+    : [];
+}
+
 export type FormBlock = {
   id: string;
   type: FormBlockType;
@@ -299,9 +305,7 @@ export function normalizeFormBlock(input: unknown): FormBlock | null {
       if (raw.imageMaxWidth !== undefined) block.imageMaxWidth = Math.max(0, Math.min(8000, Math.round(num(raw.imageMaxWidth, 0))));
 
       if (type === "select" || type === "radio" || type === "checkboxGroup") {
-        block.options = Array.isArray(raw.options)
-          ? raw.options.map((option) => str(option)).filter(Boolean).slice(0, 100)
-          : [];
+        block.options = normalizeChoiceOptions(raw.options);
       }
       if (type === "radio" || type === "checkboxGroup") {
         block.optionLayout = OPTION_LAYOUTS.includes(raw.optionLayout as OptionLayout)

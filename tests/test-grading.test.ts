@@ -35,6 +35,7 @@ test("manual text questions require review only when served and ignore old accep
 
 test("review includes manually assessed questions and uses stored points and pass mark", () => {
   const choice = createTestQuestion("radio");
+  choice.variants[0].block.options = ["Yes", "No"];
   choice.variants[0].key.correctOptions = ["Yes"];
   const essay = createTestQuestion("longText"); essay.points = 3;
   const settings = normalizeTestSettings({ questions: [choice, essay], requireReview: true, passMark: 75 });
@@ -50,4 +51,24 @@ test("review includes manually assessed questions and uses stored points and pas
   for (const invalid of [[1], [1, 4], [1, -1], [1, null], [1, "2"], [1, NaN]]) assert.throws(() => reviewedGrade(grade, invalid));
   assert.equal(gradeSitting({ ...settings, requireReview: false }, sitting, {}).questions.length, 1);
   assert.equal(normalizeTestSettings({}).requireReview, false);
+});
+
+test("nonadjacent checkbox keys are unique, canonical and independent of selection order", () => {
+  const question = createTestQuestion("checkboxGroup");
+  const variant = question.variants[0];
+  variant.block.options = ["First", "Second", "Third", "Fourth", " Third "];
+  variant.key.correctOptions = ["Third", " First ", "Third", "Old removed option"];
+  const settings = normalizeTestSettings({ questions: [question] });
+  const normalized = settings.questions[0].variants[0];
+  assert.deepEqual(normalized.block.options, ["First", "Second", "Third", "Fourth"]);
+  assert.deepEqual(normalized.key.correctOptions, ["First", "Third"]);
+  const sitting = [{ questionId: question.id, variantId: variant.id }];
+  for (const answer of [["First", "Third"], ["Third", "First"], [" Third ", "First", "First"]]) {
+    const grade = gradeSitting(settings, sitting, { [variant.block.id]: answer });
+    assert.equal(grade.percent, 100);
+    assert.equal(grade.questions[0].expected, "First, Third");
+  }
+  for (const answer of [[], ["First"], ["First", "Second", "Third"], ["Second", "Fourth"]]) {
+    assert.equal(gradeSitting(settings, sitting, { [variant.block.id]: answer }).percent, 0);
+  }
 });

@@ -18,6 +18,7 @@ import {
   createFormBlock,
   isFieldBlock,
   normalizeFormBlock,
+  normalizeChoiceOptions,
   type FormBlock,
   type FormBlockType,
 } from "./form-layout";
@@ -252,7 +253,7 @@ function stringList(value: unknown): string[] {
 export function normalizeAnswerKey(input: unknown): AnswerKey {
   const raw = (input ?? {}) as Record<string, unknown>;
   return {
-    correctOptions: stringList(raw.correctOptions),
+    correctOptions: normalizeChoiceOptions(raw.correctOptions),
     acceptedAnswers: stringList(raw.acceptedAnswers),
     matchMode: TEXT_MATCH_MODES.includes(raw.matchMode as TextMatchMode)
       ? (raw.matchMode as TextMatchMode)
@@ -267,12 +268,16 @@ export function normalizeTestVariant(input: unknown): TestVariant | null {
   // A variant with no question in it is not a variant, and a page block is not
   // something anybody can answer.
   if (!block || !isFieldBlock(block.type) || block.type === "submit") return null;
+  const key = normalizeAnswerKey(raw.key);
+  if (["select", "radio", "checkboxGroup"].includes(block.type)) {
+    key.correctOptions = (block.options ?? []).filter(option => key.correctOptions.includes(option));
+  }
 
   return {
     id: str(raw.id) || makeId("variant"),
     block,
     instructorGraded: ["shortText", "longText"].includes(block.type) && raw.instructorGraded === true,
-    key: normalizeAnswerKey(raw.key),
+    key,
   };
 }
 
@@ -475,8 +480,8 @@ function optionsAreRight(block: FormBlock, answer: unknown, key: AnswerKey): boo
   if (block.type === "checkboxGroup") {
     // Exactly the right set: a half-ticked answer to "which three of these"
     // is not a different right answer, it is a wrong one.
-    const given = new Set((Array.isArray(answer) ? answer : []).map(String));
-    const want = new Set(key.correctOptions);
+    const given = new Set(normalizeChoiceOptions(answer));
+    const want = new Set(normalizeChoiceOptions(key.correctOptions));
     if (given.size !== want.size) return false;
     for (const option of want) if (!given.has(option)) return false;
     return true;
@@ -486,6 +491,7 @@ function optionsAreRight(block: FormBlock, answer: unknown, key: AnswerKey): boo
 }
 
 export type MarkedQuestion = {
+  gradingSource?: "automatic" | "instructor";
   type?: FormBlockType;
   awarded?: number;
   questionId: string;
@@ -569,6 +575,7 @@ export function gradeSitting(
     }
 
     questions.push({
+      gradingSource: instructorGraded || !isGradable(block, key) ? "instructor" : "automatic",
       type: block.type,
       awarded: isRight ? question.points : 0,
       questionId: question.id,
@@ -639,7 +646,9 @@ export function reviewedGrade(grade: TestGrade, awards: unknown): TestGrade {
     const awarded = awards[index];
     if (typeof awarded !== "number" || !Number.isFinite(awarded) || awarded < 0 || awarded > question.points)
       throw new Error(`Points for question ${index + 1} must be between 0 and ${question.points}.`);
-    return { ...question, awarded, correct: awarded === question.points };
+    const originalAward = question.awarded ?? (question.correct ? question.points : 0);
+    return { ...question, awarded, correct: awarded === question.points,
+      gradingSource: question.gradingSource === "instructor" || awarded !== originalAward ? "instructor" as const : question.gradingSource ?? "automatic" as const };
   });
   const scored = questions.reduce((sum, question) => sum + question.awarded, 0);
   const available = questions.reduce((sum, question) => sum + question.points, 0);

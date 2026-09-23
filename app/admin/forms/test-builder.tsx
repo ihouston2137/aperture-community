@@ -10,6 +10,7 @@ import {
   FILE_UPLOAD_KINDS,
   OPTION_LAYOUTS,
   normalizeFormSettings,
+  normalizeChoiceOptions,
   type FormBlock,
   type FormBlockType,
   type FormSettings,
@@ -812,14 +813,10 @@ function VariantCard({
               <textarea
                 rows={4}
                 value={(block.options ?? []).join("\n")}
-                onChange={(event) =>
-                  patchBlock({
-                    options: event.target.value
-                      .split("\n")
-                      .map((option) => option.trim())
-                      .filter(Boolean),
-                  })
-                }
+                onChange={(event) => {
+                  const options = normalizeChoiceOptions(event.target.value.split("\n"));
+                  onPatch({ block: { ...block, options }, key: { ...key, correctOptions: options.filter(option => key.correctOptions.includes(option)) } });
+                }}
               />
             </div>
 
@@ -897,13 +894,11 @@ function VariantCard({
                       type={block.type === "checkboxGroup" ? "checkbox" : "radio"}
                       name={`key-${variant.id}`}
                       checked={key.correctOptions.includes(option)}
-                      onChange={() =>
+                      onChange={(event) =>
                         patchKey({
                           correctOptions:
                             block.type === "checkboxGroup"
-                              ? key.correctOptions.includes(option)
-                                ? key.correctOptions.filter((entry) => entry !== option)
-                                : [...key.correctOptions, option]
+                              ? (block.options ?? []).filter(entry => entry === option ? event.target.checked : key.correctOptions.includes(entry))
                               : [option],
                         })
                       }

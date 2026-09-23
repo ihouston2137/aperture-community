@@ -8,6 +8,7 @@ import { FormDefinition } from "@/lib/models";
 import { testResults } from "@/lib/test-results";
 
 import { TestResultsList, type ResultRecord } from "./results-list";
+import { RegradeSubmissions } from "./regrade-submissions";
 
 export const metadata = { title: "Test results" };
 
@@ -124,7 +125,8 @@ export default async function TestResultPage({
       {/* Reading results and removing one are the same grant: whoever is
           trusted to see a mark is the person who has to take a mistaken one
           away, and there is nobody else the job could fall to. */}
-      <TestResultsList records={records} canDelete />
+      {test?.kind === "test" && <RegradeSubmissions testId={testId} />}
+      <TestResultsList key={records.map(row => `${row._id}:${row.version}`).join(",")} records={records} canDelete />
     </>
   );
 }

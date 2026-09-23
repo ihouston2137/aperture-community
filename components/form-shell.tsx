@@ -689,7 +689,7 @@ export function FormShell({
             return {
               ...current,
               [block.id]: ticked
-                ? [...now, option]
+                ? [...new Set([...now, option])]
                 : now.filter((entry) => entry !== option),
             };
           })

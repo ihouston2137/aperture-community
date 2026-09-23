@@ -1,0 +1,35 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { createTestQuestion, gradeSitting, normalizeTestSettings, reviewedGrade } from "../lib/form-test";
+import { regradeSubmission } from "../lib/test-regrading";
+
+test("corrected keys retain original points, pass mark, instructor awards and missing questions", () => {
+  const choice = createTestQuestion("radio"); choice.variants[0].key.correctOptions = ["Yes"];
+  choice.variants[0].block.options = ["Yes", "No"];
+  const essay = createTestQuestion("longText"); essay.variants[0].instructorGraded = true; essay.points = 3;
+  const settings = normalizeTestSettings({ questions: [choice, essay], passMark: 75 });
+  const sitting = settings.questions.map(q => ({ questionId: q.id, variantId: q.variants[0].id }));
+  const fields = [{ type: "radio", value: "Yes" }, { type: "longText", value: "Explanation" }];
+  const original = gradeSitting(settings, sitting, Object.fromEntries(settings.questions.map((q, i) => [q.variants[0].block.id, fields[i].value])));
+  const reviewed = reviewedGrade(original, [1, 2]);
+  assert.equal(reviewed.questions[0].gradingSource, "automatic");
+  assert.equal(reviewed.questions[1].gradingSource, "instructor");
+  settings.questions[0].variants[0].key.correctOptions = ["No"];
+  settings.questions[0].points = 50; settings.passMark = 10;
+  const result = regradeSubmission(settings, { grade: reviewed, sitting, fields, gradedBy: "instructor" });
+  assert.equal(result.grade.percent, 50);
+  assert.equal(result.grade.passMark, 75);
+  assert.equal(result.grade.passed, false);
+  assert.equal(result.grade.questions[0].points, 1);
+  assert.equal(result.grade.questions[1].awarded, 2);
+  assert.equal(result.recalculated, 1);
+  assert.equal(result.preserved, 1);
+  const overridden = reviewedGrade(original, [0.5, 2]);
+  assert.deepEqual(regradeSubmission(settings, { grade: overridden, sitting, fields }).grade, overridden);
+  const legacyReviewed = structuredClone(reviewed);
+  legacyReviewed.questions.forEach(q => { delete q.gradingSource; });
+  assert.deepEqual(regradeSubmission(settings, { grade: legacyReviewed, sitting, fields, gradedBy: "instructor" }).grade, legacyReviewed);
+  settings.questions = [];
+  assert.deepEqual(regradeSubmission(settings, { grade: original, sitting, fields }).grade, original);
+  assert.deepEqual(regradeSubmission(settings, { grade: original }).grade, original);
+});
