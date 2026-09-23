@@ -1579,6 +1579,21 @@ input, select, textarea {
   background: rgba(76, 175, 114, 0.1);
 }
 
+.test-result-list li.is-pending {
+  border-left-color: #d6a323;
+  background: rgba(214, 163, 35, 0.12);
+}
+
+.test-result-list li.is-pending .test-result-mark,
+.test-result-pending {
+  color: #d6a323;
+}
+
+.test-result-pending {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
 .test-result-list li.is-wrong {
   border-left-color: #e06c6c;
   background: rgba(224, 108, 108, 0.1);

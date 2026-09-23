@@ -29,6 +29,7 @@ export type ResultRecord = {
     correct: boolean;
     type?: string;
     awarded?: number;
+    gradingSource?: "automatic" | "instructor";
     given?: string;
     expected?: string;
   }[];
@@ -298,16 +299,19 @@ function ResultDialog({
               </p>
             ) : (
               <ul className="test-result-list">
-                {record.questions.map((question, index) => (
+                {record.questions.map((question, index) => {
+                  const awaitingInstructor = pending && (question.gradingSource === "instructor" || question.expected === "Instructor assessment" || !question.expected);
+                  return (
                   <li
                     key={question.questionId}
-                    className={question.correct ? "is-right" : "is-wrong"}
+                    className={awaitingInstructor ? "is-pending" : question.correct ? "is-right" : "is-wrong"}
                   >
                     <span className="test-result-mark" aria-hidden="true">
-                      {question.correct ? "\u2713" : "\u2717"}
+                      {awaitingInstructor ? "\u25f7" : question.correct ? "\u2713" : "\u2717"}
                     </span>
                     <span className="test-result-question">
                       <strong>{question.label}</strong>
+                      {awaitingInstructor && <span className="test-result-pending">Pending instructor review</span>}
                       <span className="help-text">{question.type || "Question"} · {pending ? question.points : `${question.awarded ?? (question.correct ? question.points : 0)} / ${question.points}`} points</span>
                       <span className="help-text">
                         Answered: {question.given || "nothing"}
@@ -322,7 +326,7 @@ function ResultDialog({
                       </label>}
                     </span>
                   </li>
-                ))}
+                ); })}
               </ul>
             )}
           </div>
