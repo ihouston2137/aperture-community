@@ -126,6 +126,23 @@ async function main() {
     assert.equal(await TestAttempt.countDocuments(), 2);
     const privatePage = await staff.newPage(); await privatePage.goto(`${baseURL}/dashboard`);
     assert.equal(await privatePage.getByRole("heading", { name: "Test results", exact: true }).count(), 0);
+    const legacy = await FormSubmission.create({ formId: "legacy-test", formTitle: "Legacy export fixture", userId: "legacy-user", userName: "Legacy participant", grade: { scored: 1, available: 1, percent: 100, passed: true, passMark: 50 } });
+    const exportDenied = await member.request.get(`${baseURL}/api/admin/tests/export`);
+    assert.equal(exportDenied.status(), 403);
+    const allCsv = await staff.request.get(`${baseURL}/api/admin/tests/export`);
+    assert.equal(allCsv.status(), 200);
+    assert.match(allCsv.headers()["content-type"], /text\/csv/);
+    assert.match(allCsv.headers()["content-disposition"], /attachment/);
+    const allText = await allCsv.text();
+    assert.ok(allText.includes(String(legacy._id)));
+    assert.ok(allText.includes("Review test"));
+    assert.ok(allText.includes("My explanation"));
+    const filtered = await staff.request.get(`${baseURL}/api/admin/tests/export?testId=${definition._id}`);
+    assert.equal((await filtered.text()).includes("Legacy export fixture"), false);
+    await editor.goto(`${baseURL}/admin/tests/results`);
+    const download = editor.waitForEvent("download");
+    await editor.getByRole("link", { name: "Export all submissions (CSV)", exact: true }).click();
+    assert.equal((await download).suggestedFilename(), "test-submissions.csv");
     console.log("Grading browser checks passed: tabs, answer key, held submission, dashboard privacy, grading permissions, invalid points, release, stale grading, and retakes.");
   } catch (error) { console.error(logs.slice(-5000)); throw error; }
   finally { await browser?.close(); child.kill(); if (mongoose.connection.name === database && database.startsWith("aperture_grading_test_")) await mongoose.connection.dropDatabase(); await mongoose.disconnect(); }

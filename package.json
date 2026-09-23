@@ -10,7 +10,7 @@
     "migrate:publications": "tsx scripts/migrate-publications.ts",
     "test:presentations": "tsx --test tests/presentation-migration.test.ts",
     "test:presentations:browser": "tsx tests/presentation-browser.ts",
-    "test:grading": "tsx --test tests/test-grading.test.ts",
+    "test:grading": "tsx --test tests/test-grading.test.ts tests/test-results-csv.test.ts",
     "test:grading:browser": "tsx tests/test-grading-browser.ts"
   },
   "dependencies": {

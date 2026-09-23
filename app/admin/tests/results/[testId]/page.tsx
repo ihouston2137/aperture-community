@@ -110,11 +110,14 @@ export default async function TestResultPage({
               } · ${records.length - graded.length} pending review`
         }
         actions={
-          test ? (
+          <>
+          <a href={`/api/admin/tests/export?testId=${encodeURIComponent(testId)}`} className="btn btn-primary" download>Export submissions (CSV)</a>
+          {test ? (
             <Link href={`/admin/forms/${testId}/test`} className="btn btn-sm">
               Edit the test
             </Link>
-          ) : null
+          ) : null}
+          </>
         }
       />
 

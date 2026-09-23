@@ -57,6 +57,7 @@ export default async function TestResultsPage() {
       <AdminHeader
         title="Test results"
         subtitle="Review pending attempts and release grades to participants."
+        actions={<a href="/api/admin/tests/export" className="btn btn-primary" download>Export all submissions (CSV)</a>}
       />
 
       {cards.length === 0 ? (
