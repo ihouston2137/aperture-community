@@ -21,6 +21,7 @@ export const adminNavGroups: NavGroup[] = [
     label: "Content",
     items: [
       { href: "/admin/pages", label: "Pages", permission: "pages.manage" },
+      { href: "/admin/static-html", label: "Static HTML", permission: "staticHtml.manage" },
       { href: "/admin/stories", label: "Stories", permission: "stories.manage" },
       {
         href: "/admin/collections",

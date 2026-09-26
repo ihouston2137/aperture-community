@@ -26,6 +26,7 @@ export const permissionGroups: PermissionGroup[] = [
     label: "Content",
     permissions: [
       { key: "pages.manage", label: "Manage site pages" },
+      { key: "staticHtml.manage", label: "Manage static HTML" },
       { key: "stories.manage", label: "Manage stories" },
       { key: "storyTemplates.manage", label: "Manage story templates" },
       { key: "collections.manage", label: "Manage collections" },
