@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import { AdminHeader } from "@/components/admin-ui";
-import { requirePermission } from "@/lib/access";
+import { getUserAccess, requirePermission } from "@/lib/access";
 import { getRoleSummaries } from "@/lib/members";
 import { loadUserPage, readUserQuery } from "@/lib/user-query";
 
@@ -15,6 +15,7 @@ export default async function UsersPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { session } = await requirePermission("users.manage");
+  const canViewAsUser = !session.impersonatorId && (await getUserAccess(session.userId)).isAdministrator;
 
   // The whole list state lives in the URL, so a filtered view can be linked to
   // and the browser's back button steps through it.
@@ -45,6 +46,7 @@ export default async function UsersPage({
       />
 
       <UserManager
+        canViewAsUser={canViewAsUser}
         users={userRecords}
         roles={roleOptions}
         query={query}

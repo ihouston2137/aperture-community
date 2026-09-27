@@ -3,7 +3,7 @@ import { compareSync, hashSync } from "bcrypt-ts";
 import { MIN_PASSWORD_LENGTH } from "./auth-rules";
 import { connectDB } from "./db";
 import { User } from "./models";
-import { createSession } from "./session";
+import { refreshSession } from "./session";
 import { clearCodes } from "./verification";
 
 export type PasswordChangeResult = { ok: boolean; error?: string };
@@ -44,7 +44,7 @@ export async function changeUserPassword(
   await clearCodes(String(user._id));
 
   // The cookie carries `mustChangePassword`, which no longer holds.
-  await createSession({
+  await refreshSession({
     userId: String(user._id),
     email: user.email,
     name: user.name ?? "",

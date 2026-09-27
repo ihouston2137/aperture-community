@@ -10,7 +10,7 @@ import { composeName, isEmailAddress, normalizePhone } from "@/lib/members";
 import { Bio, User } from "@/lib/models";
 import { changeUserPassword } from "@/lib/passwords";
 import { sanitizeMediaPath } from "@/lib/protected-media-url";
-import { createSession, requireSession } from "@/lib/session";
+import { refreshSession, requireSession } from "@/lib/session";
 
 export type ProfileResult = { ok: boolean; error?: string; message?: string };
 
@@ -63,7 +63,7 @@ export async function saveOwnProfileAction(formData: FormData): Promise<ProfileR
   await syncMemberProfile(String(user._id));
 
   // The header reads the name from the session cookie, so it is reissued.
-  await createSession({
+  await refreshSession({
     userId: String(user._id),
     email: user.email,
     name: user.name,

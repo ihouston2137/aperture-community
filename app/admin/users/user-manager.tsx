@@ -5,6 +5,7 @@ import { useEffect, useState, useTransition } from "react";
 
 import { Panel } from "@/components/admin-ui";
 import { ModalPortal } from "@/components/modal-portal";
+import { ViewAsUserButton } from "@/components/user-view-controls";
 import {
   formatPhone,
   fullName,
@@ -33,6 +34,7 @@ export type RoleOption = { _id: string; name: string; kind: RoleKind };
 type DialogState = { mode: "create" } | { mode: "edit"; user: UserRecord } | null;
 
 export function UserManager({
+  canViewAsUser,
   users,
   roles,
   query,
@@ -41,6 +43,7 @@ export function UserManager({
   page,
   pageCount,
 }: {
+  canViewAsUser: boolean;
   /** One page of accounts, already searched and filtered by the server. */
   users: UserRecord[];
   roles: RoleOption[];
@@ -113,6 +116,9 @@ export function UserManager({
               </span>
 
               <div className="admin-list-actions">
+                {canViewAsUser && !user.isSelf && user.isActive && user.membershipStatus === "active" && (
+                  <ViewAsUserButton userId={user._id} />
+                )}
                 <button
                   type="button"
                   className="btn btn-sm"

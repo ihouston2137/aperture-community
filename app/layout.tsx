@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 
 import "./globals.css";
 import { AnalyticsBeacon } from "@/components/analytics-beacon";
+import { UserViewBanner } from "@/components/user-view-banner";
 import { customStyleCss, fontImportCss } from "@/lib/custom-style-css";
 import { protectedMediaUrl } from "@/lib/protected-media-url";
 import { appleTouchIcon, getPwaSettings } from "@/lib/pwa";
@@ -130,6 +131,7 @@ export default async function RootLayout({
         {themeCss ? <style dangerouslySetInnerHTML={{ __html: themeCss }} /> : null}
       </head>
       <body>
+        <UserViewBanner />
         {children}
         {/* Every route, admin included — the collector discards the paths that
             are not a visitor reading the site. */}
