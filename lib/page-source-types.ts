@@ -1,4 +1,5 @@
 import type { SponsorLogo } from "@/components/sponsor-scroll";
+import type { MemberGroupView } from "./member-group-block";
 import type { StoryView } from "@/components/story-blocks";
 import type { MenuItem } from "./menu-types";
 
@@ -56,6 +57,7 @@ export type PageSources = {
   storyViews: Record<string, StoryView>;
   latestStoryView: StoryView | null;
   bios: Record<string, BioSummary>;
+  memberGroups: Record<string, MemberGroupView>;
   collections: Record<string, ResolvedCollection>;
   /** For a container bound to "the latest collection". */
   latestCollection: ResolvedCollection | null;
@@ -143,6 +145,7 @@ export const emptyPageSources: PageSources = {
   storyViews: {},
   latestStoryView: null,
   bios: {},
+  memberGroups: {},
   collections: {},
   latestCollection: null,
   forms: {},

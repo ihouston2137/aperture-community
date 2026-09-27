@@ -12332,3 +12332,13 @@ html:has(.admin-shell) body::-webkit-scrollbar {
 }
 
 .user-view-banner button:disabled { opacity: 0.7; cursor: wait; }
+.pb-member-group { list-style: none; padding: 0; margin: 0; display: grid; gap: 1rem; width: 100%; }
+.pb-member-group.is-cards { grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr)); }
+.pb-member-group-person { display: flex; align-items: center; gap: 1rem; min-width: 0; padding: 1.25rem; border: 1px solid rgb(128 128 128 / 0.25); border-radius: 0.75rem; background: color-mix(in srgb, var(--content-bg) 95%, var(--content-accent)); }
+.pb-member-group.is-cards .pb-member-group-person { flex-direction: column; text-align: center; box-shadow: 0 3px 12px rgb(0 0 0 / 0.06); }
+.pb-member-group-headshot { width: 6rem; height: 6rem; flex-shrink: 0; object-fit: cover; border-radius: 50%; }
+.pb-member-group.is-list .pb-member-group-headshot { width: 3.5rem; height: 3.5rem; }
+.pb-member-group-headshot.is-placeholder { display: grid; place-items: center; background: rgb(128 128 128 / 0.12); color: inherit; font-size: 1.25rem; font-weight: 700; }
+.pb-member-group-details { min-width: 0; overflow-wrap: anywhere; }
+.pb-member-group-name { display: block; font-size: 1.125rem; font-weight: 700; }
+.pb-member-group-role { display: block; margin-top: 0.25rem; opacity: 0.75; }

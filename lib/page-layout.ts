@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import { normalizeMemberGroupBlock, type MemberGroupBlockSettings } from "./member-group-block";
 import {
   menuBlockDirection,
   menuBlockLayout,
@@ -61,6 +62,7 @@ export const PAGE_BLOCK_TYPES = [
   // A story on a page comes from a story-bound container and its story slots,
   // which render the real thing rather than a card summary of it.
   "bio",
+  "memberGroup",
   "collection",
   "calendar",
   "eventList",
@@ -616,6 +618,7 @@ export type PageBlock = ResponsiveStyleFields & {
   // references
   storyId?: string;
   bioId?: string;
+  memberGroup?: MemberGroupBlockSettings;
   collectionId?: string;
   formId?: string;
 
@@ -898,6 +901,7 @@ export function makeId(prefix: string): string {
 
 export function createBlock(type: PageBlockType): PageBlock {
   const block: PageBlock = { id: makeId("block"), type };
+  if (type === "memberGroup") block.memberGroup = normalizeMemberGroupBlock(undefined);
 
   if (type === "sponsorScroll") block.sponsorScroll = { ...defaultSponsorScroll };
   if (type === "featuredSponsor") {
@@ -1307,6 +1311,9 @@ export function normalizeBlock(
       break;
     case "bio":
       block.bioId = str(raw.bioId);
+      break;
+    case "memberGroup":
+      block.memberGroup = normalizeMemberGroupBlock(raw.memberGroup);
       break;
     case "collection":
       block.collectionId = str(raw.collectionId);
@@ -1734,6 +1741,7 @@ export function blockFillsWidth(block: WidthAwareBlock): boolean {
       return (block.mediaSize ?? "scaledWidth") === "scaledWidth";
     // No width control of their own, and nothing meaningful to shrink to.
     case "storyContent":
+    case "memberGroup":
     case "collection":
     case "calendar":
     case "eventList":

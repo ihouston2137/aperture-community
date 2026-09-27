@@ -80,6 +80,7 @@ import { SponsorCollection } from "./sponsor-collection";
 import { SponsorHighlight } from "./sponsor-highlight";
 import { SponsorScroll } from "./sponsor-scroll";
 import { MenuBlockView } from "./menu-block";
+import { MemberGroupBlock } from "./member-group-block";
 
 /**
  * The Calendar Style a block wears: its own, else the site default, else the
@@ -443,6 +444,8 @@ function BlockContent({
 
     case "bio":
       return <BioCard bio={block.bioId ? sources.bios[block.bioId] : undefined} />;
+    case "memberGroup":
+      return <MemberGroupBlock settings={block.memberGroup} group={sources.memberGroups?.[block.memberGroup?.groupId ?? ""]} interactive={interactive} />;
 
     case "collection": {
       const collection = block.collectionId ? sources.collections[block.collectionId] : undefined;

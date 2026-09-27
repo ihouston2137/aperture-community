@@ -1,6 +1,7 @@
 "use client";
 
 import { MediaField } from "@/app/admin/media/media-picker";
+import { normalizeMemberGroupBlock } from "@/lib/member-group-block";
 import { RichTextEditor } from "@/components/rich-text-editor";
 import {
   CheckField,
@@ -200,6 +201,7 @@ const BLOCK_LABELS: Record<string, string> = {
   qrCode: "QR code",
   button: "Button",
   bio: "Profile",
+  memberGroup: "Member group",
   collection: "Collection",
   calendar: "Calendar",
   eventList: "Event list",
@@ -244,6 +246,7 @@ const BLOCK_ICONS: Record<string, string> = {
   qrCode: "QrCode",
   button: "MousePointerClick",
   bio: "Contact",
+  memberGroup: "Users",
   sponsorScroll: "GalleryHorizontal",
   featuredSponsor: "BadgeCheck",
   sponsorHighlight: "AlignVerticalSpaceAround",
@@ -831,6 +834,22 @@ export function PageBlockInspector({
             </span>
           </>
         ) : null}
+
+        {block.type === "memberGroup" && (() => {
+          const settings = normalizeMemberGroupBlock(block.memberGroup);
+          return <>
+            <SelectField label="Member group" value={settings.groupId} options={[
+              { value: "", label: "Select a member group…" },
+              ...sources.memberGroups.map(group => ({ value: group.id, label: group.name })),
+            ]} onChange={groupId => update({ memberGroup: { ...settings, groupId } })} />
+            <SelectField label="Display as" value={settings.layout} options={[
+              { value: "cards", label: "Cards" }, { value: "list", label: "List" },
+            ]} onChange={layout => update({ memberGroup: { ...settings, layout: layout === "list" ? "list" : "cards" } })} />
+            <CheckField label="Show role in group" value={settings.showRole} onChange={showRole => update({ memberGroup: { ...settings, showRole } })} />
+            <CheckField label="Show profile headshot" value={settings.showHeadshot} onChange={showHeadshot => update({ memberGroup: { ...settings, showHeadshot } })} />
+            <span className="help-text">Uses profile names and the roles set in member groups. Members appear in group order; inactive accounts are omitted.</span>
+          </>;
+        })()}
 
         {block.type === "bio" ? (
           <SelectField

@@ -69,6 +69,7 @@ import {
   type PageRow,
 } from "./page-layout";
 
+import { loadMemberGroupViews } from "./member-group-sources";
 export { emptyPageSources };
 export type { BioSummary, FormSummary, PageSources };
 
@@ -95,6 +96,7 @@ export async function loadPageSources(layout: PageLayout): Promise<PageSources> 
   await connectDB();
 
   const bioIds = new Set<string>();
+  const memberGroupIds = new Set<string>();
   const collectionIds = new Set<string>();
   const formIds = new Set<string>();
   // Menu blocks are collected as pairs: the same menu shown twice is filtered
@@ -133,6 +135,7 @@ export async function loadPageSources(layout: PageLayout): Promise<PageSources> 
 
   walkBlocks(layout, (block) => {
     if (block.type === "bio" && block.bioId) bioIds.add(block.bioId);
+    if (block.type === "memberGroup" && block.memberGroup?.groupId) memberGroupIds.add(block.memberGroup.groupId);
     if (block.type === "collection" && block.collectionId) {
       collectionIds.add(block.collectionId);
     }
@@ -547,6 +550,7 @@ export async function loadPageSources(layout: PageLayout): Promise<PageSources> 
 
   return {
     sponsorLogos,
+    memberGroups: await loadMemberGroupViews([...memberGroupIds]),
     featuredSponsors,
     sponsorCollections,
     storyViews,

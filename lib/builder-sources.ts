@@ -1,4 +1,6 @@
 import { normalizeBioType } from "./bio-types";
+import { loadMemberGroupViews } from "./member-group-sources";
+import type { MemberGroupView } from "./member-group-block";
 import { normalizeVocabulary, todayDateKey } from "./calendar";
 import { normalizeCalendarTemplateLayout } from "./calendar-slot-layout";
 import {
@@ -34,6 +36,7 @@ import {
 import type { PageRow } from "./page-layout";
 
 export type BuilderSources = {
+  memberGroups: MemberGroupView[];
   fonts: string[];
   styles: { _id: string; name: string; slug: string }[];
   shapes: { _id: string; name: string; slug: string; viewBox: string; paths: string[] }[];
@@ -104,6 +107,7 @@ export async function loadBuilderSources(): Promise<BuilderSources> {
     roles,
     recognitionLevels,
     sponsorRecords,
+    memberGroups,
   ] = await Promise.all([
     FontFamily.find().select("family").sort({ family: 1 }).lean<any[]>(),
     CustomStyle.find().select("name slug").sort({ name: 1 }).lean<any[]>(),
@@ -123,6 +127,7 @@ export async function loadBuilderSources(): Promise<BuilderSources> {
     Role.find().select("name kind").sort({ kind: 1, name: 1 }).lean<any[]>(),
     RecognitionLevel.find().select("name rank").sort({ rank: -1, name: 1 }).lean<any[]>(),
     Sponsor.find().select("name").sort({ name: 1 }).lean<any[]>(),
+    loadMemberGroupViews(),
   ]);
 
   const styleRecords: CalendarStyleRecord[] = calendarStyles.map((doc) => ({
@@ -172,6 +177,7 @@ export async function loadBuilderSources(): Promise<BuilderSources> {
   }
 
   return {
+    memberGroups: Object.values(memberGroups),
     fonts: fonts.map((font) => font.family as string),
     styles: styles.map((style) => ({
       _id: String(style._id),

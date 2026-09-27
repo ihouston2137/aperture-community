@@ -207,6 +207,7 @@ export function PageBuilder({
   const canvasSources: PageSources = {
     ...emptyPageSources,
     ...previewSources,
+    memberGroups: Object.fromEntries(sources.memberGroups.map(group => [group.id, group])),
     // Resolved on the server, so a previewed calendar highlights the same day
     // the published page will.
     calendarToday: sources.calendarToday,
