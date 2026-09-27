@@ -17,7 +17,7 @@ export async function POST(request: Request) {
     const form = await request.formData();
     const file = form.get("file");
     if (!(file instanceof File)) throw new Error("Choose an HTML file.");
-    upload = await readStaticHtml(file);
+    upload = { ...await readStaticHtml(file), includeSiteHeader: form.get("includeSiteHeader") === "on" };
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : "Invalid upload." }, { status: 400 });
   }
@@ -41,5 +41,21 @@ export async function DELETE(request: Request) {
   if (!validStaticHtmlSlug(slug)) return Response.json({ error: "Invalid slug." }, { status: 400 });
   await connectDB();
   await StaticHtml.deleteOne({ _id: slug });
+  return Response.json({ ok: true });
+}
+
+export async function PATCH(request: Request) {
+  if (!(await checkPermission(await getSession(), "staticHtml.manage"))) {
+    return Response.json({ error: "Unauthorized" }, { status: 403 });
+  }
+  let input;
+  try { input = await request.json(); }
+  catch { return Response.json({ error: "Invalid settings." }, { status: 400 }); }
+  if (!input || typeof input.slug !== "string" || !validStaticHtmlSlug(input.slug) || typeof input.includeSiteHeader !== "boolean") {
+    return Response.json({ error: "Invalid settings." }, { status: 400 });
+  }
+  await connectDB();
+  const result = await StaticHtml.updateOne({ _id: input.slug }, { $set: { includeSiteHeader: input.includeSiteHeader } });
+  if (!result.matchedCount) return Response.json({ error: "File not found." }, { status: 404 });
   return Response.json({ ok: true });
 }

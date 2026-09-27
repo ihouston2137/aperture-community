@@ -46,6 +46,7 @@ async function main() {
     assert.equal((await fetch(`${baseURL}/api/admin/static-html`, { method: "POST" })).status, 403);
     assert.equal((await denied.request.post("/api/admin/static-html", { multipart })).status(), 403);
     assert.equal((await denied.request.delete("/api/admin/static-html?slug=annual-report")).status(), 403);
+    assert.equal((await denied.request.patch("/api/admin/static-html", { data: { slug: "annual-report", includeSiteHeader: true } })).status(), 403);
     const editor = await staff.newPage();
     await editor.goto(`${baseURL}/admin/static-html`);
     await editor.getByLabel("HTML file", { exact: true }).setInputFiles({ name: "Annual Report.html", mimeType: "text/html", buffer: Buffer.from(html) });
@@ -66,9 +67,43 @@ async function main() {
       assert.equal(await viewer.locator("h1").evaluate(node => getComputedStyle(node).color), "rgb(255, 0, 0)");
       assert.equal((await fetch(`${baseURL}/${prefix}/missing`)).status, 404);
     }
+    const headerSetting = editor.getByLabel("Include site header for Annual Report.html", { exact: true });
+    const [updated] = await Promise.all([
+      editor.waitForResponse(response => response.request().method() === "PATCH"),
+      headerSetting.check(),
+    ]);
+    assert.equal(updated.status(), 200);
+    for (const prefix of ["project", "report", "special"]) {
+      await viewer.goto(`${baseURL}/${prefix}/annual-report`);
+      assert.equal(viewer.url(), `${baseURL}/${prefix}/annual-report`);
+      await viewer.locator(".site-header").waitFor();
+      assert.equal(await viewer.locator(".site-footer").count(), 0);
+      const frame = viewer.frameLocator('iframe[title="Annual Report.html"]');
+      await frame.getByRole("heading", { name: "Annual report" }).waitFor();
+      assert.equal(await frame.locator("body").getAttribute("data-isolated"), "yes");
+      assert.equal(await frame.locator("h1").evaluate(node => getComputedStyle(node).color), "rgb(255, 0, 0)");
+      assert.equal(await frame.locator("body").evaluate(() => {
+        try { void window.parent.document.body; return false; } catch { return true; }
+      }), true);
+      const headerBounds = await viewer.locator(".site-header").boundingBox();
+      const frameBounds = await viewer.locator("iframe").boundingBox();
+      assert.ok(headerBounds && frameBounds && frameBounds.y >= headerBounds.y + headerBounds.height - 1);
+      assert.ok(frameBounds.height > 300);
+    }
+    await editor.reload();
+    assert.equal(await headerSetting.isChecked(), true);
+    assert.equal((await staff.request.patch("/api/admin/static-html", { data: { slug: "annual-report", includeSiteHeader: false } })).status(), 200);
+    assert.equal(await (await fetch(`${baseURL}/report/annual-report`)).text(), html);
+    const headerUpload = await staff.request.post("/api/admin/static-html", {
+      multipart: { file: { name: "With Header.html", mimeType: "text/html", buffer: Buffer.from(html) }, includeSiteHeader: "on" },
+    });
+    assert.equal(headerUpload.status(), 201);
+    await viewer.goto(`${baseURL}/special/with-header`);
+    await viewer.locator(".site-header").waitFor();
+    await viewer.frameLocator("iframe").getByRole("heading", { name: "Annual report" }).waitFor();
     assert.equal((await staff.request.delete("/api/admin/static-html?slug=annual-report")).status(), 200);
     for (const prefix of ["project", "report", "special"]) assert.equal((await fetch(`${baseURL}/${prefix}/annual-report`)).status, 404);
-    console.log("Passed: restricted upload/delete, upload UI, duplicate protection, prefix selection, all public aliases, inline styles/scripts, origin isolation, missing files and deletion.");
+    console.log("Passed: permissions, uploads, aliases, header upload option and persisted toggle, normal header above isolated content, raw delivery when disabled, scripts/styles, missing files and deletion.");
   } catch (error) {
     console.error(logs);
     throw error;

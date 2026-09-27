@@ -91,6 +91,15 @@ function SiteHeader({
   );
 }
 
+/** The normal interactive header, for uploaded HTML pages without a site footer. */
+export async function SiteHeaderOnly() {
+  const [content, appearance, account, siteMenu, viewer] = await Promise.all([
+    getSiteContent(), getAppearance(), getAccountHeaderData(), ensureSiteMenu(), getMenuViewer(),
+  ]);
+  const menu = await loadMenuFor(siteMenu, viewer);
+  return <SiteHeader content={content} appearance={appearance} account={account} menu={menu} />;
+}
+
 function SiteFooter({
   content,
   appearance,

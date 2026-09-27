@@ -6,6 +6,7 @@ export type StaticHtmlRecord = {
   originalName: string;
   size: number;
   uploadedBy: string;
+  includeSiteHeader: boolean;
   createdAt: Date;
 };
 
@@ -16,8 +17,10 @@ const schema = new Schema<StaticHtmlRecord>({
   originalName: { type: String, required: true },
   size: { type: Number, required: true },
   uploadedBy: { type: String, required: true },
+  includeSiteHeader: { type: Boolean, default: false },
   createdAt: { type: Date, default: Date.now },
 });
 
-export const StaticHtml = (mongoose.models.StaticHtml as Model<StaticHtmlRecord> | undefined)
-  ?? mongoose.model<StaticHtmlRecord>("StaticHtml", schema);
+const cached = mongoose.models.StaticHtml as Model<StaticHtmlRecord> | undefined;
+if (cached && cached.schema !== schema) mongoose.deleteModel("StaticHtml");
+export const StaticHtml = mongoose.model<StaticHtmlRecord>("StaticHtml", schema);

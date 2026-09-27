@@ -12,6 +12,6 @@ export default async function StaticHtmlPage() {
   const files = await StaticHtml.find().sort({ createdAt: -1 }).lean();
   return <>
     <AdminHeader title="Static HTML" subtitle="Publish a self-contained HTML file and share it as a project, report or special." />
-    <StaticHtmlManager files={files.map(file => ({ slug: file._id, originalName: file.originalName }))} />
+    <StaticHtmlManager files={files.map(file => ({ slug: file._id, originalName: file.originalName, includeSiteHeader: Boolean(file.includeSiteHeader) }))} />
   </>;
 }

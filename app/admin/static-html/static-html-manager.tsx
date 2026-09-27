@@ -5,13 +5,14 @@ import { useRouter } from "next/navigation";
 import { Notice, Panel } from "@/components/admin-ui";
 import { STATIC_HTML_PREFIXES, staticHtmlSlug } from "@/lib/static-html";
 
-export function StaticHtmlManager({ files }: { files: { slug: string; originalName: string }[] }) {
+export function StaticHtmlManager({ files }: { files: { slug: string; originalName: string; includeSiteHeader: boolean }[] }) {
   const router = useRouter();
   const [prefix, setPrefix] = useState<string>("project");
   const [preview, setPreview] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [headerOverrides, setHeaderOverrides] = useState<Record<string, boolean>>({});
 
   async function upload(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -21,7 +22,7 @@ export function StaticHtmlManager({ files }: { files: { slug: string; originalNa
       const response = await fetch("/api/admin/static-html", { method: "POST", body: new FormData(form) });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Upload failed.");
-      form.reset(); setPreview("");
+      form.reset(); setPreview(""); setHeaderOverrides({});
       setMessage(`Published ${result.slug}. All three link prefixes are available.`);
       router.refresh();
     } catch (error) { setError(error instanceof Error ? error.message : "Upload failed."); }
@@ -45,6 +46,22 @@ export function StaticHtmlManager({ files }: { files: { slug: string; originalNa
     catch { setError("Could not copy the link. Open it and copy the address from your browser."); }
   }
 
+  async function changeHeader(slug: string, includeSiteHeader: boolean) {
+    setHeaderOverrides(current => ({ ...current, [slug]: includeSiteHeader }));
+    setBusy(true); setError(""); setMessage("");
+    try {
+      const response = await fetch("/api/admin/static-html", {
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slug, includeSiteHeader }),
+      });
+      if (!response.ok) throw new Error("Could not update the header setting.");
+      setMessage("Header setting saved for all three links."); router.refresh();
+    } catch (error) {
+      setHeaderOverrides(current => ({ ...current, [slug]: !includeSiteHeader }));
+      setError(error instanceof Error ? error.message : "Update failed.");
+    }
+    finally { setBusy(false); }
+  }
+
   return <>
     <div role="status">{message && <Notice>{message}</Notice>}</div>
     <div role="alert">{error && <Notice variant="error">{error}</Notice>}</div>
@@ -58,6 +75,7 @@ export function StaticHtmlManager({ files }: { files: { slug: string; originalNa
           catch (error) { setPreview(""); setError(error instanceof Error ? error.message : "Invalid filename."); }
         }} /></label>
         {preview && <p>Available at /project/{preview}, /report/{preview} and /special/{preview}</p>}
+        <label className="checkbox-row"><input type="checkbox" name="includeSiteHeader" disabled={busy} />Include site header</label>
         <div><button className="btn btn-primary" disabled={busy || !preview}>Upload and publish</button></div>
       </form>
     </Panel>
@@ -71,6 +89,7 @@ export function StaticHtmlManager({ files }: { files: { slug: string; originalNa
           const path = `/${prefix}/${file.slug}`;
           return <li key={file.slug} style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "1rem", padding: "1rem 0" }}>
             <span>{file.originalName}</span>
+            <label className="checkbox-row"><input type="checkbox" aria-label={`Include site header for ${file.originalName}`} checked={headerOverrides[file.slug] ?? file.includeSiteHeader} disabled={busy} onChange={event => changeHeader(file.slug, event.target.checked)} />Include site header</label>
             <a href={path} target="_blank" rel="noopener noreferrer">{path}</a>
             <button className="btn" onClick={() => copy(path)}>Copy link</button>
             <button className="btn" disabled={busy} onClick={() => remove(file.slug)}>Delete</button>
