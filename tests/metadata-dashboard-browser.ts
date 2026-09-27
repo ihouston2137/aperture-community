@@ -102,7 +102,7 @@ async function main() {
     assert.equal((await MetadataGroup.findById(managed._id))!.showOnDashboard, true);
     assert.match(await managedCard.innerText(), /50% complete/);
     assert.match(await managedCard.innerText(), /Member-only value/);
-    assert.match(await managedCard.innerText(), /Read only/);
+    assert.doesNotMatch(await managedCard.innerText(), /Managed by your community|Read only/);
     assert.equal(await managedCard.getByRole("link").count(), 0);
     assert.equal(await managedCard.locator("input, button, textarea, select").count(), 0);
     assert.doesNotMatch(await dashboard.locator(".member-page").innerText(), /Another account secret|Private manager notes/);

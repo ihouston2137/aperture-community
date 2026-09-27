@@ -31,7 +31,7 @@ export function MetadataCard({ task }: { task: MemberMetadataTask }) {
       )}
       {group.managedBy === "member" ? <div className="member-actions">
         <Link href={`/dashboard/metadata#metadata-${group._id}`} className="btn btn-sm">{summary.complete < summary.total ? "Complete your details" : "Review your details"}</Link>
-      </div> : <p className="member-note">Managed by your community · Read only</p>}
+      </div> : null}
     </section>
   );
 }
