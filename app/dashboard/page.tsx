@@ -71,8 +71,6 @@ export default async function DashboardPage() {
           </h1>
         </header>
 
-        {tasks.map(task => <MetadataCard key={task.group._id} task={task} />)}
-
         {results.length > 0 && (
           <section className="member-card dashboard-test-results" aria-labelledby="test-results-title">
             <h2 id="test-results-title" className="member-card-title">Test results</h2>
@@ -99,6 +97,8 @@ export default async function DashboardPage() {
             </div>
           </section>
         )}
+        {tasks.map(task => <MetadataCard key={task.group._id} task={task} />)}
+
         <AccountCard
           member={{
             firstName: record.firstName ?? "",
