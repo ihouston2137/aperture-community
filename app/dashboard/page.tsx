@@ -93,15 +93,32 @@ export default async function DashboardPage() {
           </section>
         ) : null}
 
-        {results.length > 0 && <section className="member-card" style={{ marginBottom: "1.25rem", overflowX: "auto" }}>
-          <h2 className="member-card-title">Test results</h2>
-          <table className="admin-table"><thead><tr><th>Test</th><th>Taken</th><th>Result</th></tr></thead>
-            <tbody>{results.map(result => <tr key={String(result._id)}><th scope="row">{result.formTitle || "Untitled test"}</th>
-              <td>{new Date(result.createdAt).toLocaleDateString()}</td>
-              <td>{result.gradingStatus === "pending" ? "Pending" : `${result.grade?.percent ?? 0}% — ${result.grade?.passed === true ? "Pass" : result.grade?.passed === false ? "Fail" : "No pass mark set"}`}</td>
-            </tr>)}</tbody>
-          </table>
-        </section>}
+        {results.length > 0 && (
+          <section className="member-card dashboard-test-results" aria-labelledby="test-results-title">
+            <h2 id="test-results-title" className="member-card-title">Test results</h2>
+            <div className="dashboard-test-results-scroll">
+              <table className="dashboard-test-results-table">
+                <thead><tr><th scope="col">Test</th><th scope="col">Taken</th><th scope="col">Result</th></tr></thead>
+                <tbody>{results.map(result => {
+                  const status = result.gradingStatus === "pending" ? "pending"
+                    : result.grade?.passed === true ? "pass"
+                    : result.grade?.passed === false ? "fail" : "unscored";
+                  return (
+                    <tr key={String(result._id)}>
+                      <th scope="row" className="dashboard-test-name">{result.formTitle || "Untitled test"}</th>
+                      <td className="dashboard-test-date">{new Date(result.createdAt).toLocaleDateString()}</td>
+                      <td>
+                        <span className="dashboard-test-result" data-status={status}>
+                          {status === "pending" ? "Pending" : `${result.grade?.percent ?? 0}% — ${status === "pass" ? "Pass" : status === "fail" ? "Fail" : "No pass mark set"}`}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}</tbody>
+              </table>
+            </div>
+          </section>
+        )}
         <AccountCard
           member={{
             firstName: record.firstName ?? "",

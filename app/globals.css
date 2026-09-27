@@ -7924,6 +7924,94 @@ html:has(.admin-shell) body::-webkit-scrollbar {
   margin: 0 0 1rem;
 }
 
+.dashboard-test-results {
+  margin-bottom: 1.25rem;
+  border-top: 3px solid var(--content-accent);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--content-accent) 7%, var(--content-bg)), var(--content-bg) 70%);
+  box-shadow: 0 4px 8px rgb(0 0 0 / 0.04), 0 12px 28px rgb(0 0 0 / 0.08);
+}
+
+.dashboard-test-results .member-card-title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  opacity: 1;
+}
+
+.dashboard-test-results-scroll { overflow-x: auto; }
+
+.dashboard-test-results-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0 0.5rem;
+  text-align: left;
+}
+
+.dashboard-test-results-table thead th {
+  padding: 0 1rem 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.65;
+}
+
+.dashboard-test-results-table tbody th,
+.dashboard-test-results-table tbody td {
+  padding: 1rem;
+  background: var(--content-bg);
+  border-top: 1px solid rgb(128 128 128 / 0.2);
+  border-bottom: 1px solid rgb(128 128 128 / 0.2);
+}
+
+.dashboard-test-results-table tbody th {
+  border-left: 1px solid rgb(128 128 128 / 0.2);
+  border-radius: 0.625rem 0 0 0.625rem;
+}
+
+.dashboard-test-results-table tbody td:last-child {
+  border-right: 1px solid rgb(128 128 128 / 0.2);
+  border-radius: 0 0.625rem 0.625rem 0;
+}
+
+.dashboard-test-name {
+  min-width: 11rem;
+  font-size: 1.125rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.dashboard-test-date { font-size: 0.875rem; white-space: nowrap; }
+
+.dashboard-test-result {
+  display: inline-block;
+  padding: 0.45rem 0.75rem;
+  border: 1px solid rgb(128 128 128 / 0.25);
+  border-radius: 0.5rem;
+  background: rgb(128 128 128 / 0.08);
+  font-size: 1.0625rem;
+  font-weight: 800;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.dashboard-test-result[data-status="pass"] {
+  color: #166534;
+  background: #dcfce7;
+  border-color: #86efac;
+}
+
+.dashboard-test-result[data-status="fail"] {
+  color: #991b1b;
+  background: #fee2e2;
+  border-color: #fca5a5;
+}
+
+.dashboard-test-result[data-status="pending"] {
+  color: #854d0e;
+  background: #fef3c7;
+  border-color: #fcd34d;
+}
+
 .member-facts {
   display: grid;
   grid-template-columns: auto 1fr;
