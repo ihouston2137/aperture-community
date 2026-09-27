@@ -4,7 +4,7 @@ import { SiteChrome } from "@/components/site-chrome";
 import { getUserAccess } from "@/lib/access";
 import { connectDB } from "@/lib/db";
 import { getMemberProfile } from "@/lib/member-profiles";
-import { memberMetadataTasks } from "@/lib/metadata";
+import { dashboardMetadataTasks } from "@/lib/metadata";
 import { fullName } from "@/lib/members";
 import { User } from "@/lib/models";
 import { getSession } from "@/lib/session";
@@ -59,7 +59,7 @@ export default async function DashboardPage() {
   const bio = await getMemberProfile(session.userId);
 
   // What the community has asked of them, and how much of it is still owed.
-  const tasks = await memberMetadataTasks(session.userId, roleIds);
+  const tasks = await dashboardMetadataTasks(session.userId, roleIds);
   const results = await testResults({ userId: session.userId });
 
   return (

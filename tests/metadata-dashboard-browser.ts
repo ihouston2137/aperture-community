@@ -20,7 +20,10 @@ async function main() {
   const questions = [{ id: "name", label: "Contact name", type: "short", isRequired: true }, { id: "phone", label: "Telephone", type: "short" }];
   const group = await MetadataGroup.create({ name: "Contact details", managedBy: "member", roleIds: [String(memberRole._id)], questions });
   await MetadataGroup.create({ name: "Hidden details", managedBy: "member", showOnDashboard: false, roleIds: [String(memberRole._id)], questions });
-  await MetadataGroup.create({ name: "Private manager notes", managedBy: "manager", showOnDashboard: true, roleIds: [String(memberRole._id)], questions });
+  const managed = await MetadataGroup.create({ name: "Manager details", managedBy: "manager", showOnDashboard: false, roleIds: [String(memberRole._id)], questions });
+  await MetadataGroup.create({ name: "Private manager notes", managedBy: "manager", roleIds: [String(memberRole._id)], questions });
+  await MetadataAnswer.create({ userId: String(member._id), groupId: String(managed._id), entries: [{ id: "one", values: [{ questionId: "name", text: "Member-only value" }] }] });
+  await MetadataAnswer.create({ userId: String(admin._id), groupId: String(managed._id), entries: [{ id: "one", values: [{ questionId: "name", text: "Another account secret" }] }] });
   await MetadataGroup.create({ name: "Another level", managedBy: "member", roleIds: [String(adminRole._id)], questions });
   await MetadataAnswer.create({ userId: String(member._id), groupId: String(group._id), entries: [{ id: "one", values: [{ questionId: "name", text: "Ada" }] }] });
   const server = spawn(process.execPath, ["node_modules/next/dist/bin/next", "start", "-p", "3194"], {
@@ -72,6 +75,15 @@ async function main() {
     }
     await card.getByRole("link", { name: "Complete your details" }).click();
     await dashboard.waitForURL(`${baseURL}/dashboard/metadata#metadata-${group._id}`);
+    const saveRequest = dashboard.waitForRequest(request => request.method() === "POST" && Boolean(request.headers()["next-action"]));
+    await dashboard.locator(`#metadata-${group._id}`).getByRole("button", { name: "Save answers", exact: true }).click();
+    const submitted = await saveRequest;
+    assert.ok(submitted.postData()!.includes(String(group._id)));
+    const denied = await account.request.post("/dashboard/metadata", {
+      headers: { "Next-Action": submitted.headers()["next-action"], "Content-Type": submitted.headers()["content-type"], Origin: baseURL },
+      data: submitted.postData()!.replaceAll(String(group._id), String(managed._id)),
+    });
+    assert.match(await denied.text(), /That group is not yours to answer/);
     await dashboard.goto(`${baseURL}/dashboard`);
     await edit();
     await editor.getByLabel("Show percent complete", { exact: true }).uncheck();
@@ -82,7 +94,23 @@ async function main() {
     await save();
     assert.equal(await dashboard.locator(".dashboard-metadata-card").count(), 0);
     assert.equal((await MetadataGroup.findById(group._id))!.showOnDashboard, false);
-    console.log("Passed: settings persist, group visibility and role isolation, percent toggle, all/completed/incomplete lists, saved values, direct edit links, and member-facing wording.");
+    await editor.locator(".admin-list-item").filter({ hasText: "Manager details" }).getByRole("button", { name: "Edit", exact: true }).click();
+    await editor.getByLabel("Show on dashboard", { exact: true }).check();
+    await editor.getByLabel("Items to display").selectOption("all");
+    await save();
+    const managedCard = dashboard.getByRole("region", { name: "Manager details", exact: true });
+    assert.equal((await MetadataGroup.findById(managed._id))!.showOnDashboard, true);
+    assert.match(await managedCard.innerText(), /50% complete/);
+    assert.match(await managedCard.innerText(), /Member-only value/);
+    assert.match(await managedCard.innerText(), /Read only/);
+    assert.equal(await managedCard.getByRole("link").count(), 0);
+    assert.equal(await managedCard.locator("input, button, textarea, select").count(), 0);
+    assert.doesNotMatch(await dashboard.locator(".member-page").innerText(), /Another account secret|Private manager notes/);
+    await dashboard.goto(`${baseURL}/dashboard/metadata`);
+    assert.equal(await dashboard.locator(`#metadata-${managed._id}`).count(), 0);
+    const answer = await MetadataAnswer.findOne({ userId: String(member._id), groupId: String(managed._id) });
+    assert.equal(answer!.entries[0].values[0].text, "Member-only value");
+    console.log("Passed: dashboard settings and filters, read-only manager cards, per-user isolation, private manager defaults, and server-side refusal of member edits to manager data.");
   } catch (error) { console.error(logs); throw error; }
   finally {
     await browser?.close(); server.kill();

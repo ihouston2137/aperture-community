@@ -17,6 +17,8 @@ test("existing groups retain dashboard visibility and percent, with summary-only
   assert.equal(hidden.showOnDashboard, false);
   assert.equal(hidden.dashboardShowPercent, false);
   assert.equal(hidden.dashboardItems, "none");
+  assert.equal(toMetadataGroup({ _id: "legacy-manager", managedBy: "manager" }).showOnDashboard, false);
+  assert.equal(toMetadataGroup({ _id: "enabled-manager", managedBy: "manager", showOnDashboard: true }).showOnDashboard, true);
 });
 
 test("completion counts optional values, recognizes zero, and ignores stale choices", () => {

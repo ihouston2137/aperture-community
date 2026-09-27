@@ -34,7 +34,7 @@ export function toMetadataGroup(record: any): MetadataGroupSummary {
     name: String(record.name ?? ""),
     description: String(record.description ?? ""),
     managedBy: managedBy(record.managedBy),
-    showOnDashboard: record.showOnDashboard !== false,
+    showOnDashboard: typeof record.showOnDashboard === "boolean" ? record.showOnDashboard : managedBy(record.managedBy) === "member",
     dashboardShowPercent: record.dashboardShowPercent !== false,
     dashboardItems: dashboardItemMode(record.dashboardItems),
     roleIds: ids(record.roleIds),
@@ -164,6 +164,18 @@ export async function memberMetadataTasks(
   const groups = groupsForRoles(await getMetadataGroups(), roleIds).filter(
     (group) => group.managedBy === "member" && group.questions.length > 0
   );
+  return metadataTasksForGroups(userId, groups);
+}
+
+/** Dashboard visibility is separate from the member's editable details and required reminders. */
+export async function dashboardMetadataTasks(userId: string, roleIds: string[]): Promise<MemberMetadataTask[]> {
+  const groups = groupsForRoles(await getMetadataGroups(), roleIds).filter(
+    group => group.showOnDashboard && group.questions.length > 0
+  );
+  return metadataTasksForGroups(userId, groups);
+}
+
+async function metadataTasksForGroups(userId: string, groups: MetadataGroupSummary[]): Promise<MemberMetadataTask[]> {
   if (groups.length === 0) return [];
 
   await connectDB();
@@ -177,7 +189,7 @@ export async function memberMetadataTasks(
       (entry) => String(entry.groupId) === group._id
     );
     const entries = record ? toMetadataAnswer(record, group).entries : [];
-    return { group, entries, outstanding: unanswered(group, entries).length };
+    return { group, entries, outstanding: group.managedBy === "member" ? unanswered(group, entries).length : 0 };
   });
 }
 

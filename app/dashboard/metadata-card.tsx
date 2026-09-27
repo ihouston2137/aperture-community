@@ -4,7 +4,7 @@ import { metadataDashboardSummary } from "@/lib/metadata-dashboard";
 
 export function MetadataCard({ task }: { task: MemberMetadataTask }) {
   const { group } = task;
-  if (group.managedBy !== "member" || !group.showOnDashboard) return null;
+  if (!group.showOnDashboard) return null;
   const summary = metadataDashboardSummary(group, task.entries);
   return (
     <section className="member-card dashboard-metadata-card" aria-labelledby={`metadata-title-${group._id}`}>
@@ -29,9 +29,9 @@ export function MetadataCard({ task }: { task: MemberMetadataTask }) {
           </li>)}
         </ul> : <p className="member-note">{group.dashboardItems === "complete" ? "No completed items yet." : "No incomplete items."}</p>
       )}
-      <div className="member-actions">
+      {group.managedBy === "member" ? <div className="member-actions">
         <Link href={`/dashboard/metadata#metadata-${group._id}`} className="btn btn-sm">{summary.complete < summary.total ? "Complete your details" : "Review your details"}</Link>
-      </div>
+      </div> : <p className="member-note">Managed by your community · Read only</p>}
     </section>
   );
 }

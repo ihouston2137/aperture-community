@@ -8,8 +8,8 @@
  * put in front of them until they have.
  *
  * A **manager-managed** group is kept *about* the member — a safeguarding
- * check, a subscription paid, a note from the committee. The member never sees
- * it. Who may read it and who may change it are separate questions, answered
+ * check, a subscription paid, a note from the committee. An enabled dashboard
+ * card lets the member read their own data. Who else may read or change it is decided
  * first by what a management role carries and then by who is named on the
  * group itself.
  *

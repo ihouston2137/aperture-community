@@ -341,17 +341,17 @@ function GroupDialog({
                 <span className="help-text">
                   {kind === "member"
                     ? "The member fills it in on their dashboard, and a required question is put in front of them at sign-in until they have."
-                    : "The member never sees it. Who may read it and who may change it are set below."}
+                    : "Managers maintain this data. You can show the member a read-only card on their dashboard below."}
                 </span>
               </div>
 
-              {kind === "member" && (
-                <fieldset style={{ marginTop: "1.25rem" }}>
-                  <legend className="field-label">Member dashboard</legend>
+                <fieldset style={{ marginTop: "1.25rem", padding: "1rem", border: "1px solid var(--admin-border)", borderRadius: "0.5rem" }}>
+                  <legend className="field-label">User dashboard</legend>
                   <label className="checkbox-row">
                     <input type="checkbox" name="showOnDashboard" checked={showOnDashboard} onChange={event => setShowOnDashboard(event.target.checked)} disabled={pending} />
                     Show on dashboard
                   </label>
+                  {kind === "manager" && <p className="help-text">Members see only their own data in this card and cannot edit it. The membership levels under “Asked of” determine who sees the card.</p>}
                   <div hidden={!showOnDashboard} style={{ marginTop: "0.75rem" }}>
                     <label className="checkbox-row">
                       <input type="checkbox" name="dashboardShowPercent" defaultChecked={group?.dashboardShowPercent ?? true} disabled={pending} />
@@ -369,7 +369,6 @@ function GroupDialog({
                     </div>
                   </div>
                 </fieldset>
-              )}
 
               <div className="field" style={{ marginTop: "0.875rem" }}>
                 <span className="field-label">Asked of</span>

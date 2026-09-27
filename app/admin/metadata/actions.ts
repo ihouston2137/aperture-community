@@ -77,7 +77,7 @@ export async function saveMetadataGroupAction(
     name,
     description: String(formData.get("description") ?? "").trim().slice(0, 2000),
     managedBy: managedBy(formData.get("managedBy")),
-    showOnDashboard: managedBy(formData.get("managedBy")) === "member" && formData.get("showOnDashboard") === "on",
+    showOnDashboard: formData.get("showOnDashboard") === "on",
     dashboardShowPercent: formData.get("dashboardShowPercent") === "on",
     dashboardItems: dashboardItemMode(formData.get("dashboardItems")),
     roleIds: list("roleIds"),

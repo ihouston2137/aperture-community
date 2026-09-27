@@ -780,7 +780,7 @@ const MetadataGroupSchema = new Schema<any>(
     description: { type: String, default: "" },
     /** `member` — they answer it. `manager` — it is kept about them. */
     managedBy: { type: String, default: "member" },
-    showOnDashboard: { type: Boolean, default: true },
+    showOnDashboard: { type: Boolean, default: function (this: { managedBy?: string }) { return this.managedBy !== "manager"; } },
     dashboardShowPercent: { type: Boolean, default: true },
     dashboardItems: { type: String, enum: ["none", "all", "complete", "incomplete"], default: "none" },
     /** The membership roles it is asked of, active accounts and inactive alike. */
