@@ -54,7 +54,7 @@ export function MetadataForm({
   }
 
   return (
-    <section className="member-card">
+    <section id={`metadata-${group._id}`} className="member-card metadata-edit-card">
       <div className="manager-card-head">
         <h2 className="member-card-title">{group.name}</h2>
         {outstanding.length > 0 ? (
@@ -98,7 +98,7 @@ export function MetadataForm({
           <span className="help-text">
             {outstanding.length === 0
               ? "Saved. Nothing else is needed here."
-              : `Saved. ${outstanding.length} required question${
+              : `Saved. ${outstanding.length} required item${
                   outstanding.length === 1 ? "" : "s"
                 } still to answer.`}
           </span>

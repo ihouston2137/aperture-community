@@ -10,6 +10,7 @@ import { connectDB } from "./db";
 import { MetadataAnswer, MetadataGroup, User } from "./models";
 import {
   managedBy,
+  dashboardItemMode,
   METADATA_PERMISSIONS,
   normalizeEntries,
   normalizeQuestions,
@@ -33,6 +34,9 @@ export function toMetadataGroup(record: any): MetadataGroupSummary {
     name: String(record.name ?? ""),
     description: String(record.description ?? ""),
     managedBy: managedBy(record.managedBy),
+    showOnDashboard: record.showOnDashboard !== false,
+    dashboardShowPercent: record.dashboardShowPercent !== false,
+    dashboardItems: dashboardItemMode(record.dashboardItems),
     roleIds: ids(record.roleIds),
     questions: normalizeQuestions(record.questions),
     isRepeatable: Boolean(record.isRepeatable),

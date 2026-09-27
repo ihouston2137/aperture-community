@@ -9,6 +9,7 @@ import { connectDB } from "@/lib/db";
 import { getMetadataGroup, toMetadataAnswer } from "@/lib/metadata";
 import {
   canEditGroup,
+  dashboardItemMode,
   isChoiceType,
   managedBy,
   METADATA_PERMISSIONS,
@@ -76,6 +77,9 @@ export async function saveMetadataGroupAction(
     name,
     description: String(formData.get("description") ?? "").trim().slice(0, 2000),
     managedBy: managedBy(formData.get("managedBy")),
+    showOnDashboard: managedBy(formData.get("managedBy")) === "member" && formData.get("showOnDashboard") === "on",
+    dashboardShowPercent: formData.get("dashboardShowPercent") === "on",
+    dashboardItems: dashboardItemMode(formData.get("dashboardItems")),
     roleIds: list("roleIds"),
     questions,
     isRepeatable: formData.get("isRepeatable") === "on",

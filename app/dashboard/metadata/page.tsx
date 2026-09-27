@@ -40,7 +40,7 @@ export default async function OwnMetadataPage() {
             {tasks.length === 0
               ? "Nothing is being asked of you at the moment."
               : outstanding > 0
-                ? `${outstanding} question${
+                ? `${outstanding} item${
                     outstanding === 1 ? "" : "s"
                   } still needs an answer.`
                 : "Everything asked of you has been answered. You can change any of it here."}

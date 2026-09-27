@@ -94,6 +94,12 @@ export const MANAGED_BY = ["member", "manager"] as const;
 
 export type ManagedBy = (typeof MANAGED_BY)[number];
 
+export const DASHBOARD_ITEM_MODES = ["none", "all", "complete", "incomplete"] as const;
+export type DashboardItemMode = (typeof DASHBOARD_ITEM_MODES)[number];
+export function dashboardItemMode(value: unknown): DashboardItemMode {
+  return DASHBOARD_ITEM_MODES.includes(value as DashboardItemMode) ? value as DashboardItemMode : "none";
+}
+
 export const MANAGED_BY_LABELS: Record<ManagedBy, string> = {
   member: "Members answer it themselves",
   manager: "Kept about the member, by managers",
@@ -104,6 +110,9 @@ export type MetadataGroupSummary = {
   name: string;
   description: string;
   managedBy: ManagedBy;
+  showOnDashboard: boolean;
+  dashboardShowPercent: boolean;
+  dashboardItems: DashboardItemMode;
   /** The membership roles it is asked of. Empty means nobody. */
   roleIds: string[];
   questions: MetadataQuestion[];

@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { SiteChrome } from "@/components/site-chrome";
@@ -12,6 +11,7 @@ import { getSession } from "@/lib/session";
 import { testResults } from "@/lib/test-results";
 
 import { AccountCard } from "./account-card";
+import { MetadataCard } from "./metadata-card";
 
 export const metadata = { title: "Your dashboard" };
 
@@ -60,7 +60,6 @@ export default async function DashboardPage() {
 
   // What the community has asked of them, and how much of it is still owed.
   const tasks = await memberMetadataTasks(session.userId, roleIds);
-  const outstanding = tasks.reduce((total, task) => total + task.outstanding, 0);
   const results = await testResults({ userId: session.userId });
 
   return (
@@ -72,26 +71,7 @@ export default async function DashboardPage() {
           </h1>
         </header>
 
-        {tasks.length > 0 ? (
-          <section
-            className={`member-card${outstanding > 0 ? " is-flagged" : ""}`}
-            style={{ marginBottom: "1.25rem" }}
-          >
-            <h2 className="member-card-title">Your details</h2>
-            <p className="member-note">
-              {outstanding > 0
-                ? `${outstanding} question${
-                    outstanding === 1 ? "" : "s"
-                  } asked of you still needs an answer.`
-                : "Everything asked of you has been answered."}
-            </p>
-            <div className="member-actions">
-              <Link href="/dashboard/metadata" className="btn btn-sm">
-                {outstanding > 0 ? "Answer them" : "Review your answers"}
-              </Link>
-            </div>
-          </section>
-        ) : null}
+        {tasks.map(task => <MetadataCard key={task.group._id} task={task} />)}
 
         {results.length > 0 && (
           <section className="member-card dashboard-test-results" aria-labelledby="test-results-title">

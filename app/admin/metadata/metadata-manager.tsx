@@ -199,6 +199,7 @@ function GroupDialog({
   onSaved: () => void;
 }) {
   const [kind, setKind] = useState<ManagedBy>(group?.managedBy ?? "member");
+  const [showOnDashboard, setShowOnDashboard] = useState(group?.showOnDashboard ?? true);
   const [repeats, setRepeats] = useState(group?.isRepeatable ?? false);
   const [groupBy, setGroupBy] = useState(group?.reportGroupBy ?? "user");
   const [countBy, setCountBy] = useState(group?.reportCountBy ?? "record");
@@ -343,6 +344,32 @@ function GroupDialog({
                     : "The member never sees it. Who may read it and who may change it are set below."}
                 </span>
               </div>
+
+              {kind === "member" && (
+                <fieldset style={{ marginTop: "1.25rem" }}>
+                  <legend className="field-label">Member dashboard</legend>
+                  <label className="checkbox-row">
+                    <input type="checkbox" name="showOnDashboard" checked={showOnDashboard} onChange={event => setShowOnDashboard(event.target.checked)} disabled={pending} />
+                    Show on dashboard
+                  </label>
+                  <div hidden={!showOnDashboard} style={{ marginTop: "0.75rem" }}>
+                    <label className="checkbox-row">
+                      <input type="checkbox" name="dashboardShowPercent" defaultChecked={group?.dashboardShowPercent ?? true} disabled={pending} />
+                      Show percent complete
+                    </label>
+                    <div className="field" style={{ marginTop: "0.75rem" }}>
+                      <label htmlFor="metadata-dashboard-items">Items to display</label>
+                      <select id="metadata-dashboard-items" name="dashboardItems" defaultValue={group?.dashboardItems ?? "none"} disabled={pending}>
+                        <option value="none">No items — summary only</option>
+                        <option value="all">All items</option>
+                        <option value="complete">Completed items</option>
+                        <option value="incomplete">Incomplete items</option>
+                      </select>
+                      <span className="help-text">Each group gets its own card. Completion counts all fields, including optional fields, across saved entries. An empty group starts at 0%.</span>
+                    </div>
+                  </div>
+                </fieldset>
+              )}
 
               <div className="field" style={{ marginTop: "0.875rem" }}>
                 <span className="field-label">Asked of</span>
