@@ -77,6 +77,7 @@ async function main() {
       await viewer.goto(`${baseURL}/${prefix}/annual-report`);
       assert.equal(viewer.url(), `${baseURL}/${prefix}/annual-report`);
       await viewer.locator(".site-header").waitFor();
+      await viewer.waitForFunction(() => document.title === "Original");
       assert.equal(await viewer.locator(".site-footer").count(), 0);
       const frame = viewer.frameLocator('iframe[title="Annual Report.html"]');
       await frame.getByRole("heading", { name: "Annual report" }).waitFor();

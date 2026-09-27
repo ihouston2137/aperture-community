@@ -23,6 +23,7 @@
     "mongoose": "^9.7.3",
     "next": "16.2.10",
     "nodemailer": "^9.0.0",
+    "parse5": "^8.0.1",
     "pdfjs-dist": "^6.3.289",
     "qrcode": "^1.5.4",
     "quill": "^2.0.3",
