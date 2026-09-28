@@ -12346,3 +12346,10 @@ html:has(.admin-shell) body::-webkit-scrollbar {
 .static-html-shell > .site-header { flex-shrink: 0; }
 .static-html-content { flex: 1; min-height: 0; display: flex; }
 .static-html-content iframe { display: block; width: 100%; height: 100%; border: 0; background: #fff; }
+.question-analysis-table th:first-child { min-width: 16rem; }
+.question-analysis-table th > strong { display: block; font-size: 1rem; }
+.question-analysis-table details { margin-top: 0.5rem; font-weight: 400; font-size: 0.8125rem; }
+.question-analysis-rate { min-width: 8rem; }
+.question-analysis-rate strong { display: block; font-size: 1.125rem; font-weight: 800; }
+.question-analysis-track { display: block; height: 0.4rem; border-radius: 1rem; overflow: hidden; background: rgb(128 128 128 / 0.2); margin-top: 0.4rem; }
+.question-analysis-track > span { display: block; height: 100%; background: #e07852; border-radius: inherit; }

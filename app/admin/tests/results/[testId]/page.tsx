@@ -112,6 +112,7 @@ export default async function TestResultPage({
         }
         actions={
           <>
+          <Link href={`/admin/tests/results/${testId}/questions`} className="btn">Question analysis</Link>
           <a href={`/api/admin/tests/export?testId=${encodeURIComponent(testId)}`} className="btn btn-primary" download>Export submissions (CSV)</a>
           {test ? (
             <Link href={`/admin/forms/${testId}/test`} className="btn btn-sm">
