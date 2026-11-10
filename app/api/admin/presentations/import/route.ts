@@ -11,6 +11,7 @@ import { storeUpload, generateThumbnail, ADMIN_MEDIA_MIME_TYPES } from "@/lib/me
 import { normalizeDeck, type Slide } from "@/lib/presentation";
 import { PDF_PAGE_SIZES, pdfDeckSize, pdfPageSlide, type PdfPageSize } from "@/lib/pdf-import-layout";
 import { MAX_PDF_BYTES, PdfImportError, renderPdfSlides } from "@/lib/pdf-presentation";
+import { isAllowedRequestOrigin } from "@/lib/request-origin";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -21,8 +22,12 @@ export async function POST(request: Request) {
   if (!await checkPermission(session, "publications.manage"))
     return Response.json({ error: "You do not have permission to create presentations." }, { status: 403 });
 
-  const origin = request.headers.get("origin");
-  if (origin && origin !== new URL(request.url).origin) return Response.json({ error: "Invalid request origin." }, { status: 403 });
+  if (!isAllowedRequestOrigin(request, process.env.NEXT_PUBLIC_SITE_URL)) {
+    console.warn("PDF import origin rejected", {
+      origin: request.headers.get("origin"), requestOrigin: new URL(request.url).origin,
+    });
+    return Response.json({ error: "Invalid request origin. Open the admin using the configured site URL, or ask the administrator to check NEXT_PUBLIC_SITE_URL." }, { status: 403 });
+  }
   const contentLength = Number(request.headers.get("content-length"));
   if (contentLength > MAX_PDF_BYTES + 1024 * 1024)
     return Response.json({ error: "Choose a PDF smaller than 50 MB." }, { status: 413 });

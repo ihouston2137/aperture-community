@@ -1,4 +1,5 @@
 import test from "node:test";
+import { isAllowedRequestOrigin } from "../lib/request-origin";
 import { copyBlockStyles, pasteBlockStyles } from "../lib/presentation-styles";
 import assert from "node:assert/strict";
 import { convertPublication } from "../lib/publication-migration";
@@ -11,6 +12,21 @@ import { jsPDF } from "jspdf";
 import { collectMediaRefs } from "../lib/media-usage";
 
 const source = () => ({ title: "Fixture", status: "draft", kind: "zine", presentationSize: { width: 1440, height: 1080 }, pages: [{ ...createPublicationPage(), id: "first" }] });
+
+test("PDF origin check accepts the configured public origin behind a proxy", () => {
+  const request = (origin?: string, extra = {}) => new Request("http://localhost:3000/api/admin/presentations/import", {
+    headers: { ...(origin === undefined ? {} : { origin }), ...extra },
+  });
+  assert.equal(isAllowedRequestOrigin(request("http://localhost:3000")), true);
+  assert.equal(isAllowedRequestOrigin(request("https://community.example"), "https://community.example/"), true);
+  assert.equal(isAllowedRequestOrigin(request("https://localhost:3000"), "https://localhost:3000"), true);
+  assert.equal(isAllowedRequestOrigin(request()), true);
+  for (const origin of ["null", "", "https://evil.example", "https://community.example.evil.example", "https://community.example:8443", "http://community.example", "https://community.example/path", "https://user@community.example"]) {
+    assert.equal(isAllowedRequestOrigin(request(origin), "https://community.example"), false, origin);
+  }
+  assert.equal(isAllowedRequestOrigin(request("https://evil.example", { "x-forwarded-host": "evil.example", "x-forwarded-proto": "https" }), "https://community.example"), false);
+  assert.equal(isAllowedRequestOrigin(request("https://community.example"), "invalid configuration"), false);
+});
 
 test("PDF pages fit each supported canvas without cropping, including mixed page sizes", () => {
   for (const choice of Object.keys(PDF_PAGE_SIZES) as PdfPageSize[]) {

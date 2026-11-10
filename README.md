@@ -18,7 +18,7 @@ npm run dev
 | Variable | Purpose |
 | --- | --- |
 | `MONGODB_URI` | MongoDB connection string. |
-| `NEXT_PUBLIC_SITE_URL` | Public origin, used for share links. |
+| `NEXT_PUBLIC_SITE_URL` | Public origin, used for share links and PDF import origin validation behind proxies. Include the browser-facing scheme, hostname, and port (if non-default), e.g. `https://community.example.com`. Rebuild/restart after changing it. |
 | `SESSION_SECRET` | Signing key for the `aperture_session` JWT cookie. Required. |
 | `SEED_ADMIN_EMAIL` | Email of the admin account created on first sign-in. |
 | `SEED_ADMIN_PASSWORD` | Its temporary password — a change is forced at first sign-in. |
