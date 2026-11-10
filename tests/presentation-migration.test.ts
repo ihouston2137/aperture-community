@@ -3,12 +3,87 @@ import { copyBlockStyles, pasteBlockStyles } from "../lib/presentation-styles";
 import assert from "node:assert/strict";
 import { convertPublication } from "../lib/publication-migration";
 import { createPublicationPage, createPublicationBlock, createTable, emptyBackground } from "../lib/publication-layout";
-import { normalizeDeck, slideDimensions, newObject, newSlideBlock, normalizeSlideShadow, slideShadowFilter, duplicateSlide, duplicateObjects, fitObject } from "../lib/presentation";
+import { normalizeDeck, slideDimensions, newObject, newSlide, newSlideBlock, normalizeSlideShadow, slideShadowFilter, duplicateSlide, duplicateObjects, fitObject, applySlideLayout, resizeDeck } from "../lib/presentation";
+import { PDF_PAGE_SIZES, pdfDeckSize, pdfPageSlide, type PdfPageSize } from "../lib/pdf-import-layout";
+import { readPdfImportResponse } from "../lib/pdf-import-response";
 import { renderPdfSlides, PdfImportError } from "../lib/pdf-presentation";
 import { jsPDF } from "jspdf";
 import { collectMediaRefs } from "../lib/media-usage";
 
 const source = () => ({ title: "Fixture", status: "draft", kind: "zine", presentationSize: { width: 1440, height: 1080 }, pages: [{ ...createPublicationPage(), id: "first" }] });
+
+test("PDF pages fit each supported canvas without cropping, including mixed page sizes", () => {
+  for (const choice of Object.keys(PDF_PAGE_SIZES) as PdfPageSize[]) {
+    const size = pdfDeckSize(choice, { width: 600, height: 800 });
+    const frame = slideDimensions(size);
+    for (const page of [{ number: 1, width: 600, height: 800 }, { number: 2, width: 1600, height: 900 }]) {
+      const slide = pdfPageSlide(page, size, { url: "/uploads/media/page.png", id: "a".repeat(24), alt: "PDF page" });
+      const deck = normalizeDeck({ title: "Import", ...size, slides: [slide] });
+      const image = deck.slides[0].objects[0];
+      assert.ok(image.locked);
+      assert.equal(image.type, "image");
+      assert.ok(Math.abs(image.width / image.height - page.width / page.height) < 0.00001);
+      assert.ok(image.x >= -0.00001 && image.y >= -0.00001);
+      assert.ok(image.x + image.width <= frame.width + 0.00001);
+      assert.ok(image.y + image.height <= frame.height + 0.00001);
+      assert.ok(Math.abs(image.x * 2 + image.width - frame.width) < 0.00001);
+    }
+  }
+  assert.deepEqual(slideDimensions(pdfDeckSize("16:9-4k", { width: 10, height: 10 })), { width: 3840, height: 2160 });
+});
+
+test("applying and reapplying layouts preserves PDF and user content across saves", () => {
+  const size = pdfDeckSize("16:9", { width: 1600, height: 900 });
+  const slide = pdfPageSlide({ number: 1, width: 1600, height: 900 }, size, { url: "/uploads/media/page.png", id: "a".repeat(24), alt: "Page" });
+  slide.objects.push(newSlideBlock("richText"));
+  const layout = { id: "layout", name: "Header", slide: { ...newSlide(), objects: [newSlideBlock("richText")] } };
+  const applied = applySlideLayout(slide, layout);
+  const saved = normalizeDeck({ title: "Import", ...size, slides: [applied] });
+  const reapplied = applySlideLayout(saved.slides[0], { ...layout, id: "replacement" });
+  assert.equal(reapplied.objects.length, 3);
+  assert.deepEqual(reapplied.objects.slice(0, 2).map(o => o.id), slide.objects.map(o => o.id));
+  assert.equal(reapplied.objects[2].layoutSourceId, "replacement");
+  assert.notEqual(reapplied.objects[2].id, applied.objects[2].id);
+  assert.equal(duplicateSlide(reapplied).objects[2].layoutSourceId, "replacement");
+  assert.equal(duplicateObjects([reapplied.objects[2]])[0].layoutSourceId, undefined);
+  const full = { ...slide, objects: Array.from({ length: 100 }, () => newObject("text")) };
+  assert.throws(() => applySlideLayout(full, layout), /100 blocks/);
+  assert.equal(full.objects.length, 100);
+});
+
+test("resizing fits locked PDF content and layouts without changing image proportions", () => {
+  const size = pdfDeckSize("16:9", { width: 1600, height: 900 });
+  const slide = pdfPageSlide({ number: 1, width: 1600, height: 900 }, size, { url: "/uploads/media/page.png", id: "a".repeat(24), alt: "Page" });
+  const deck = normalizeDeck({ title: "Import", ...size, slides: [slide], layouts: [{ id: "layout", name: "Layout", slide: duplicateSlide(slide) }] });
+  const enlarged = resizeDeck(deck, { aspect: "16:9", pageUnit: "px", resolution: "4k" }, true);
+  assert.equal(enlarged.slides[0].objects[0].width, 3840);
+  assert.equal(enlarged.layouts![0].slide.objects[0].width, 3840);
+  assert.equal(deck.slides[0].objects[0].width, 1920);
+  const portrait = resizeDeck(deck, { aspect: "9:16", pageUnit: "px" }, true).slides[0].objects[0];
+  assert.equal(portrait.width, 1080);
+  assert.equal(portrait.height, 607.5);
+  assert.equal(portrait.y, (1920 - 607.5) / 2);
+  assert.deepEqual(resizeDeck(deck, { aspect: "9:16", pageUnit: "px" }, false).slides, deck.slides);
+});
+
+test("PDF import reports gateway failures without exposing JSON parse errors", async () => {
+  await assert.rejects(readPdfImportResponse(new Response("<html>Too large</html>", { status: 413 })), /too large/);
+  await assert.rejects(readPdfImportResponse(new Response(null, { status: 504 })), /timed out/);
+  await assert.rejects(readPdfImportResponse(Response.json({ error: "Unlock this PDF" }, { status: 400 })), /Unlock this PDF/);
+  await assert.rejects(readPdfImportResponse(Response.json({ id: "invalid" })), /could not be confirmed/);
+  assert.deepEqual(await readPdfImportResponse(Response.json({ id: "a".repeat(24) }, { status: 201 })), { id: "a".repeat(24) });
+});
+
+test("PDF renderer stops on a page persistence failure and honors cancellation", async () => {
+  const pdf = new jsPDF(); pdf.text("One", 10, 10); pdf.addPage();
+  let called = 0;
+  await assert.rejects(renderPdfSlides(new Uint8Array(pdf.output("arraybuffer")), async () => { called++; throw new Error("Storage unavailable"); }), /Storage unavailable/);
+  assert.equal(called, 1);
+  const controller = new AbortController();
+  called = 0;
+  await assert.rejects(renderPdfSlides(new Uint8Array(pdf.output("arraybuffer")), async () => { called++; controller.abort(); }, controller.signal), { name: "AbortError" });
+  assert.equal(called, 1);
+});
 
 test("duplicating selections preserves independent groups, content, effects and relative positions", () => {
   const originals = [newSlideBlock("shape"), newObject("line"), newObject("text")];

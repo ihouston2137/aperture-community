@@ -1,8 +1,9 @@
 import { chromium } from "@playwright/test";
+import { protectedMediaUrl } from "../lib/protected-media-url";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { mkdir, unlink } from "node:fs/promises";
+import { mkdir, unlink, readdir } from "node:fs/promises";
 import path from "node:path";
 import { jsPDF } from "jspdf";
 import { SignJWT } from "jose";
@@ -133,15 +134,67 @@ async function main() {
     await page.getByRole("button", { name: "Unpublish", exact: true }).click();
     await page.getByRole("button", { name: "Publish", exact: true }).waitFor();
     const pdf = new jsPDF(); pdf.text("Imported page", 10, 10);
+    pdf.addPage([400, 200], "landscape"); pdf.text("Wide imported page", 10, 10);
+    // Force a second-page storage failure only in this disposable database.
+    // The already-created first page and both pages' files must be rolled back.
+    await MediaAsset.createCollection();
+    const uploadFiles = async () => (await Promise.all(["media", "thumbnails"].map(async folder =>
+      (await readdir(path.join("public/uploads", folder)).catch(() => [])).map(file => `${folder}/${file}`)
+    ))).flat().sort();
+    const beforeFiles = await uploadFiles();
+    const beforeAssets = await MediaAsset.countDocuments();
+    await mongoose.connection.db!.command({ collMod: MediaAsset.collection.name, validator: { title: { $ne: "Forced failure — Page 2" } }, validationAction: "error" });
+    try {
+      const failed = await context.request.post(`${baseURL}/api/admin/presentations/import`, { multipart: {
+        title: "Forced failure", pageSize: "16:9",
+        pdf: { name: "failure.pdf", mimeType: "application/pdf", buffer: Buffer.from(pdf.output("arraybuffer")) },
+      } });
+      assert.equal(failed.status(), 500);
+      const failure = await failed.json();
+      assert.equal(await Presentation.countDocuments({ _id: failure.importId }), 0);
+      assert.equal(await Zine.countDocuments({ _id: failure.importId }), 0);
+      assert.equal(await MediaAsset.countDocuments(), beforeAssets);
+      assert.deepEqual(await uploadFiles(), beforeFiles);
+    } finally {
+      await mongoose.connection.db!.command({ collMod: MediaAsset.collection.name, validator: {} });
+    }
     await page.goto(`${baseURL}/admin/presentations/import`);
     await page.getByLabel("PDF file", { exact: true }).setInputFiles({ name: "browser-import.pdf", mimeType: "application/pdf", buffer: Buffer.from(pdf.output("arraybuffer")) });
+    await page.getByLabel("Page size", { exact: true }).selectOption("16:9");
     await page.getByRole("button", { name: "Import PDF", exact: true }).click();
     await page.waitForURL("**/admin/presentations/*/edit");
     const importedId = page.url().split("/").at(-2)!;
     const imported = await Presentation.findById(importedId).lean<any>();
-    assert.equal(imported.deck.slides.length, 1);
+    assert.equal(imported.deck.slides.length, 2);
+    assert.equal(imported.deck.aspect, "16:9");
+    assert.equal(imported.deck.pageUnit, "px");
     assert.equal(imported.deck.slides[0].objects[0].type, "image");
     assert.equal(imported.published, null);
+    const imageUrl = imported.deck.slides[0].objects[0].mediaUrl;
+    const imageResponse = await context.request.get(new URL(protectedMediaUrl(imageUrl), baseURL).href);
+    assert.equal(imageResponse.status(), 200);
+    // Build and apply a layout through the same interface used for imported pages.
+    await page.getByRole("tab", { name: "Layouts", exact: true }).click();
+    await page.getByRole("button", { name: "Shape", exact: true }).click();
+    await page.getByRole("tab", { name: "Pages", exact: true }).click();
+    const layoutValue = await page.getByLabel("Page layout", { exact: true }).locator("option").nth(1).getAttribute("value");
+    await page.getByLabel("Page layout", { exact: true }).selectOption(layoutValue!);
+    await page.getByRole("button", { name: "Apply layout", exact: true }).click();
+    await page.getByRole("button", { name: "Apply layout", exact: true }).click();
+    assert.equal(await page.locator(".deck-object").count(), 2);
+    await page.getByRole("button", { name: "Presentation settings", exact: true }).click();
+    await page.getByLabel("Page size", { exact: true }).selectOption("16:9-4k");
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+    await page.getByRole("status").filter({ hasText: "Presentation saved." }).waitFor();
+    const updatedImport = (await Presentation.findById(importedId).lean<any>()).deck;
+    assert.equal(updatedImport.slides[0].objects.length, 2);
+    assert.equal(updatedImport.slides[0].objects[0].mediaUrl, imageUrl);
+    assert.equal(updatedImport.slides[0].objects[1].layoutSourceId, layoutValue);
+    assert.equal(updatedImport.slides[0].objects[0].height, 2160);
+    await page.reload();
+    await page.getByLabel("Page layout", { exact: true }).selectOption(layoutValue!);
+    await page.getByRole("button", { name: "Apply layout", exact: true }).click();
+    assert.equal(await page.locator(".deck-object").count(), 2);
     for (const type of ["Shape", "Custom shape"]) {
       await page.goto(`${baseURL}/admin/presentations/new`);
       await page.getByRole("button", { name: type, exact: true }).click();

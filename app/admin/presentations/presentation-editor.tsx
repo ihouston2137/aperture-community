@@ -33,6 +33,8 @@ import { ColorPicker } from "@/components/color-field";
 import { MediaPicker } from "@/app/admin/media/media-picker";
 import {
   objectBounds,
+  applySlideLayout,
+  resizeDeck,
   newObject,
   lineEndpoints,
   lineFromPoints,
@@ -131,6 +133,8 @@ export function PresentationEditor({
   const [styleClipboard, setStyleClipboard] = useState<SlideObject | null>(null);
   const [blockClipboard, setBlockClipboard] = useState<{ objects: SlideObject[]; token: string; slideId: string; pastes: number } | null>(null);
   const [layoutId, setLayoutId] = useState("");
+  const [scaleOnResize, setScaleOnResize] = useState(true);
+  const pageResizeStart = useRef<Deck | null>(null);
   const [editingLayout, setEditingLayout] = useState(false);
   const [exporting, setExporting] = useState(false);
   const exportHost = useRef<HTMLDivElement>(null);
@@ -1532,8 +1536,8 @@ export function PresentationEditor({
                       onChange={(e) => {
                         const value = e.target.value;
                         const aspect = value.replace("-4k", "") as Deck["aspect"];
-                        commit({ ...deck, aspect, pageUnit: "px", resolution: value.endsWith("-4k") ? "4k" : "hd",
-                          customWidth: dimensions.width, customHeight: dimensions.height });
+                        commit(resizeDeck(deck, { aspect, pageUnit: "px", resolution: value.endsWith("-4k") ? "4k" : "hd",
+                          customWidth: dimensions.width, customHeight: dimensions.height }, scaleOnResize));
                       }}
                     >
                       <option value="16:9">16:9 HD &mdash; 1920 &times; 1080 px</option>
@@ -1545,6 +1549,7 @@ export function PresentationEditor({
                       <option value="custom">Custom</option>
                     </select>
                   </label>
+                  <label><input type="checkbox" checked={scaleOnResize} onChange={(event) => setScaleOnResize(event.target.checked)} /> Scale content to fit when changing page size</label>
                   {deck.aspect === "custom" && (
                     <>
                       <label>Page size unit
@@ -1563,7 +1568,7 @@ export function PresentationEditor({
                             setMessage(`This DPI would exceed ${MAX_PAGE_PIXELS} pixels per side. Reduce the page size first.`);
                             return;
                           }
-                          commit({ ...deck, dpi });
+                          commit(resizeDeck(deck, { ...deck, dpi }, scaleOnResize));
                         }}>{PAGE_DPI.map((dpi) => <option key={dpi} value={dpi}>{dpi} DPI</option>)}</select>
                       </label>}
                       {(["customWidth", "customHeight"] as const).map((key) => {
@@ -1573,9 +1578,11 @@ export function PresentationEditor({
                         return <label key={key}>{label}
                           <input className="input" type="number" min={min} max={max} step="any" aria-label={label}
                             value={deck[key] ?? (key === "customWidth" ? 1920 : 1080)}
+                            onFocus={() => { pageResizeStart.current = deck; }}
+                            onBlur={() => { pageResizeStart.current = null; }}
                             onChange={(e) => {
                               const n = Number(e.target.value);
-                              if (Number.isFinite(n) && n >= min && n <= max) commit({ ...deck, [key]: n });
+                              if (Number.isFinite(n) && n >= min && n <= max) commit(resizeDeck(pageResizeStart.current ?? deck, { aspect: deck.aspect, pageUnit: deck.pageUnit, dpi: deck.dpi, resolution: deck.resolution, customWidth: deck.customWidth, customHeight: deck.customHeight, [key]: n }, scaleOnResize));
                             }} />
                         </label>;
                       })}
@@ -2099,16 +2106,14 @@ export function PresentationEditor({
                             (l) => l.id === layoutId,
                           );
                           if (!layout) return;
-                          const copy = duplicateSlide(layout.slide);
-                          patchSlide({
-                            objects: copy.objects,
-                            background: copy.background,
-                          });
+                          try { patchSlide(applySlideLayout(slide, layout)); }
+                          catch (error) { setMessage(error instanceof Error ? error.message : "Could not apply layout."); return; }
                           setSelected(null);
                         }}
                       >
                         Apply layout
                       </button>
+                      <p className="help-text">Keeps page content and replaces previously applied layout blocks. Layout blocks appear over page content.</p>
                     </section>
                   )}
                   {!object && (

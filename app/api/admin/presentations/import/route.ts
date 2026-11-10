@@ -8,7 +8,8 @@ import { getSession } from "@/lib/session";
 import { connectDB } from "@/lib/db";
 import { Zine, MediaAsset, Presentation } from "@/lib/models";
 import { storeUpload, generateThumbnail, ADMIN_MEDIA_MIME_TYPES } from "@/lib/media-upload";
-import { newObject, newSlide, normalizeDeck, type Slide } from "@/lib/presentation";
+import { normalizeDeck, type Slide } from "@/lib/presentation";
+import { PDF_PAGE_SIZES, pdfDeckSize, pdfPageSlide, type PdfPageSize } from "@/lib/pdf-import-layout";
 import { MAX_PDF_BYTES, PdfImportError, renderPdfSlides } from "@/lib/pdf-presentation";
 
 export const runtime = "nodejs";
@@ -35,18 +36,20 @@ export async function POST(request: Request) {
   if (file.size > MAX_PDF_BYTES)
     return Response.json({ error: "Choose a PDF smaller than 50 MB." }, { status: 413 });
   const title = (String(form.get("title") || "").trim() || file.name.replace(/\.pdf$/i, "") || "Imported PDF").slice(0, 200);
+  const pageSize = String(form.get("pageSize") || "original");
+  if (!Object.hasOwn(PDF_PAGE_SIZES, pageSize))
+    return Response.json({ error: "Choose a supported page size." }, { status: 400 });
   const id = String(new Types.ObjectId());
   const assetIds: Types.ObjectId[] = [];
   const files: string[] = [];
   const slides: Slide[] = [];
-  let frame = { width: 960, height: 540 };
+  let size = pdfDeckSize(pageSize as PdfPageSize, { width: 1920, height: 1080 });
   let saved = false;
   try {
     await connectDB();
     await renderPdfSlides(new Uint8Array(await file.arrayBuffer()), async (page) => {
       if (page.number === 1) {
-        const scale = 960 / Math.max(page.width, page.height);
-        frame = { width: Math.max(16, page.width * scale), height: Math.max(16, page.height * scale) };
+        size = pdfDeckSize(pageSize as PdfPageSize, page);
       }
       const stored = await storeUpload(new File([new Uint8Array(page.png)], `${title}-page-${page.number}.png`, { type: "image/png" }), "media", ADMIN_MEDIA_MIME_TYPES);
       files.push(stored.absolutePath);
@@ -63,29 +66,27 @@ export async function POST(request: Request) {
         mediaType: "image", provider: "local",
         usage: [{ kind: "publication", refId: id, label: title }],
       });
-      const scale = Math.min(frame.width / page.width, frame.height / page.height);
-      const width = page.width * scale, height = page.height * scale;
-      slides.push({ ...newSlide(), name: `Page ${page.number}`, objects: [{
-        ...newObject("image"), x: (frame.width - width) / 2, y: (frame.height - height) / 2,
-        width, height, mediaUrl: stored.url, mediaId: String(assetId), imageFit: "contain",
-        imageRatio: page.width / page.height, locked: true, alt: `${title}, page ${page.number}`,
-      }] });
-    }, request.signal);
+      slides.push(pdfPageSlide(page, size, { url: stored.url, id: String(assetId), alt: `${title}, page ${page.number}` }));
+    }, request.signal, pageSize.endsWith("-4k") ? 3840 : 2560);
     request.signal.throwIfAborted();
-    const deck = normalizeDeck({ title, aspect: "custom", pageUnit: "px", customWidth: frame.width, customHeight: frame.height, slides });
+    const deck = normalizeDeck({ title, ...size, slides });
     await createPresentation(deck, id);
     saved = true;
-    revalidatePath("/admin/presentations");
+    try { revalidatePath("/admin/presentations"); }
+    catch (error) { console.error("PDF import cache refresh failed", { importId: id, error }); }
     return Response.json({ id, pages: slides.length }, { status: 201 });
   } catch (error) {
+    console.error("PDF import failed", { importId: id, pagesRendered: slides.length, error });
     if (!saved) {
-      await Promise.allSettled([
+      const cleanup = await Promise.allSettled([
         Presentation.deleteOne({ _id: id }),
         Zine.deleteOne({ _id: id }),
         MediaAsset.deleteMany({ _id: { $in: assetIds } }),
         ...files.map((filePath) => unlink(filePath)),
       ]);
+      for (const result of cleanup) if (result.status === "rejected")
+        console.error("PDF import cleanup failed", { importId: id, error: result.reason });
     }
-    return Response.json({ error: error instanceof PdfImportError ? error.message : "The PDF could not be imported. Please try again." }, { status: error instanceof PdfImportError ? 400 : 500 });
+    return Response.json({ error: error instanceof PdfImportError ? error.message : `The PDF could not be imported. Reference: ${id}.`, importId: id }, { status: error instanceof PdfImportError ? 400 : 500 });
   }
 }

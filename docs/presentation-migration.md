@@ -36,7 +36,17 @@ Rollback backs up current state, disables converted rendering, and restores the 
 
 Run migration during a pause in publication editing. Conversion checks source modification timestamps, but is not a cross-collection transaction. Run the dry run first and verify any partial-failure report before resuming editing.
 
-## Verification
+## PDF import and layouts
+
+PDF import preserves each page as a locked native image object in a draft presentation. The form offers the builder's HD/4K and portrait presets, or the first PDF page's proportions at a 1920-pixel longest edge. Mixed-size pages are centered with contain fitting. 4K imports render page images at a 3840-pixel longest edge; other imports use 2560 pixels. PDF text and artwork are not converted into individually editable blocks.
+
+Applying a layout retains existing page content and places copies of the layout's objects above it. These copies carry `layoutSourceId`, which survives saving and duplicating a page. Applying another layout replaces the previous layout copies. Duplicating individual blocks makes independent content copies. Older applied layouts without this metadata are treated as page content, so they are preserved rather than guessed at and deleted.
+
+The editor's "Scale content to fit when changing page size" option uniformly fits object positions and sizes, including locked PDF images and reusable layouts, into the new canvas. Unchecking it changes only the canvas. Named styles and inline rich-text sizing remain independently authored styles.
+
+Imports still run in one HTTP request. Gateway and connection failures tell users to check the presentation list before retrying, and server failures include an import reference in the logs. Durable background jobs and automatic retry deduplication are not implemented.
+
+## Verification commands
 
 ```sh
 npm run test:presentations

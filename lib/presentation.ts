@@ -7,8 +7,11 @@ import {
 } from "./page-layout";
 import { normalizeRichText } from "./rich-text";
 import { sanitizeMediaPath } from "./protected-media-url";
+import type { StyleValues } from "./style-values";
 export type SlideObject = {
   id: string;
+  /** Identifies objects materialized by Apply layout, separate from page content. */
+  layoutSourceId?: string;
   shadow?: SlideShadow;
   publication?: PublicationBlock;
   type: "publication" | "text" | "image" | "video" | "rectangle" | "ellipse" | "block" | "line";
@@ -182,12 +185,13 @@ export function newObject(type: SlideObject["type"], defaults?: Partial<Presenta
     alt: "",
   };
 }
-export function duplicateObjects(objects: SlideObject[], offset = 20): SlideObject[] {
+export function duplicateObjects(objects: SlideObject[], offset = 20, preserveLayoutSource = false): SlideObject[] {
   const groups = new Map<string, string>();
   for (const o of objects)
     if (o.groupId && !groups.has(o.groupId)) groups.set(o.groupId, slideId());
   return objects.map((o) => ({
       ...structuredClone(o),
+      layoutSourceId: preserveLayoutSource ? o.layoutSourceId : undefined,
       groupId: o.groupId ? groups.get(o.groupId) : undefined,
       id: slideId(),
       x: o.x + offset,
@@ -205,8 +209,61 @@ export function duplicateSlide(slide: Slide): Slide {
     ...structuredClone(slide),
     id: slideId(),
     name: slide.name ? `${slide.name} copy` : "",
-    objects: duplicateObjects(slide.objects, 0),
+    objects: duplicateObjects(slide.objects, 0, true),
   };
+}
+
+/** Replace the applied layout while retaining PDF pages and user-added blocks. */
+export function applySlideLayout(slide: Slide, layout: SlideLayout): Slide {
+  const objects = duplicateObjects(layout.slide.objects, 0).map((object) => ({
+    ...object, layoutSourceId: layout.id,
+  }));
+  if (slide.objects.filter((object) => !object.layoutSourceId).length + objects.length > 100)
+    throw new Error("This layout would exceed the limit of 100 blocks per page.");
+  return {
+    ...slide,
+    background: layout.slide.background,
+    publicationBackground: structuredClone(layout.slide.publicationBackground),
+    objects: [...slide.objects.filter((object) => !object.layoutSourceId), ...objects],
+  };
+}
+
+/** Uniformly fit content into a resized canvas without stretching images. */
+export function resizeDeck(deck: Deck, size: PageSize, scaleContent: boolean): Deck {
+  const next = { ...deck, ...size };
+  if (!scaleContent) return next;
+  const before = slideDimensions(deck), after = slideDimensions(next);
+  const scale = Math.min(after.width / before.width, after.height / before.height);
+  const dx = (after.width - before.width * scale) / 2;
+  const dy = (after.height - before.height * scale) / 2;
+  const style = (input?: StyleValues): StyleValues | undefined => {
+    if (!input) return input;
+    const next = { ...input };
+    for (const key of ["fontSize", "letterSpacing", "borderWidth", "borderRadius", "borderRadiusTopLeft", "borderRadiusTopRight", "borderRadiusBottomLeft", "borderRadiusBottomRight", "paddingTop", "paddingRight", "paddingBottom", "paddingLeft", "marginTop", "marginRight", "marginBottom", "marginLeft", "shadowX", "shadowY", "shadowBlur"] as const)
+      if (typeof next[key] === "number") next[key] *= scale;
+    return next;
+  };
+  const resize = (slide: Slide): Slide => ({ ...slide, objects: slide.objects.map((object) => ({
+    ...object,
+    x: object.x * scale + dx, y: object.y * scale + dy,
+    width: object.width * scale, height: object.height * scale,
+    fontSize: object.fontSize * scale,
+    borderWidth: (object.borderWidth ?? 0) * scale,
+    borderRadius: (object.borderRadius ?? 0) * scale,
+    shadow: object.shadow ? { ...object.shadow, x: object.shadow.x * scale, y: object.shadow.y * scale, blur: object.shadow.blur * scale } : undefined,
+    line: object.line ? { ...object.line, strokeWidth: object.line.strokeWidth * scale } : undefined,
+    block: object.block ? { ...object.block,
+      textStyle: style(object.block.textStyle), shapeTextStyle: style(object.block.shapeTextStyle),
+      borderWidth: object.block.borderWidth === undefined ? undefined : object.block.borderWidth * scale,
+      radius: object.block.radius === undefined ? undefined : object.block.radius * scale,
+      strokeWidth: object.block.strokeWidth === undefined ? undefined : object.block.strokeWidth * scale,
+    } : undefined,
+    publication: object.publication ? { ...object.publication,
+      textStyle: style(object.publication.textStyle), shapeStyle: style(object.publication.shapeStyle),
+      radius: object.publication.radius === undefined ? undefined : object.publication.radius * scale,
+    } : undefined,
+  })) });
+  return { ...next, slides: deck.slides.map(resize), layouts: deck.layouts?.map((layout) => ({ ...layout, slide: resize(layout.slide) })) };
 }
 
 export type LinePoint = { x: number; y: number };
@@ -428,6 +485,7 @@ export function normalizeDeck(input: unknown): Deck {
             borderColor: string(o.borderColor, 100) || "#16181d",
             borderRadius: number(o.borderRadius, 0, 200, 0),
             id: id(o.id),
+            layoutSourceId: string(o.layoutSourceId, 80) || undefined,
             type: o.type,
             x: number(o.x, -32000, 32000, 80),
             y: number(o.y, -32000, 32000, 80),

@@ -20,6 +20,7 @@ export async function renderPdfSlides(
   data: Uint8Array,
   onPage: (page: PdfSlidePage) => Promise<void>,
   signal?: AbortSignal,
+  renderEdge = RENDER_EDGE,
 ) {
   if (!data.length || data.length > MAX_PDF_BYTES)
     throw new PdfImportError("Choose a PDF smaller than 50 MB.");
@@ -57,7 +58,7 @@ export async function renderPdfSlides(
       const natural = page.getViewport({ scale: 1 });
       if (![natural.width, natural.height].every((n) => Number.isFinite(n) && n > 0))
         throw new PdfImportError(`Page ${number} has an invalid size.`);
-      const viewport = page.getViewport({ scale: RENDER_EDGE / Math.max(natural.width, natural.height) });
+      const viewport = page.getViewport({ scale: Math.max(RENDER_EDGE, Math.min(3840, renderEdge)) / Math.max(natural.width, natural.height) });
       const width = Math.max(1, Math.ceil(viewport.width));
       const height = Math.max(1, Math.ceil(viewport.height));
       const surface = factory.create(width, height);
