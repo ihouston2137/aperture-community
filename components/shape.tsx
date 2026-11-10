@@ -266,7 +266,7 @@ export function CustomShapeView({
   textClassName,
   textStyle,
 }: {
-  shape: { viewBox: string; paths: string[] } | undefined;
+  shape: { viewBox: string; paths: string[]; fillRule?: "nonzero" | "evenodd"; lineCap?: "butt" | "round" | "square"; lineJoin?: "miter" | "round" | "bevel"; miterLimit?: number } | undefined;
   color: string;
   width: number;
   height: number;
@@ -325,7 +325,7 @@ export function CustomShapeView({
           </defs>
         ) : null}
         {shape.paths.map((d, index) => (
-          <path key={index} d={d} fill={color} {...border} />
+          <path key={index} d={d} fill={color} fillRule={shape.fillRule} strokeLinecap={shape.lineCap} strokeLinejoin={shape.lineJoin} strokeMiterlimit={shape.miterLimit} {...border} />
         ))}
       </svg>
 

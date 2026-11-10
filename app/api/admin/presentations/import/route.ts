@@ -8,7 +8,7 @@ import { getSession } from "@/lib/session";
 import { connectDB } from "@/lib/db";
 import { Zine, MediaAsset, Presentation } from "@/lib/models";
 import { storeUpload, generateThumbnail, ADMIN_MEDIA_MIME_TYPES } from "@/lib/media-upload";
-import { normalizeDeck, type Slide } from "@/lib/presentation";
+import { newSlide, normalizeDeck, resizeDeck, type Slide } from "@/lib/presentation";
 import { PDF_PAGE_SIZES, pdfDeckSize, pdfPageSlide, type PdfPageSize } from "@/lib/pdf-import-layout";
 import { MAX_PDF_BYTES, PdfImportError, renderPdfSlides } from "@/lib/pdf-presentation";
 import { isAllowedRequestOrigin } from "@/lib/request-origin";
@@ -44,42 +44,71 @@ export async function POST(request: Request) {
   const pageSize = String(form.get("pageSize") || "original");
   if (!Object.hasOwn(PDF_PAGE_SIZES, pageSize))
     return Response.json({ error: "Choose a supported page size." }, { status: 400 });
+  const mode = String(form.get("mode") || "image");
+  if (mode !== "image" && mode !== "editable")
+    return Response.json({ error: "Choose a supported import mode." }, { status: 400 });
   const id = String(new Types.ObjectId());
   const assetIds: Types.ObjectId[] = [];
   const files: string[] = [];
   const slides: Slide[] = [];
   let size = pdfDeckSize(pageSize as PdfPageSize, { width: 1920, height: 1080 });
   let saved = false;
+  const warnings: string[] = [];
+  let convertedPages = 0;
   try {
     await connectDB();
-    await renderPdfSlides(new Uint8Array(await file.arrayBuffer()), async (page) => {
-      if (page.number === 1) {
-        size = pdfDeckSize(pageSize as PdfPageSize, page);
-      }
-      const stored = await storeUpload(new File([new Uint8Array(page.png)], `${title}-page-${page.number}.png`, { type: "image/png" }), "media", ADMIN_MEDIA_MIME_TYPES);
+    async function saveImage(png: Buffer, width: number, height: number, label: string) {
+      const stored = await storeUpload(new File([new Uint8Array(png)], `${title}-${label}.png`, { type: "image/png" }), "media", ADMIN_MEDIA_MIME_TYPES);
       files.push(stored.absolutePath);
       const thumbnail = await generateThumbnail(stored.absolutePath, stored.fileName);
       if (thumbnail) files.push(path.join(process.cwd(), "public", thumbnail.thumbnailUrl));
       const assetId = new Types.ObjectId();
       assetIds.push(assetId);
       await MediaAsset.create({
-        _id: assetId, uploadedBy: session.userId, uploadSource: "publications",
+        _id: assetId, uploadedBy: session!.userId, uploadSource: "publications",
         filename: stored.fileName, fileName: stored.fileName, url: stored.url,
-        thumbnailUrl: thumbnail?.thumbnailUrl ?? "", width: page.width, height: page.height,
+        thumbnailUrl: thumbnail?.thumbnailUrl ?? "", width, height,
         originalName: stored.originalName, mimeType: stored.mimeType, size: stored.size,
-        title: `${title} — Page ${page.number}`, alt: `${title}, page ${page.number}`,
+        title: `${title} — ${label}`, alt: `${title}, ${label.toLowerCase()}`,
         mediaType: "image", provider: "local",
         usage: [{ kind: "publication", refId: id, label: title }],
       });
-      slides.push(pdfPageSlide(page, size, { url: stored.url, id: String(assetId), alt: `${title}, page ${page.number}` }));
-    }, request.signal, pageSize.endsWith("-4k") ? 3840 : 2560);
+      return { url: stored.url, id: String(assetId), alt: `${title}, ${label.toLowerCase()}` };
+    }
+    await renderPdfSlides(new Uint8Array(await file.arrayBuffer()), async (page) => {
+      if (page.number === 1) {
+        size = pdfDeckSize(pageSize as PdfPageSize, page);
+      }
+      if (page.editable && !page.editable.fallbackReason) {
+        const slide = { ...newSlide(), name: `Page ${page.number}`, objects: page.editable.objects.map(entry => entry.object) };
+        for (const [index, entry] of page.editable.objects.entries()) {
+          request.signal.throwIfAborted();
+          if (!entry.png) continue;
+          const media = await saveImage(entry.png, entry.pixelWidth!, entry.pixelHeight!, `Page ${page.number} image ${index + 1}`);
+          entry.object.mediaUrl = media.url; entry.object.mediaId = media.id; entry.object.alt = media.alt;
+        }
+        slide.notes = page.editable.warnings.join("\n");
+        const resized = resizeDeck({ title, aspect: "custom", pageUnit: "px", customWidth: page.width, customHeight: page.height, slides: [slide] }, size, true);
+        slides.push(resized.slides[0]);
+        convertedPages++;
+        warnings.push(...page.editable.warnings.map(warning => `Page ${page.number}: ${warning}`));
+      } else {
+        const media = await saveImage(page.png, page.width, page.height, `Page ${page.number}`);
+        const slide = pdfPageSlide(page, size, media);
+        if (page.editable?.fallbackReason) {
+          slide.notes = `Imported as a page image: ${page.editable.fallbackReason}.`;
+          warnings.push(`Page ${page.number}: ${slide.notes}`);
+        }
+        slides.push(slide);
+      }
+    }, request.signal, pageSize.endsWith("-4k") ? 3840 : 2560, mode);
     request.signal.throwIfAborted();
     const deck = normalizeDeck({ title, ...size, slides });
     await createPresentation(deck, id);
     saved = true;
     try { revalidatePath("/admin/presentations"); }
     catch (error) { console.error("PDF import cache refresh failed", { importId: id, error }); }
-    return Response.json({ id, pages: slides.length }, { status: 201 });
+    return Response.json({ id, pages: slides.length, convertedPages, fallbackPages: mode === "editable" ? slides.length - convertedPages : 0, warnings }, { status: 201 });
   } catch (error) {
     console.error("PDF import failed", { importId: id, pagesRendered: slides.length, error });
     if (!saved) {

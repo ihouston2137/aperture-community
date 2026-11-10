@@ -10,6 +10,7 @@ import { sanitizeMediaPath } from "./protected-media-url";
 import type { StyleValues } from "./style-values";
 export type SlideObject = {
   id: string;
+  vectorPath?: { d: string; viewBox: string; fillRule: "nonzero" | "evenodd"; lineCap: "butt" | "round" | "square"; lineJoin: "miter" | "round" | "bevel"; miterLimit: number };
   /** Identifies objects materialized by Apply layout, separate from page content. */
   layoutSourceId?: string;
   shadow?: SlideShadow;
@@ -485,6 +486,14 @@ export function normalizeDeck(input: unknown): Deck {
             borderColor: string(o.borderColor, 100) || "#16181d",
             borderRadius: number(o.borderRadius, 0, 200, 0),
             id: id(o.id),
+            vectorPath: o.type === "block" && block?.type === "customShape" && o.vectorPath
+              && /^[MLCQZmlcqz0-9eE.,+\s-]+$/.test(o.vectorPath.d) && o.vectorPath.d.length <= 100000
+              && /^0 0 [\d.]+ [\d.]+$/.test(o.vectorPath.viewBox)
+              ? { d: o.vectorPath.d, viewBox: o.vectorPath.viewBox,
+                fillRule: o.vectorPath.fillRule === "evenodd" ? "evenodd" : "nonzero",
+                lineCap: o.vectorPath.lineCap === "round" ? "round" : o.vectorPath.lineCap === "square" ? "square" : "butt",
+                lineJoin: o.vectorPath.lineJoin === "round" ? "round" : o.vectorPath.lineJoin === "bevel" ? "bevel" : "miter",
+                miterLimit: number(o.vectorPath.miterLimit, 1, 1000, 10) } : undefined,
             layoutSourceId: string(o.layoutSourceId, 80) || undefined,
             type: o.type,
             x: number(o.x, -32000, 32000, 80),

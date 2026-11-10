@@ -29,7 +29,7 @@ export function ShapeToolbar({ object, shapes, disabled, update, onSettings }: {
   return <div className="deck-shape-tools">
     <fieldset className="deck-shape-toolbar" aria-label={custom ? "Custom shape controls" : "Shape controls"} disabled={disabled}>
       <label>Shape<select aria-label={custom ? "Toolbar custom shape" : "Toolbar shape"} value={(custom ? block.shapeSlug : block.shapeKind) || (custom ? "" : "rectangle")} onChange={event => select(event.target.value)}>
-        {custom ? <><option value="">Select a shape</option>{shapes.map(shape => <option key={shape.slug} value={shape.slug}>{shape.name}</option>)}</> : SHAPE_KINDS.map(kind => <option key={kind} value={kind}>{SHAPE_KIND_LABELS[kind]}</option>)}
+        {custom ? <><option value="">{object.vectorPath ? "Imported PDF shape" : "Select a shape"}</option>{shapes.map(shape => <option key={shape.slug} value={shape.slug}>{shape.name}</option>)}</> : SHAPE_KINDS.map(kind => <option key={kind} value={kind}>{SHAPE_KIND_LABELS[kind]}</option>)}
       </select></label>
       <label>Foreground<input type="color" aria-label="Shape foreground color" value={hex} onChange={event => setColor(formatColor(event.target.value, alpha))} /></label>
       <label>Transparency <span className="deck-shape-alpha"><input type="range" aria-label="Shape transparency" min={0} max={100} value={Math.round((1 - alpha) * 100)} onChange={event => setColor(formatColor(hex, 1 - Number(event.target.value) / 100))} /><output>{Math.round((1 - alpha) * 100)}%</output></span></label>

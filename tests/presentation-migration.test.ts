@@ -9,9 +9,75 @@ import { PDF_PAGE_SIZES, pdfDeckSize, pdfPageSlide, type PdfPageSize } from "../
 import { readPdfImportResponse } from "../lib/pdf-import-response";
 import { renderPdfSlides, PdfImportError } from "../lib/pdf-presentation";
 import { jsPDF } from "jspdf";
+import { createCanvas } from "@napi-rs/canvas";
 import { collectMediaRefs } from "../lib/media-usage";
 
 const source = () => ({ title: "Fixture", status: "draft", kind: "zine", presentationSize: { width: 1440, height: 1080 }, pages: [{ ...createPublicationPage(), id: "first" }] });
+
+test("editable PDF conversion preserves shapes, text styles, images, and stacking through save", async () => {
+  const pdf = new jsPDF({ unit: "pt", format: [600, 400], orientation: "landscape" });
+  pdf.setFillColor("#ff0000"); pdf.rect(20, 20, 100, 50, "F");
+  pdf.setDrawColor("#00ff00"); pdf.setLineWidth(2); pdf.ellipse(200, 100, 30, 20, "FD");
+  pdf.setFont("helvetica", "bolditalic"); pdf.setFontSize(20); pdf.setTextColor("#123456"); pdf.text("Hello <world>", 40, 150);
+  const image = createCanvas(20,20); image.getContext("2d").fillRect(0,0,20,20);
+  pdf.addImage(image.toDataURL("image/png"), "PNG", 200, 200, 30, 30);
+  let checked = false;
+  await renderPdfSlides(new Uint8Array(pdf.output("arraybuffer")), async page => {
+    assert.equal(page.editable?.fallbackReason, undefined);
+    const entries = page.editable!.objects;
+    assert.deepEqual(entries.map(entry => entry.object.type), ["block", "block", "text", "image"]);
+    const saved = normalizeDeck({ title: "Editable", aspect: "custom", pageUnit: "px", customWidth: page.width, customHeight: page.height, slides: [{ ...newSlide(), objects: entries.map(entry => entry.object) }] });
+    const [rectangle, ellipse, text, bitmap] = saved.slides[0].objects;
+    assert.equal(rectangle.block?.type, "customShape");
+    assert.equal(rectangle.block?.color, "rgba(255,0,0,1)");
+    assert.match(rectangle.vectorPath!.d, /^M.*L.*Z$/);
+    assert.match(ellipse.vectorPath!.d, /C/);
+    assert.equal(ellipse.block?.borderColor, "rgba(0,255,0,1)");
+    assert.ok(Math.abs(ellipse.block!.borderWidth! - (2 * 2560/600)/16) < 0.001);
+    assert.equal(text.color, "rgba(18,52,86,1)");
+    assert.equal(text.fontFamily, "Arial");
+    assert.match(text.html, /font-weight:bold/);
+    assert.match(text.html, /font-style:italic/);
+    assert.match(text.html, /Hello &lt;world&gt;/);
+    assert.ok(Math.abs(text.fontSize - 20*2560/600) < 0.001);
+    assert.ok(Math.abs(rectangle.x - 20*2560/600) < 0.001);
+    assert.equal(bitmap.locked, false);
+    assert.equal(entries[3].png!.subarray(1,4).toString(), "PNG");
+    assert.equal(entries[3].pixelWidth, 20);
+    assert.ok(page.editable!.warnings.some(warning => warning.includes("fonts")));
+    assert.deepEqual(duplicateSlide(saved.slides[0]).objects[0].vectorPath, rectangle.vectorPath);
+    checked = true;
+  }, undefined, 2560, "editable");
+  assert.ok(checked);
+});
+
+test("editable PDF conversion falls back per page for clipping and block limits", async () => {
+  const pdf = new jsPDF();
+  pdf.text("Supported page", 10, 10);
+  pdf.addPage();
+  pdf.rect(10, 10, 40, 40); pdf.clip(); pdf.discardPath(); pdf.text("Clipped", 20, 20);
+  pdf.addPage();
+  for (let i = 0; i < 101; i++) pdf.rect(10 + i % 10, 10 + Math.floor(i/10), 1, 1, "F");
+  const reasons: (string | undefined)[] = [];
+  await renderPdfSlides(new Uint8Array(pdf.output("arraybuffer")), async page => {
+    reasons.push(page.editable!.fallbackReason);
+    if (page.editable!.fallbackReason) {
+      assert.deepEqual(page.editable!.objects, []);
+      assert.equal(page.png.subarray(1,4).toString(), "PNG");
+    }
+  }, undefined, 2560, "editable");
+  assert.equal(reasons[0], undefined);
+  assert.match(reasons[1]!, /clip/i);
+  assert.match(reasons[2]!, /100-block/);
+});
+
+test("page-image mode does not invoke editable conversion", async () => {
+  const pdf = new jsPDF(); pdf.text("Default mode", 10, 10);
+  await renderPdfSlides(new Uint8Array(pdf.output("arraybuffer")), async page => {
+    assert.equal(page.editable, undefined);
+    assert.ok(page.png.length > 0);
+  });
+});
 
 test("PDF origin check accepts the configured public origin behind a proxy", () => {
   const request = (origin?: string, extra = {}) => new Request("http://localhost:3000/api/admin/presentations/import", {

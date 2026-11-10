@@ -128,7 +128,7 @@ export function SlideShape({
   const Component = block.type === "customShape" ? CustomShapeView : Shape;
   return (
     <Component
-      shape={shapes.find((s) => s.slug === block.shapeSlug)}
+      shape={object.vectorPath && !block.shapeSlug ? { ...object.vectorPath, paths: [object.vectorPath.d] } : shapes.find((s) => s.slug === block.shapeSlug)}
       kind={block.shapeKind ?? "rectangle"}
       width={object.width / 16}
       height={object.height / 16}

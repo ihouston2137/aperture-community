@@ -1,6 +1,7 @@
 import path from "node:path";
 import { createRequire } from "node:module";
 import type { Canvas, SKRSContext2D } from "@napi-rs/canvas";
+import { captureEditablePdf, convertEditablePdf, type EditablePdfPage } from "./pdf-editable";
 
 export const MAX_PDF_BYTES = 50 * 1024 * 1024;
 export const MAX_PDF_PAGES = 200;
@@ -13,6 +14,7 @@ export type PdfSlidePage = {
   width: number;
   height: number;
   png: Buffer;
+  editable?: EditablePdfPage;
 };
 
 /** Render sequentially so a large PDF never holds all of its page bitmaps in RAM. */
@@ -21,6 +23,7 @@ export async function renderPdfSlides(
   onPage: (page: PdfSlidePage) => Promise<void>,
   signal?: AbortSignal,
   renderEdge = RENDER_EDGE,
+  mode: "image" | "editable" = "image",
 ) {
   if (!data.length || data.length > MAX_PDF_BYTES)
     throw new PdfImportError("Choose a PDF smaller than 50 MB.");
@@ -63,6 +66,11 @@ export async function renderPdfSlides(
       const height = Math.max(1, Math.ceil(viewport.height));
       const surface = factory.create(width, height);
       try {
+        let captured = null;
+        if (mode === "editable") {
+          try { captured = await captureEditablePdf(page); }
+          catch (error) { console.warn("PDF editable data capture failed", { page: number, error }); }
+        }
         const render = page.render({
           canvas: null,
           canvasContext: surface.context as unknown as CanvasRenderingContext2D,
@@ -74,7 +82,8 @@ export async function renderPdfSlides(
         try { await render.promise; }
         finally { signal?.removeEventListener("abort", abort); }
         signal?.throwIfAborted();
-        await onPage({ number, width, height, png: await surface.canvas.encode("png") });
+        const editable = mode === "editable" ? await convertEditablePdf(page, captured, viewport, signal) : undefined;
+        await onPage({ number, width, height, png: await surface.canvas.encode("png"), editable });
       } finally {
         factory.destroy(surface);
         page.cleanup();
